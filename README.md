@@ -1,28 +1,27 @@
-# Personal Notes App
+# Tritou Notes
 
 Application de prise note en ligne perso (un siteweb) avec récupération de données en ligne.
 
 Il faut faire :
 
-- lier à une base de données postgresql pour stocker les données
 - scraper pour récupérer automatiquement des infos sur un site (pour faire de la veille)
 - clés api mistral pour ce qui est ia (simplifier du contenu, rechercher rapidement un mot, ...)
 
 TODO modèle :
 
-- [ ] user
+- [x] user
 - [ ] scraper
 - [ ] document
 
 TODO controller :
 
-- [ ] userController
+- [x] userController
 - [ ] scraperController
 - [ ] documentController
 
 TODO routes :
 
-- [ ] userRoutes
+- [x] userRoutes
 - [ ] scraperRoutes
 - [ ] documentRoutes
 
@@ -32,19 +31,45 @@ TODO middleware :
 
 TODO config :
 
-- [ ] dbClient (ou client simplement)
 - [ ] mistralClient
-- [ ] cronConfig
+- [ ] crons
 
 TODO utils :
 
 - [ ] jwtConfig
 
-## api
+Gestion des browsers pour les scrapers, à ne pas oublier de faire :
+
+- ne pas charger le css et les images
+- ouvrir et fermer le navigateur quand on a besoin et quand on a terminé avec
+
+## App (frontend)
+
+### Technos
+
+- TypeScript
+- React
+- Tailwind
+- Eslint
+- Vite
+
+## Api (backend)
+
+### Technos
+
+- TypeScript
+- Express
+- Dotenv
+- Eslint
+- Prettier
+
+### Structure
 
 ```
-ts-node-express/
+tritou-notes/
 ├── src/
+│   ├── prima/
+│   │   └── schema.prisma.ts   // Database schema
 │   ├── config/
 │   │   └── config.ts        // Load and type environment variables
 │   ├── controllers/
