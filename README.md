@@ -1,29 +1,53 @@
 # Tritou Notes
 
+## Structure
+
+```
+api/
+├── app/ // frontend app
+├── api/ // backend app (REST api)
+├── docker/
+│   ├── api/
+│   │   └── Dockerfile   // Database schema
+│   ├── app/
+│       └── Dockerfile   // Database schema
+└── README.md //
+```
+
 Application de prise note en ligne perso (un siteweb) avec récupération de données en ligne.
+
+- Possibilité de rendre des notes ouverte au public
+- Rajouter le fait que les visiteurs (ou que les gens connéctés) peuvent contribuer à une notes (créer un système de versionnening comme sur github)
+- Fonctionnalités ia que au utilisateur connécté (admin ou certain user)
+- Un dashboard avec les liste des users invités (et pouvoir inviter un user, ce qui lui envoie un mail avec ses identifiants à créer : username et password)
 
 Il faut faire :
 
 - scraper pour récupérer automatiquement des infos sur un site (pour faire de la veille)
 - clés api mistral pour ce qui est ia (simplifier du contenu, rechercher rapidement un mot, ...)
 
+Par défaut un user admin est défini lors de la première connection à l'app, il peut ensuite inviter d'autre user avec des permissions choisis. (une autre table à faire pour les permissions)
+
 TODO modèle :
 
 - [x] user
-- [ ] scraper
-- [ ] document
+- [x] scraper
+- [x] document
+- [ ] permission
 
 TODO controller :
 
 - [x] userController
 - [ ] scraperController
 - [ ] documentController
+- [ ] permissionController
 
 TODO routes :
 
 - [x] userRoutes
 - [ ] scraperRoutes
 - [ ] documentRoutes
+- [ ] permissionRoutes
 
 TODO middleware :
 
@@ -31,8 +55,9 @@ TODO middleware :
 
 TODO config :
 
-- [ ] mistralClient
+- [ ] anthropicClient
 - [ ] crons
+- [ ] mailClient
 
 TODO utils :
 
@@ -55,6 +80,20 @@ Gestion des browsers pour les scrapers, à ne pas oublier de faire :
 
 ## Api (backend)
 
+### Prisma
+
+Sync the schema with the database
+
+```sh
+npx prisma db push
+```
+
+Generate client :
+
+```sh
+npx prisma generate
+```
+
 ### Technos
 
 - TypeScript
@@ -66,7 +105,7 @@ Gestion des browsers pour les scrapers, à ne pas oublier de faire :
 ### Structure
 
 ```
-tritou-notes/
+api/
 ├── src/
 │   ├── prima/
 │   │   └── schema.prisma.ts   // Database schema
