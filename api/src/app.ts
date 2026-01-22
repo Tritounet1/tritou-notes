@@ -1,15 +1,21 @@
 import express from "express";
+import { authHandler } from "./middlewares/authMiddleware";
 import { errorHandler } from "./middlewares/errorHandler";
+import authRoutes from "./routes/authRoutes";
 import itemRoutes from "./routes/itemRoutes";
-import userRoutes from "./routes/userRoutes";
 
 const app = express();
 
 app.use(express.json());
 
-// Routes
+// Routes without connection need
+app.use("/auth", authRoutes);
+
+// Auth middleware for check if user is connected
+app.use(authHandler);
+
+// Routes with connection need
 app.use("/api/items", itemRoutes);
-app.use("/api/user", userRoutes);
 
 // Global error handler (should be after routes)
 app.use(errorHandler);

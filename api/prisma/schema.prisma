@@ -25,8 +25,8 @@ model User {
 model Document {
   id                Int               @id @default(autoincrement())
   title             String
-  text              String
-  public            Boolean
+  text              String            @default("")
+  public            Boolean           @default(false)
   created_at        DateTime          @default(now())
   last_update       DateTime          @default(now())
   author            User              @relation(fields: [authorId], references: [id])

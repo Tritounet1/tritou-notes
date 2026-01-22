@@ -61,7 +61,14 @@ TODO config :
 
 TODO utils :
 
-- [ ] jwtConfig
+- [x] bcryptUtils
+- [ ] jwtUtils
+
+TODO docker :
+
+- [ ] tester le dockerfile de l'api
+- [ ] Finir le dockerfile de l'app (frontend avec nginx ou voir autre chose si trouvé mieux)
+- [ ] Finir le docker-compose
 
 Gestion des browsers pour les scrapers, à ne pas oublier de faire :
 
