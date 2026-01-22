@@ -14,8 +14,76 @@ datasource db {
 }
 
 model User {
-  id          Int      @id @default(autoincrement())
-  email       String   @unique
-  username    String
-  password    String
+  id                Int               @id @default(autoincrement())
+  email             String            @unique
+  username          String
+  password          String
+  documents         Document[]
+  documentHistories DocumentHistory[]
+}
+
+model Document {
+  id                Int               @id @default(autoincrement())
+  title             String
+  text              String
+  public            Boolean
+  created_at        DateTime          @default(now())
+  last_update       DateTime          @default(now())
+  author            User              @relation(fields: [authorId], references: [id])
+  authorId          Int
+  documentHistories DocumentHistory[]
+}
+
+model DocumentHistory {
+  id         Int      @id @default(autoincrement())
+  document   Document @relation(fields: [documentId], references: [id])
+  created_at DateTime @default(now())
+  documentId Int
+  author     User     @relation(fields: [authorId], references: [id])
+  authorId   Int
+}
+
+model Scraper {
+  id                     Int                  @id @default(autoincrement())
+  name                   String
+  description            String?
+  base_url               String[]
+  options                ScraperConfiguration @relation(fields: [scraperConfigurationId], references: [id])
+  status                 ScraperStatus        @default(DISABLE)
+  created_at             DateTime             @default(now())
+  last_update            DateTime             @default(now())
+  scraperConfigurationId Int
+}
+
+model InstanceScrape {
+  id          Int                  @id @default(autoincrement())
+  url         String
+  status      InstanceScrapeStatus @default(IN_QUEUE)
+  created_at  DateTime             @default(now())
+  last_update DateTime             @default(now())
+}
+
+model ScraperConfiguration {
+  id       Int       @id @default(autoincrement())
+  code     String
+  browser  Boolean
+  scrapers Scraper[]
+}
+
+enum InstanceScrapeStatus {
+  IN_QUEUE
+  STARTING
+  WORKING
+  FINISHED
+  ERROR
+}
+
+enum ScraperStatus {
+  ACTIVE
+  DISABLE
+}
+
+enum Role {
+  USER
+  ADMIN
 }
