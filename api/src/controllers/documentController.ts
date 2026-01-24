@@ -8,90 +8,140 @@ export const createDocument = async (
 ) => {
   try {
     const { title } = req.body;
-    const user = await prisma.document.create({
+    const author = await prisma.user.findFirst({ where: { id: req.user.id } });
+
+    if (!author) {
+      throw new Error("Utilisateur introuvable");
+    }
+    const document = await prisma.document.create({
       data: {
         title: title,
-        author: null,
+        author: {
+          connect: { id: author.id },
+        },
       },
     });
-    res.status(201).json(user);
+    res.status(201).json(document);
   } catch (error) {
     next(error);
   }
 };
 
-export const getUsers = async (
+export const getDocuments = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const users = await prisma.user.findMany();
-    res.json(users);
+    const documents = await prisma.document.findMany();
+    res.json(documents);
   } catch (error) {
     next(error);
   }
 };
 
-export const getUserById = async (
+export const getDocumentById = async (
   req: Request<{ id: string }>,
   res: Response,
   next: NextFunction,
 ) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const user = await prisma.user.findUnique({
+    const document = await prisma.document.findUnique({
       where: {
         id: id,
       },
     });
-    if (!user) {
-      res.status(404).json({ message: "User not found" });
+    if (!document) {
+      res.status(404).json({ message: "Document not found" });
       return;
     }
-    res.json(user);
+    res.json(document);
   } catch (error) {
     next(error);
   }
 };
 
-export const updateUser = (
+export const updateDocument = async (
   req: Request<{ id: string }>,
   res: Response,
   next: NextFunction,
 ) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const { email, username, password } = req.body;
-    const user = prisma.user.update({
+    const { title, text, is_public } = req.body;
+
+    const previous_document = await prisma.document.findFirst({
+      where: { id: id },
+    });
+
+    if (!previous_document) {
+      throw new Error("Le document n'existe pas");
+    }
+
+    const author = await prisma.user.findFirst({ where: { id: req.user.id } });
+
+    if (!author) {
+      throw new Error("Utilisateur introuvable");
+    }
+
+    await prisma.documentHistory.create({
+      data: {
+        title: previous_document.title,
+        text: previous_document.text,
+        public: previous_document.public,
+        document: {
+          connect: {
+            id: id,
+          },
+        },
+        author: {
+          connect: {
+            id: author.id,
+          },
+        },
+      },
+    });
+
+    const document = await prisma.document.update({
       where: {
         id: id,
       },
       data: {
-        email: email,
-        username: username,
-        password: password,
+        title: title,
+        text: text,
+        author: {
+          connect: { id: author.id },
+        },
+        public: is_public,
+        last_update: new Date(),
       },
     });
-    res.json(user);
+
+    res.json(document);
   } catch (error) {
     next(error);
   }
 };
 
-export const deleteUser = (
+export const deleteDocument = async (
   req: Request<{ id: string }>,
   res: Response,
   next: NextFunction,
 ) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const deletedUser = prisma.user.delete({
+    const deletedDocument = await prisma.document.delete({
       where: {
         id: id,
       },
     });
-    res.json(deletedUser);
+    await prisma.documentHistory.deleteMany({
+      where: {
+        documentId: id,
+      },
+    });
+    res.json(deletedDocument);
   } catch (error) {
     next(error);
   }

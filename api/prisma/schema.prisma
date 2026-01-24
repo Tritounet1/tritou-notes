@@ -36,6 +36,9 @@ model Document {
 
 model DocumentHistory {
   id         Int      @id @default(autoincrement())
+  title      String
+  text       String
+  public     Boolean
   document   Document @relation(fields: [documentId], references: [id])
   created_at DateTime @default(now())
   documentId Int

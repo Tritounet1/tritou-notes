@@ -8,9 +8,10 @@ api/
 ├── api/ // backend app (REST api)
 ├── docker/
 │   ├── api/
-│   │   └── Dockerfile   // Database schema
+│   │   └── Dockerfile   // Dockerfile for backend app
 │   ├── app/
-│       └── Dockerfile   // Database schema
+│   │   └── Dockerfile   // Dockerfile for the frontend app
+│   └── docker-compose.yml //
 └── README.md //
 ```
 
@@ -30,45 +31,32 @@ Par défaut un user admin est défini lors de la première connection à l'app, 
 
 TODO modèle :
 
-- [x] user
-- [x] scraper
-- [x] document
 - [ ] permission
 
 TODO controller :
 
-- [x] userController
 - [ ] scraperController
-- [ ] documentController
 - [ ] permissionController
 
 TODO routes :
 
-- [x] userRoutes
 - [ ] scraperRoutes
-- [ ] documentRoutes
 - [ ] permissionRoutes
-
-TODO middleware :
-
-- [ ] authMiddleware
 
 TODO config :
 
-- [ ] anthropicClient
 - [ ] crons
 - [ ] mailClient
-
-TODO utils :
-
-- [x] bcryptUtils
-- [ ] jwtUtils
 
 TODO docker :
 
 - [ ] tester le dockerfile de l'api
 - [ ] Finir le dockerfile de l'app (frontend avec nginx ou voir autre chose si trouvé mieux)
 - [ ] Finir le docker-compose
+
+TODO final api :
+
+- [ ] clean le code quand les fondations de l'api sont fini (pas mal de code inutile utilisé au démarrage du projet)
 
 Gestion des browsers pour les scrapers, à ne pas oublier de faire :
 
