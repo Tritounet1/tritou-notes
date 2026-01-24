@@ -1,17 +1,38 @@
-import { NextFunction, Request, Response } from "express";
+import { NextFunction, Request, RequestHandler, Response } from "express";
+import { prisma } from "../config/prismaClient";
+import { decodeToken } from "../utils/jwtUtils";
 
 export interface AppError extends Error {
   status?: number;
 }
 
-export const authHandler = (
-  err: AppError,
+export const authHandler: RequestHandler = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
-  console.error(err);
-  res.status(err.status || 500).json({
-    message: err.message || "Internal Server Error",
-  });
+  try {
+    if (req.headers.authorization) {
+      const token = req.headers.authorization;
+      const verifytoken: any = decodeToken(token);
+      const user = await prisma.user.findFirst({
+        where: {
+          id: verifytoken.id,
+        },
+      });
+      if (!user) {
+        throw "User not found";
+      }
+      req.user = {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+      };
+      next();
+    } else {
+      throw "Authentication is required";
+    }
+  } catch (error) {
+    return res.status(400).json({ message: "Authorization required" });
+  }
 };
