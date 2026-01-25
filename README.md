@@ -15,7 +15,7 @@ api/
 └── README.md //
 ```
 
-Application de prise note en ligne perso (un siteweb) avec récupération de données en ligne.
+Application de prise note en ligne perso (un siteweb) avec récupération de données en ligne. (scraper)
 
 - Possibilité de rendre des notes ouverte au public
 - Rajouter le fait que les visiteurs (ou que les gens connéctés) peuvent contribuer à une notes (créer un système de versionnening comme sur github)

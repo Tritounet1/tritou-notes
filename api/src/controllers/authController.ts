@@ -26,7 +26,7 @@ export const login = async (
       });
       return;
     }
-    const isPasswordCorrect = await verifyPassword(user.password, password);
+    const isPasswordCorrect = await verifyPassword(password, user.password);
     if (!isPasswordCorrect) {
       res.status(401).json({
         error: "Invalid credentials",
@@ -66,7 +66,7 @@ export const register = async (
     }
     if (user !== undefined && user !== null) {
       res.status(401).json({
-        error: "User already exist with this credentials",
+        error: "User already exist with this username or email",
       });
       return;
     }
@@ -95,5 +95,3 @@ export const register = async (
     next(error);
   }
 };
-
-//
