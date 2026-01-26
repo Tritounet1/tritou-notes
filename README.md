@@ -32,6 +32,7 @@ Par défaut un user admin est défini lors de la première connection à l'app, 
 TODO modèle :
 
 - [ ] permission
+      -> Concernant modèle, c'est une table qui est déjà rempli avec toutes les permissions nécéssaires (accès dashboard, lancer scraper, créer scraper, modifier scraper, ...) donc sur le frontend on pourras pas créer des permissions seulement attribuer des permissions à des users. (Un compte admin qui est le compte principal et que des comptes user ou on décide les permisions, on peut ajouter d'autre admin mais c'est pas urgent ça)
 
 TODO controller :
 

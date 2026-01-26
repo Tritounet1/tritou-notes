@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
+import config from "./config";
 
 const client = new Anthropic({
-  apiKey: process.env["ANTHROPIC_API_KEY"],
+  apiKey: config.anthropicKey,
 });
 
 export const getAnthropicModels = async () => {

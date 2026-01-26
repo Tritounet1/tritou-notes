@@ -14,7 +14,10 @@ export const authHandler: RequestHandler = async (
   try {
     if (req.headers.authorization) {
       const token = req.headers.authorization;
-      const verifytoken: any = decodeToken(token);
+      if (!token) {
+        throw "Authentication is required";
+      }
+      const verifytoken: any = decodeToken(token.replace("Bearer ", ""));
       const user = await prisma.user.findFirst({
         where: {
           id: verifytoken.id,
