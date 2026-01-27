@@ -131,14 +131,14 @@ export const deleteDocument = async (
 ) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const deletedDocument = await prisma.document.delete({
-      where: {
-        id: id,
-      },
-    });
     await prisma.documentHistory.deleteMany({
       where: {
         documentId: id,
+      },
+    });
+    const deletedDocument = await prisma.document.delete({
+      where: {
+        id: id,
       },
     });
     res.json(deletedDocument);
