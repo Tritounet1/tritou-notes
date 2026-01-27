@@ -12,6 +12,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get("/health", (req, res) => res.sendStatus(200));
+
 // Routes without connection need
 app.use("/auth", authRoutes);
 

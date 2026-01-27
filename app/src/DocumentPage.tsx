@@ -32,8 +32,6 @@ function computeDiff(oldText: string, newText: string): DiffLine[] {
   const newLines = newText.split("\n");
   const diff: DiffLine[] = [];
 
-  const maxLen = Math.max(oldLines.length, newLines.length);
-
   let oldIndex = 0;
   let newIndex = 0;
 
