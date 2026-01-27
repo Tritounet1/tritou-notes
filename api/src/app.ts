@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import { authHandler } from "./middlewares/authMiddleware";
 import { errorHandler } from "./middlewares/errorHandler";
+import aiClientRoutes from "./routes/aiClientRoutes";
 import authRoutes from "./routes/authRoutes";
 import documentHistoryRoutes from "./routes/documentHistoryRoutes";
 import documentRoutes from "./routes/documentRoutes";
@@ -24,6 +25,7 @@ app.use(authHandler);
 app.use("/api/items", itemRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/document-histories", documentHistoryRoutes);
+app.use("/api/ai-client", aiClientRoutes);
 
 // Global error handler (should be after routes)
 app.use(errorHandler);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "./api";
 import { useAuth } from "./hooks/useAuth";
@@ -60,12 +60,12 @@ export const Dashboard = () => {
   };
 
   const filteredDocuments = documents
-    .filter((doc) =>
-      doc.title.toLowerCase().includes(search.toLowerCase())
-    )
+    .filter((doc) => doc.title.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       if (sortBy === "date") {
-        return new Date(b.last_update).getTime() - new Date(a.last_update).getTime();
+        return (
+          new Date(b.last_update).getTime() - new Date(a.last_update).getTime()
+        );
       }
       return a.title.localeCompare(b.title);
     });
@@ -77,32 +77,12 @@ export const Dashboard = () => {
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600">Bienvenue, {user?.username}</p>
         </div>
-
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <p className="text-sm text-gray-500 mb-1">Documents</p>
-            <p className="text-2xl font-semibold text-gray-900">
-              {documents.length}
-            </p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <p className="text-sm text-gray-500 mb-1">Publics</p>
-            <p className="text-2xl font-semibold text-gray-900">
-              {documents.filter((d) => d.public).length}
-            </p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <p className="text-sm text-gray-500 mb-1">Privés</p>
-            <p className="text-2xl font-semibold text-gray-900">
-              {documents.filter((d) => !d.public).length}
-            </p>
-          </div>
-        </div>
-
         <div className="bg-white rounded-lg shadow-sm">
           <div className="px-6 py-5 border-b border-gray-100 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Mes documents</h2>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Mes documents
+              </h2>
               <button
                 onClick={handleCreateDocument}
                 disabled={creating}

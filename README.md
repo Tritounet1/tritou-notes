@@ -18,8 +18,6 @@ api/
 Application de prise note en ligne perso (un siteweb) avec récupération de données en ligne. (scraper)
 
 - Possibilité de rendre des notes ouverte au public
-- Rajouter le fait que les visiteurs (ou que les gens connéctés) peuvent contribuer à une notes (créer un système de versionnening comme sur github)
-- Fonctionnalités ia que au utilisateur connécté (admin ou certain user)
 - Un dashboard avec les liste des users invités (et pouvoir inviter un user, ce qui lui envoie un mail avec ses identifiants à créer : username et password)
 
 Il faut faire :
@@ -51,9 +49,7 @@ TODO config :
 
 TODO docker :
 
-- [ ] tester le dockerfile de l'api
-- [ ] Finir le dockerfile de l'app (frontend avec nginx ou voir autre chose si trouvé mieux)
-- [ ] Finir le docker-compose
+- [ ] Finir le docker-compose (le Dockerfile à un problème)
 
 TODO final api :
 
