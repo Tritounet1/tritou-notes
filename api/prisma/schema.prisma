@@ -18,8 +18,10 @@ model User {
   email             String            @unique
   username          String
   password          String
+  role              Role              @default(USER)
   documents         Document[]
   documentHistories DocumentHistory[]
+  conversations     Conversation[]
 }
 
 model Document {
@@ -32,6 +34,12 @@ model Document {
   author            User              @relation(fields: [authorId], references: [id])
   authorId          Int
   documentHistories DocumentHistory[]
+  conversations     Conversation[]
+}
+
+enum DocumentType {
+  TEXT
+  EXCEL
 }
 
 model DocumentHistory {
@@ -47,30 +55,36 @@ model DocumentHistory {
 }
 
 model Scraper {
-  id                     Int                  @id @default(autoincrement())
-  name                   String
-  description            String?
-  base_url               String[]
-  options                ScraperConfiguration @relation(fields: [scraperConfigurationId], references: [id])
-  status                 ScraperStatus        @default(DISABLE)
-  created_at             DateTime             @default(now())
-  last_update            DateTime             @default(now())
-  scraperConfigurationId Int
+  id          Int           @id @default(autoincrement())
+  name        String
+  description String?       @default("")
+  code        String?       @default("")
+  browser     Boolean       @default(false)
+  base_url    String[]
+  status      ScraperStatus @default(DISABLE)
+  created_at  DateTime      @default(now())
+  last_update DateTime      @default(now())
 }
 
 model InstanceScrape {
   id          Int                  @id @default(autoincrement())
   url         String
+  response    Json?
   status      InstanceScrapeStatus @default(IN_QUEUE)
   created_at  DateTime             @default(now())
   last_update DateTime             @default(now())
 }
 
-model ScraperConfiguration {
-  id       Int       @id @default(autoincrement())
-  code     String
-  browser  Boolean
-  scrapers Scraper[]
+model Conversation {
+  id         Int       @id @default(autoincrement())
+  message    String
+  response   String
+  model_id   String
+  document   Document? @relation(fields: [documentId], references: [id])
+  documentId Int?
+  author     User?     @relation(fields: [authorId], references: [id])
+  authorId   Int?
+  created_at DateTime  @default(now())
 }
 
 enum InstanceScrapeStatus {

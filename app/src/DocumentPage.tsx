@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
+import { useNavigate, useParams } from "react-router-dom";
 import remarkGfm from "remark-gfm";
 import { apiFetch } from "./api";
 import { slashCommands } from "./commands";
@@ -42,6 +42,16 @@ interface ChatMessage {
   content: string;
 }
 
+interface Conversation {
+  id: number;
+  message: string;
+  response: string;
+  model_id: string;
+  documentId: number;
+  authorId: number;
+  created_at: string;
+}
+
 function computeDiff(oldText: string, newText: string): DiffLine[] {
   const oldLines = oldText.split("\n");
   const newLines = newText.split("\n");
@@ -73,7 +83,10 @@ function computeDiff(oldText: string, newText: string): DiffLine[] {
         diff.push({ type: "added", content: newLine });
         oldIndex++;
         newIndex++;
-      } else if (oldInNew !== -1 && (newInOld === -1 || oldInNew - newIndex <= newInOld - oldIndex)) {
+      } else if (
+        oldInNew !== -1 &&
+        (newInOld === -1 || oldInNew - newIndex <= newInOld - oldIndex)
+      ) {
         while (newIndex < oldInNew) {
           diff.push({ type: "added", content: newLines[newIndex] });
           newIndex++;
@@ -129,6 +142,24 @@ export const DocumentPage = () => {
   const aiTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        const response = await apiFetch(`/api/conversations/${id}`);
+        if (response.ok) {
+          const data: Conversation[] = await response.json();
+          // Transform conversations into chat messages
+          const messages: ChatMessage[] = [];
+          data.forEach((conv) => {
+            messages.push({ role: "user", content: conv.message });
+            messages.push({ role: "assistant", content: conv.response });
+          });
+          setChatMessages(messages);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
     const fetchDocument = async () => {
       try {
         const response = await apiFetch(`/api/documents/${id}`);
@@ -140,6 +171,8 @@ export const DocumentPage = () => {
         setTitle(data.title || "");
         setText(data.text || "");
         setIsPublic(data.public || false);
+        // Fetch conversations after document is loaded
+        fetchConversations();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erreur");
       } finally {
@@ -204,12 +237,15 @@ export const DocumentPage = () => {
     // Replace @file with actual document content for AI
     const messageForAi = userMessage.replace(
       /@file/g,
-      `[Document: ${title}]\n${text}\n[Fin du document]`
+      `[Document: ${title}]\n${text}\n[Fin du document]`,
     );
 
     setAiInput("");
     // Show the original message (with @file) to the user
-    setChatMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+    setChatMessages((prev) => [
+      ...prev,
+      { role: "user", content: userMessage },
+    ]);
     setAiLoading(true);
 
     try {
@@ -218,6 +254,7 @@ export const DocumentPage = () => {
         body: JSON.stringify({
           model_id: selectedModel,
           message: messageForAi,
+          document_id: document?.id,
         }),
       });
 
@@ -258,7 +295,7 @@ export const DocumentPage = () => {
   ];
 
   const filteredMentions = mentions.filter((m) =>
-    m.name.toLowerCase().startsWith(mentionSearch.toLowerCase())
+    m.name.toLowerCase().startsWith(mentionSearch.toLowerCase()),
   );
 
   const handleAiInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -381,7 +418,7 @@ export const DocumentPage = () => {
         setSaving(false);
       }
     },
-    [id]
+    [id],
   );
 
   const debouncedSave = useDebounce(saveDocument, 1000);
@@ -411,7 +448,7 @@ export const DocumentPage = () => {
 
   // Filter commands based on search
   const filteredCommands = slashCommands.filter((cmd) =>
-    cmd.name.toLowerCase().startsWith(commandSearch.toLowerCase())
+    cmd.name.toLowerCase().startsWith(commandSearch.toLowerCase()),
   );
 
   // Reset selected index when filtered commands change
@@ -490,7 +527,7 @@ export const DocumentPage = () => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setSelectedCommandIndex((prev) =>
-        prev < filteredCommands.length - 1 ? prev + 1 : prev
+        prev < filteredCommands.length - 1 ? prev + 1 : prev,
       );
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
@@ -755,7 +792,9 @@ export const DocumentPage = () => {
                   {text}
                 </Markdown>
               ) : (
-                <p className="text-gray-300">Cliquez pour écrire en Markdown...</p>
+                <p className="text-gray-300">
+                  Cliquez pour écrire en Markdown...
+                </p>
               )}
             </div>
           )}
@@ -888,7 +927,7 @@ export const DocumentPage = () => {
                               </span>
                             ) : (
                               part
-                            )
+                            ),
                           )
                         : msg.content}
                     </p>
@@ -940,7 +979,7 @@ export const DocumentPage = () => {
                   onChange={handleAiInputChange}
                   onKeyDown={handleAiKeyDown}
                   placeholder="Écrivez votre message... (@file pour inclure le document)"
-                  className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-800 resize-none min-h-[40px] max-h-[150px]"
+                  className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-800 resize-none min-h-[60px] max-h-[150px]"
                   disabled={aiLoading}
                   rows={1}
                 />
@@ -1070,7 +1109,10 @@ export const DocumentPage = () => {
                             ? `Changements depuis la version précédente`
                             : "Version initiale"}
                         </span>
-                        {history[selectedVersion].public !== (selectedVersion > 0 ? history[selectedVersion - 1]?.public : false) && (
+                        {history[selectedVersion].public !==
+                          (selectedVersion > 0
+                            ? history[selectedVersion - 1]?.public
+                            : false) && (
                           <span
                             className={`px-2 py-0.5 rounded text-xs ${
                               history[selectedVersion].public
@@ -1105,7 +1147,9 @@ export const DocumentPage = () => {
 
                       <div className="bg-gray-900 rounded-lg p-4 font-mono text-sm overflow-x-auto">
                         {getDiff().length === 0 ? (
-                          <p className="text-gray-500">Aucune modification du contenu</p>
+                          <p className="text-gray-500">
+                            Aucune modification du contenu
+                          </p>
                         ) : (
                           getDiff().map((line, index) => (
                             <div
@@ -1114,16 +1158,16 @@ export const DocumentPage = () => {
                                 line.type === "added"
                                   ? "bg-green-900/30 text-green-400"
                                   : line.type === "removed"
-                                  ? "bg-red-900/30 text-red-400"
-                                  : "text-gray-400"
+                                    ? "bg-red-900/30 text-red-400"
+                                    : "text-gray-400"
                               } px-2 py-0.5 -mx-2`}
                             >
                               <span className="select-none mr-2">
                                 {line.type === "added"
                                   ? "+"
                                   : line.type === "removed"
-                                  ? "-"
-                                  : " "}
+                                    ? "-"
+                                    : " "}
                               </span>
                               {line.content || " "}
                             </div>

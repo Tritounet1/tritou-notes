@@ -14,13 +14,10 @@ export const getAnthropicModels = async () => {
 };
 
 export const getResponse = async (model_id: string, content: string) => {
-  const message = await client.messages.create({
+  const response = await client.messages.create({
     max_tokens: 1024,
     messages: [{ role: "user", content: content }],
     model: model_id,
   });
-
-  console.log(message.content);
-
-  return message.content;
+  return response.content;
 };

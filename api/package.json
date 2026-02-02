@@ -7,6 +7,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/server.ts",
+    "dev:worker": "nodemon --watch 'src/worker.ts' --exec 'ts-node' src/worker.ts",
     "lint": "eslint 'src/**/*.ts'",
     "sync-database": "npx prisma db push"
   },
@@ -33,10 +34,19 @@
     "@anthropic-ai/sdk": "^0.71.2",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
+    "@types/cheerio": "^0.22.35",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/puppeteer": "^5.4.7",
     "bcrypt": "^6.0.0",
+    "bullmq": "^5.67.2",
+    "cheerio": "^1.2.0",
     "cors": "^2.8.6",
+    "ioredis": "^5.9.2",
     "jsonwebtoken": "^9.0.3",
-    "prisma": "^7.3.0"
+    "prisma": "^7.3.0",
+    "puppeteer": "^24.36.1",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "vm": "^0.1.0"
   }
 }
