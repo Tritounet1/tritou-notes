@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { API_URL } from "./api";
 import { useAuth } from "./hooks/useAuth";
 
@@ -99,15 +99,17 @@ export const Loginpage = () => {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-600">
-          Pas encore de compte ?{" "}
-          <Link
-            to="/register"
-            className="font-medium text-gray-800 hover:underline"
-          >
-            Inscrivez-vous
-          </Link>
-        </p>
+        {/*
+          <p className="mt-6 text-center text-sm text-gray-600">
+            Pas encore de compte ?{" "}
+            <Link
+              to="/register"
+              className="font-medium text-gray-800 hover:underline"
+            >
+              Inscrivez-vous
+            </Link>
+          </p>
+          */}
       </div>
     </div>
   );

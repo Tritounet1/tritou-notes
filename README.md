@@ -26,49 +26,25 @@ api/
 Il faut faire :
 
 - scraper pour récupérer automatiquement des infos sur un site (pour faire de la veille automatique)
-- trouver un meilleur nom de fichier pour les routes et controlleur : aiClientRoutes
 - améliorer l'utilisation de l'ia dans le front d'un document (l'ia peut automatiquement intégrer le contenu générer dans le document)
 - Modifier la sécurité du token (localStorage dans le front, mettre en place https Cookie ou chercher autre chose)
 - Rajouter un context des messages précédents envoyés à l'ia ? (ça peut être très couteux en token donc je pense pas)
 - Pouvoir créer des tableaux excel (donc avoir des documents ou on rajoute la colonne type : text (donc ce qu'il y a déjà) et excell pour tableau comme excell)
 - Connexion websocket pour la modifications des notes (avec la possibilité de la faire avec une autre personne et voir qui modifie quoi, ...)
-
-L'user admin peut ensuite inviter d'autre user avec des permissions choisis. (une autre table à faire pour les permissions)
-
-TODO modèle :
-
-- [ ] permission
-      -> Concernant modèle, c'est une table qui est déjà rempli avec toutes les permissions nécéssaires (accès dashboard, lancer scraper, créer scraper, modifier scraper, ...) donc sur le frontend on pourras pas créer des permissions seulement attribuer des permissions à des users. (Un compte admin qui est le compte principal et que des comptes user ou on décide les permisions, on peut ajouter d'autre admin mais c'est pas urgent ça)
-
-TODO controller :
-
-- [ ] permissionController
-
-TODO routes :
-
-- [ ] permissionRoutes
+- L'user admin peut inviter d'autre user et peut modifier les permissions de cette utilisateur. (par défaut tout est null)
 
 TODO config :
 
-- [ ] crons
-- [ ] mailClient
-
-TODO permissions :
-
-Les différentes permissions imaginer pour l'instant :
-
-- scraperModify # Permet de configurer les scrapers
-- scraperUse # Permet d'utiliser ou non les scrapers (c'est les instances de scrape)
-- scraperStatus # Permet de changer le status d'un scraper (draft, active, ...)
-- scraperDelete # Permet de supprimer un scraper
-- documentCreate
-- documentDelete
-- documentModify
-- aiUse
+- [ ] crons (pour automatiser les )
+- [ ] mailClient (pour envoyer le mail dès qu'on invite un user)
 
 TODO docker :
 
 - [ ] Finir le docker-compose (le Dockerfile du frontend à un problème)
+
+TODO important :
+
+- Vérifier la sécurité des routes, des users peuvent accéder à des ressources qui ne devrait pas.
 
 ## App (frontend)
 

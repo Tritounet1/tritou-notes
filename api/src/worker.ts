@@ -50,14 +50,16 @@ const scrapeWithBrowser = async (url: string, code: string) => {
     const $ = cheerio.load(htmlContent);
 
     const context = { $, result: null };
+
     vm.createContext(context);
     vm.runInContext(code, context);
 
-    console.log(context.result);
-
     await browser.close();
 
-    return context.result;
+    return {
+      url: url,
+      ...(context.result as any),
+    };
   } catch (e) {
     console.log("error : ", e);
   }
@@ -94,12 +96,12 @@ new Worker(
           base_url: {
             has: instanceScrapeBaseUrl,
           },
+          status: "ACTIVE",
         },
       });
 
       if (scraper === null || scraper === undefined) {
-        console.log("Error: Scraper not found.");
-        return;
+        throw "Error: Scraper not found";
       }
 
       if (
@@ -107,13 +109,11 @@ new Worker(
         scraper?.code === undefined ||
         scraper?.code === ""
       ) {
-        console.log("Error: Scraper don't have code.");
-        return;
+        throw "Error: Scraper don't have code.";
       }
 
       if (instanceScrape === null || instanceScrape === undefined) {
-        console.log("Error: Instance of scrape not found.");
-        return;
+        throw "Error: Instance of scrape not found.";
       }
 
       const response = await scrapeWithBrowser(
@@ -122,7 +122,7 @@ new Worker(
       );
 
       if (!response) {
-        return;
+        throw "Error: No response from scraper.";
       }
 
       await prisma.instanceScrape.update({
@@ -136,6 +136,14 @@ new Worker(
 
       console.log("Finish scraping for : ", instanceScrape?.id);
     } catch (e) {
+      await prisma.instanceScrape.update({
+        where: { id: job.data.id },
+        data: {
+          status: "ERROR",
+          last_update: new Date(),
+          response: { error: e as any }, // TODO: find the correct way to replace this any
+        },
+      });
       console.log("Error : ", e);
     }
   },

@@ -248,7 +248,7 @@ export const ScraperPage = () => {
       if (response.ok) {
         navigate("/scrapers");
       }
-    } catch (err) {
+    } catch {
       setError("Erreur lors de la suppression");
     }
   };
@@ -377,10 +377,8 @@ export const ScraperPage = () => {
                       : "bg-gray-100 text-gray-600"
               }`}
             >
-              <option value="draft">Draft</option>
-              <option value="active">Active</option>
-              <option value="paused">Paused</option>
-              <option value="error">Error</option>
+              <option value="DISABLE">Désactivé</option>
+              <option value="ACTIVE">Active</option>
             </select>
             <button
               onClick={handleDelete}

@@ -7,7 +7,6 @@ import { Dashboard } from "./Dashboard";
 import { DocumentPage } from "./DocumentPage";
 import { InstancesScrapePage } from "./InstancesScrapePage";
 import { Loginpage } from "./LoginPage";
-import { RegisterPage } from "./RegisterPage";
 import { ScraperPage } from "./ScraperPage";
 import { ScrapersPage } from "./ScrapersPage";
 
@@ -19,7 +18,9 @@ export const App = () => {
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/login" element={<Loginpage />} />
+          {/*
           <Route path="/register" element={<RegisterPage />} />
+            */}
           <Route path="/admin-auth" element={<AdminAuthPage />} />
           <Route
             path="/dashboard"

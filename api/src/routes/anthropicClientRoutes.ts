@@ -1,5 +1,8 @@
 import { Router } from "express";
-import { getModels, sendMessage } from "../controllers/aiClientController";
+import {
+  getModels,
+  sendMessage,
+} from "../controllers/anthropicClientController";
 
 const router = Router();
 

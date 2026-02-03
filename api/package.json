@@ -5,8 +5,9 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/server.js",
-    "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/server.ts",
+    "start:api": "node dist/server.js",
+    "start:worker": "node dist/worker.js",
+    "dev:api": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/server.ts",
     "dev:worker": "nodemon --watch 'src/worker.ts' --exec 'ts-node' src/worker.ts",
     "lint": "eslint 'src/**/*.ts'",
     "sync-database": "npx prisma db push"

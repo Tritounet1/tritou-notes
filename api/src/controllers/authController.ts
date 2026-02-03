@@ -33,12 +33,18 @@ export const login = async (
       });
       return;
     }
+    const userPermissions = await prisma.userPermissions.findFirst({
+      where: {
+        userId: user.id,
+      },
+    });
     const jwtToken = createToken(user.id.toString(), user.username, user.email);
     res.status(201).json({
       user: {
         id: user.id,
         username: user.username,
         email: user.email,
+        userPermissions: userPermissions,
       },
       token: jwtToken,
     });

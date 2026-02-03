@@ -22,6 +22,7 @@ model User {
   documents         Document[]
   documentHistories DocumentHistory[]
   conversations     Conversation[]
+  userPermissions   UserPermissions?
 }
 
 model Document {
@@ -103,4 +104,20 @@ enum ScraperStatus {
 enum Role {
   USER
   ADMIN
+}
+
+model UserPermissions {
+  id                          Int     @id @default(autoincrement())
+  modifyScraper               Boolean @default(false)
+  useScraper                  Boolean @default(false)
+  modifyScraperStatus         Boolean @default(false)
+  deleteScraper               Boolean @default(false)
+  createDocument              Boolean @default(false)
+  deleteDocument              Boolean @default(false)
+  modifyDocument              Boolean @default(false)
+  useAiChatBot                Boolean @default(false)
+  accessScrapersPage          Boolean @default(false)
+  accessInstancesScrapersPage Boolean @default(false)
+  userId                      Int     @unique
+  user                        User    @relation(fields: [userId], references: [id])
 }

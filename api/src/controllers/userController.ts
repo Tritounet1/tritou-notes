@@ -15,6 +15,15 @@ export const createUser = async (
         password: password,
       },
     });
+    await prisma.userPermissions.create({
+      data: {
+        user: {
+          connect: {
+            id: user.id,
+          },
+        },
+      },
+    });
     res.status(201).json(user);
   } catch (error) {
     next(error);

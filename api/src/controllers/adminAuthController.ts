@@ -34,6 +34,26 @@ export const adminAuthPostRoute = async (
       },
     });
 
+    const userPermissions = await prisma.userPermissions.create({
+      data: {
+        modifyScraper: true,
+        useScraper: true,
+        modifyScraperStatus: true,
+        deleteScraper: true,
+        createDocument: true,
+        deleteDocument: true,
+        modifyDocument: true,
+        useAiChatBot: true,
+        accessScrapersPage: true,
+        accessInstancesScrapersPage: true,
+        user: {
+          connect: {
+            id: user.id,
+          },
+        },
+      },
+    });
+
     const jwtToken = createToken(user.id.toString(), user.username, user.email);
 
     res.status(201).json({
@@ -41,6 +61,7 @@ export const adminAuthPostRoute = async (
         id: user.id,
         username: user.username,
         email: user.email,
+        userPermissions: userPermissions,
       },
       token: jwtToken,
     });
