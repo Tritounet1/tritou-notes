@@ -23,6 +23,9 @@ RUN npm install
 # Copy app
 COPY api .
 
+# Generate Prisma client
+RUN npx prisma generate
+
 # Build TypeScript
 RUN npm run build
 
