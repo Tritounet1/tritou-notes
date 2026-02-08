@@ -1,15 +1,15 @@
 import { Router } from "express";
 import { prisma } from "../config/prismaClient";
-import { hashPassword } from "../utils/bcryptUtils";
-import { setAuthCookie } from "../utils/cookieUtils";
-import { createToken } from "../utils/jwtUtils";
-import { makeid } from "../utils/utils";
 import {
   registerWithInvitation,
   sendInvitation,
   verifyInvitation,
 } from "../controllers/adminAuthController";
 import { authHandler } from "../middlewares/authMiddleware";
+import { hashPassword } from "../utils/bcryptUtils";
+import { setAuthCookie } from "../utils/cookieUtils";
+import { createToken } from "../utils/jwtUtils";
+import { makeid } from "../utils/utils";
 
 const router = Router();
 
@@ -86,6 +86,7 @@ const initFirstAdmin = async () => {
       }
     });
 
+    // TODO: replace localhost par l'url du site à voir la variable d'env
     console.log(
       "admin auth page : http://localhost:5173/admin-auth?code=" + randomUrl,
     );
