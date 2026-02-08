@@ -17,7 +17,6 @@ interface Scraper {
   last_update: string;
 }
 
-// Mini-langage de scraping - documentation et autocomplétion
 const SCRAPER_COMMANDS = [
   {
     name: "fetch",
@@ -26,28 +25,16 @@ const SCRAPER_COMMANDS = [
     example: 'fetch("https://example.com")',
   },
   {
-    name: "select",
-    syntax: "select(selector)",
+    name: "select element(s) with css selector",
+    syntax: "select element(s) with css selector",
     description: "Sélectionne des éléments avec un sélecteur CSS",
-    example: 'select("div.content")',
-  },
-  {
-    name: "selectAll",
-    syntax: "selectAll(selector)",
-    description: "Sélectionne tous les éléments correspondants",
-    example: 'selectAll("li.item")',
+    example: '$("div.content")',
   },
   {
     name: "text",
     syntax: ".text()",
     description: "Extrait le texte d'un élément",
     example: 'select("h1").text()',
-  },
-  {
-    name: "html",
-    syntax: ".html()",
-    description: "Extrait le HTML interne d'un élément",
-    example: 'select("div").html()',
   },
   {
     name: "attr",
@@ -62,12 +49,6 @@ const SCRAPER_COMMANDS = [
     example: 'selectAll("li").each((el) => { ... })',
   },
   {
-    name: "find",
-    syntax: ".find(selector)",
-    description: "Recherche des éléments enfants",
-    example: 'select("ul").find("li")',
-  },
-  {
     name: "first",
     syntax: ".first()",
     description: "Retourne le premier élément",
@@ -78,36 +59,6 @@ const SCRAPER_COMMANDS = [
     syntax: ".last()",
     description: "Retourne le dernier élément",
     example: 'selectAll("li").last()',
-  },
-  {
-    name: "parent",
-    syntax: ".parent()",
-    description: "Retourne l'élément parent",
-    example: 'select("span").parent()',
-  },
-  {
-    name: "children",
-    syntax: ".children()",
-    description: "Retourne les éléments enfants directs",
-    example: 'select("ul").children()',
-  },
-  {
-    name: "next",
-    syntax: ".next()",
-    description: "Retourne l'élément suivant",
-    example: 'select("h2").next()',
-  },
-  {
-    name: "prev",
-    syntax: ".prev()",
-    description: "Retourne l'élément précédent",
-    example: 'select("p").prev()',
-  },
-  {
-    name: "filter",
-    syntax: ".filter(selector)",
-    description: "Filtre les éléments avec un sélecteur",
-    example: 'selectAll("li").filter(".active")',
   },
   {
     name: "map",
@@ -122,12 +73,6 @@ const SCRAPER_COMMANDS = [
     example: 'select("button").click()',
   },
   {
-    name: "type",
-    syntax: ".type(text)",
-    description: "Tape du texte dans un input (browser requis)",
-    example: 'select("input").type("hello")',
-  },
-  {
     name: "wait",
     syntax: "wait(ms)",
     description: "Attend un certain temps en millisecondes",
@@ -138,24 +83,6 @@ const SCRAPER_COMMANDS = [
     syntax: "waitFor(selector)",
     description: "Attend qu'un élément apparaisse",
     example: 'waitFor("div.loaded")',
-  },
-  {
-    name: "screenshot",
-    syntax: "screenshot(filename)",
-    description: "Prend une capture d'écran (browser requis)",
-    example: 'screenshot("page.png")',
-  },
-  {
-    name: "save",
-    syntax: "save(data)",
-    description: "Sauvegarde les données extraites",
-    example: "save({ title, price })",
-  },
-  {
-    name: "log",
-    syntax: "log(message)",
-    description: "Affiche un message dans les logs",
-    example: 'log("Scraping terminé")',
   },
 ];
 
@@ -335,7 +262,7 @@ export const ScraperPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">

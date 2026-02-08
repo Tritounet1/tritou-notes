@@ -84,7 +84,10 @@ export const InstancesScrapePage = () => {
   // Pagination
   const totalPages = Math.ceil(sortedInstances.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
-  const paginatedInstances = sortedInstances.slice(startIndex, startIndex + pageSize);
+  const paginatedInstances = sortedInstances.slice(
+    startIndex,
+    startIndex + pageSize,
+  );
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
@@ -101,14 +104,7 @@ export const InstancesScrapePage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-5xl mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Instances de Scrape</h1>
-          <p className="text-gray-500 mt-1">
-            Testez vos scrapers en lançant des instances sur des URLs
-          </p>
-        </div>
-
+      <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Formulaire de création */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -142,17 +138,26 @@ export const InstancesScrapePage = () => {
 
             <button
               type="button"
-              onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+              onClick={() =>
+                setSortOrder(sortOrder === "desc" ? "asc" : "desc")
+              }
               className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition"
             >
-              <span>{sortOrder === "desc" ? "Plus récent" : "Plus ancien"}</span>
+              <span>
+                {sortOrder === "desc" ? "Plus récent" : "Plus ancien"}
+              </span>
               <svg
                 className={`w-4 h-4 transition-transform ${sortOrder === "asc" ? "rotate-180" : ""}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
               </svg>
             </button>
           </div>
@@ -169,7 +174,9 @@ export const InstancesScrapePage = () => {
                   <div key={instance.id}>
                     <button
                       type="button"
-                      onClick={() => setExpandedId(isExpanded ? null : instance.id)}
+                      onClick={() =>
+                        setExpandedId(isExpanded ? null : instance.id)
+                      }
                       className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition text-left"
                     >
                       <div className="flex-1 min-w-0">
@@ -177,7 +184,10 @@ export const InstancesScrapePage = () => {
                           {instance.url}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          Créé le {new Date(instance.created_at).toLocaleString("fr-FR")}
+                          Créé le{" "}
+                          {new Date(instance.created_at).toLocaleString(
+                            "fr-FR",
+                          )}
                         </p>
                       </div>
 
@@ -190,7 +200,8 @@ export const InstancesScrapePage = () => {
                           {STATUS_CONFIG[instance.status].label}
                         </span>
 
-                        {(instance.status === "WORKING" || instance.status === "STARTING") && (
+                        {(instance.status === "WORKING" ||
+                          instance.status === "STARTING") && (
                           <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin" />
                         )}
 
@@ -257,7 +268,9 @@ export const InstancesScrapePage = () => {
 
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-600">
-                  {startIndex + 1}-{Math.min(startIndex + pageSize, instances.length)} sur {instances.length}
+                  {startIndex + 1}-
+                  {Math.min(startIndex + pageSize, instances.length)} sur{" "}
+                  {instances.length}
                 </span>
 
                 <div className="flex items-center gap-1 ml-4">
@@ -267,8 +280,18 @@ export const InstancesScrapePage = () => {
                     disabled={currentPage === 1}
                     className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
                   >
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                    <svg
+                      className="w-5 h-5 text-gray-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+                      />
                     </svg>
                   </button>
                   <button
@@ -277,8 +300,18 @@ export const InstancesScrapePage = () => {
                     disabled={currentPage === 1}
                     className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
                   >
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    <svg
+                      className="w-5 h-5 text-gray-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 19l-7-7 7-7"
+                      />
                     </svg>
                   </button>
                   <span className="px-3 text-sm text-gray-700">
@@ -286,12 +319,24 @@ export const InstancesScrapePage = () => {
                   </span>
                   <button
                     type="button"
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
                     disabled={currentPage === totalPages}
                     className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
                   >
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    <svg
+                      className="w-5 h-5 text-gray-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
                     </svg>
                   </button>
                   <button
@@ -300,8 +345,18 @@ export const InstancesScrapePage = () => {
                     disabled={currentPage === totalPages}
                     className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
                   >
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                    <svg
+                      className="w-5 h-5 text-gray-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 5l7 7-7 7M5 5l7 7-7 7"
+                      />
                     </svg>
                   </button>
                 </div>

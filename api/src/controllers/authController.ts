@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
 import { hashPassword, verifyPassword } from "../utils/bcryptUtils";
+import { clearAuthCookie, setAuthCookie } from "../utils/cookieUtils";
 import { createToken } from "../utils/jwtUtils";
 
 export const login = async (
@@ -38,15 +39,27 @@ export const login = async (
         userId: user.id,
       },
     });
-    const jwtToken = createToken(user.id.toString(), user.username, user.email);
-    res.status(201).json({
+    const jwtToken = createToken(
+      user.id.toString(),
+      user.username,
+      user.email,
+      user.role,
+    );
+
+    if (!jwtToken) {
+      throw new Error("Erreur lors de la creation du token");
+    }
+
+    setAuthCookie(res, jwtToken);
+
+    res.status(200).json({
       user: {
         id: user.id,
         username: user.username,
         email: user.email,
+        role: user.role,
         userPermissions: userPermissions,
       },
-      token: jwtToken,
     });
   } catch (error) {
     next(error);
@@ -84,18 +97,70 @@ export const register = async (
         password: hashedPassword,
       },
     });
+    const userPermissions = await prisma.userPermissions.findFirst({
+      where: {
+        id: newUser.id,
+      },
+    });
     const jwtToken = createToken(
       newUser.id.toString(),
       newUser.username,
       newUser.email,
+      newUser.role,
     );
+
+    if (!jwtToken) {
+      throw new Error("Erreur lors de la creation du token");
+    }
+
+    setAuthCookie(res, jwtToken);
+
     res.status(201).json({
       user: {
         id: newUser.id,
         username: newUser.username,
         email: newUser.email,
+        role: newUser.role,
+        userPermissions: userPermissions,
       },
-      token: jwtToken,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logout = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    clearAuthCookie(res);
+    res.status(200).json({ message: "Deconnexion reussie" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const me = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Non authentifie" });
+      return;
+    }
+
+    const userPermissions = await prisma.userPermissions.findFirst({
+      where: { userId: req.user.id },
+    });
+
+    res.json({
+      user: {
+        id: req.user.id,
+        username: req.user.username,
+        email: req.user.email,
+        role: req.user.role,
+        userPermissions,
+      },
     });
   } catch (error) {
     next(error);

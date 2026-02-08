@@ -1,6 +1,33 @@
 import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
 
+export const getUserPermissionsByUserId = async (
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+
+    if (req.user.role !== "ADMIN") {
+      res.json({
+        message: "You don't have access to this route.",
+      });
+      return;
+    }
+
+    const userPermissions = await prisma.userPermissions.findFirst({
+      where: {
+        userId: id,
+      },
+    });
+
+    res.json(userPermissions);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const updateUserPermissions = async (
   req: Request<{ id: string }>,
   res: Response,
@@ -23,7 +50,7 @@ export const updateUserPermissions = async (
 
     const user = await prisma.user.findFirst({
       where: {
-        id: req.body.user,
+        id: req.user.id,
       },
     });
 
@@ -36,7 +63,7 @@ export const updateUserPermissions = async (
 
     const userPermissions = await prisma.userPermissions.update({
       where: {
-        id: id,
+        userId: id,
       },
       data: {
         modifyScraper: modifyScraper,

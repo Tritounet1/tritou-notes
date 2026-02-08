@@ -89,11 +89,6 @@ export const ScrapersPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Scrapers</h1>
-          <p className="text-gray-600">Gérez vos scrapers de données</p>
-        </div>
-
         <div className="bg-white rounded-lg shadow-sm">
           <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">
@@ -128,9 +123,7 @@ export const ScrapersPage = () => {
                   className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900">
-                      {scraper.name}
-                    </p>
+                    <p className="font-medium text-gray-900">{scraper.name}</p>
                     {scraper.description && (
                       <p className="text-sm text-gray-500 truncate">
                         {scraper.description}
@@ -140,13 +133,15 @@ export const ScrapersPage = () => {
                   <div className="flex items-center gap-3 ml-4">
                     <span
                       className={`px-2 py-0.5 text-xs rounded ${getStatusColor(
-                        scraper.status
+                        scraper.status,
                       )}`}
                     >
                       {scraper.status || "draft"}
                     </span>
                     <span className="text-xs text-gray-400">
-                      {new Date(scraper.last_update).toLocaleDateString("fr-FR")}
+                      {new Date(scraper.last_update).toLocaleDateString(
+                        "fr-FR",
+                      )}
                     </span>
                     <svg
                       className="w-4 h-4 text-gray-400"

@@ -7,7 +7,7 @@ export const createDocument = async (
   next: NextFunction,
 ) => {
   try {
-    const { title } = req.body;
+    const { title, type } = req.body;
     const author = await prisma.user.findFirst({ where: { id: req.user.id } });
 
     if (!author) {
@@ -16,6 +16,7 @@ export const createDocument = async (
     const document = await prisma.document.create({
       data: {
         title: title,
+        type: type,
         author: {
           connect: { id: author.id },
         },

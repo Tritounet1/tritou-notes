@@ -12,32 +12,20 @@ export const authHandler: RequestHandler = async (
   next: NextFunction,
 ) => {
   try {
-    /* TODO: pas fonctionnel à changer
-    if (req.path.startsWith("/api/documents/")) {
-      const documentId = req.path.split("/")[3];
-      console.log("On est dans document : ", documentId);
-      if (documentId) {
-        console.log("testtt");
-        const document = await prisma.document.findFirst({
-          where: { id: parseInt(documentId) },
-        });
-        console.log("document : ", document);
-        if (document?.public) {
-          return next();
-        }
-      }
-    }
-    */
+    // Recuperer le token depuis le cookie ou le header Authorization
+    let token: string | undefined;
 
-    if (req.headers.authorization) {
-      const token = req.headers.authorization;
-      if (!token) {
-        throw "Authentication is required";
-      }
-      const verifytoken: any = decodeToken(token.replace("Bearer ", ""));
-      const user = await prisma.user.findFirst({
+    if (req.cookies?.auth_token) {
+      token = req.cookies.auth_token;
+    } else if (req.headers.authorization) {
+      token = req.headers.authorization.replace("Bearer ", "");
+    }
+
+    if (token) {
+      const verifytoken: any = decodeToken(token);
+      const user = await prisma.user.findUnique({
         where: {
-          id: verifytoken.id,
+          id: parseInt(verifytoken.id),
         },
       });
       if (!user) {
@@ -47,12 +35,26 @@ export const authHandler: RequestHandler = async (
         id: user.id,
         email: user.email,
         username: user.username,
+        role: user.role,
       };
-      next();
-    } else {
-      throw "Authentication is required";
+      return next();
     }
+
+    // Permettre l'acces aux documents publics sans auth
+    if (req.path.startsWith("/api/documents/")) {
+      const documentId = req.path.split("/")[3];
+      if (documentId) {
+        const document = await prisma.document.findFirst({
+          where: { id: parseInt(documentId) },
+        });
+        if (document?.public) {
+          return next();
+        }
+      }
+    }
+
+    throw "Authentication is required";
   } catch (error) {
-    return res.status(400).json({ message: "Authorization required" });
+    return res.status(401).json({ message: "Authorization required" });
   }
 };

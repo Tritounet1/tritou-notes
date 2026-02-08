@@ -38,11 +38,12 @@ export const AdminAuthPage = () => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/admin-auth/${code}`, {
+      const response = await fetch(`${API_URL}/api/admin-auth/${code}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({ email, username, password }),
       });
 
@@ -52,24 +53,9 @@ export const AdminAuthPage = () => {
         throw new Error(data.error || "Erreur lors de l'inscription");
       }
 
-      // Login after registration
-      const loginResponse = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, username, password }),
-      });
-
-      const loginData = await loginResponse.json();
-
-      if (loginResponse.ok) {
-        login(loginData.token, loginData.user);
-        navigate("/dashboard");
-      } else {
-        // Registration succeeded but login failed, redirect to login
-        navigate("/login");
-      }
+      // Le cookie est deja defini par le backend
+      login(data.user);
+      navigate("/dashboard");
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Erreur lors de l'inscription",

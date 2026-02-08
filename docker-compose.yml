@@ -8,9 +8,22 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: default_database
     volumes:
-      - /var/lib/postgresql/data/
+      - postgres-data:/var/lib/postgresql/data/
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U username"]
+      interval: 5s
+      retries: 5
+      timeout: 5s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       retries: 5
       timeout: 5s
@@ -21,8 +34,16 @@ services:
       dockerfile: docker/api/Dockerfile
     ports:
       - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://username:password@database:5432/default_database
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      FRONTEND_URL: http://localhost:5173
+      NODE_ENV: production
     depends_on:
       database:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
@@ -30,9 +51,29 @@ services:
       retries: 5
       start_period: 10s
 
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://username:password@database:5432/default_database
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   app:
     build:
       context: .
       dockerfile: docker/app/Dockerfile
     ports:
-      - "5173:5173"
+      - "5173:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:
+  redis-data:

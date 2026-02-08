@@ -1,44 +1,65 @@
-import { useState, type ReactNode } from "react";
-import { AuthContext } from "../context/AuthContext";
-
-interface User {
-  id: number;
-  username: string;
-  email: string;
-}
-
-function getInitialToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("token");
-}
+import { useEffect, useState, type ReactNode } from "react";
+import { apiFetch } from "../api";
+import { AuthContext, type User } from "../context/AuthContext";
 
 function getInitialUser(): User | null {
   if (typeof window === "undefined") return null;
   const storedUser = localStorage.getItem("user");
-  return storedUser ? JSON.parse(storedUser) : null;
+  if (!storedUser) return null;
+  return JSON.parse(storedUser);
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(getInitialUser);
-  const [token, setToken] = useState<string | null>(getInitialToken);
+  const [loading, setLoading] = useState(true);
 
-  const login = (newToken: string, newUser: User) => {
-    setToken(newToken);
+  // Verifier l'authentification au chargement
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await apiFetch("/auth/me");
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
+        } else {
+          setUser(null);
+        }
+      } catch {
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  const login = (newUser: User) => {
     setUser(newUser);
-    localStorage.setItem("token", newToken);
-    localStorage.setItem("user", JSON.stringify(newUser));
   };
 
-  const logout = () => {
-    setToken(null);
+  const logout = async () => {
+    try {
+      await apiFetch("/auth/logout", { method: "POST" });
+    } catch {
+      // Ignorer les erreurs
+    }
     setUser(null);
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
   };
+
+  const isAdmin = user?.role === "ADMIN";
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-gray-500">Chargement...</p>
+      </div>
+    );
+  }
 
   return (
     <AuthContext.Provider
-      value={{ user, token, login, logout, isAuthenticated: !!token }}
+      value={{ user, login, logout, isAuthenticated: !!user, isAdmin }}
     >
       {children}
     </AuthContext.Provider>

@@ -4,6 +4,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import remarkGfm from "remark-gfm";
 import { apiFetch } from "./api";
 import { slashCommands } from "./commands";
+import { SpreadsheetEditor } from "./components/SpreadsheetEditor";
+import { TodoEditor } from "./components/TodoEditor";
+import { useAuth } from "./hooks/useAuth";
 import { useDebounce } from "./hooks/useDebounce";
 
 interface Document {
@@ -13,6 +16,7 @@ interface Document {
   public: boolean;
   last_update: string;
   authorId: number;
+  type: "TEXT" | "EXCEL" | "TODO";
 }
 
 interface HistoryEntry {
@@ -106,6 +110,7 @@ function computeDiff(oldText: string, newText: string): DiffLine[] {
 export const DocumentPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [document, setDocument] = useState<Document | null>(null);
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
@@ -594,61 +599,183 @@ export const DocumentPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        {isAuthenticated && (
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            Retour
-          </button>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              Retour
+            </button>
 
-          <div className="flex items-center gap-3">
-            {saving && (
-              <span className="text-xs text-gray-400">Sauvegarde...</span>
-            )}
-            <button
-              onClick={handleTogglePublic}
-              className={`px-3 py-1.5 text-sm rounded-md transition ${
-                isPublic
-                  ? "bg-green-100 text-green-700 hover:bg-green-200"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              {isPublic ? "Public" : "Privé"}
-            </button>
-            <button
-              onClick={handleDelete}
-              className="px-3 py-1.5 text-sm bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition"
-            >
-              Supprimer
-            </button>
+            <div className="flex items-center gap-3">
+              {saving && (
+                <span className="text-xs text-gray-400">Sauvegarde...</span>
+              )}
+              <button
+                onClick={handleTogglePublic}
+                className={`px-3 py-1.5 text-sm rounded-md transition ${
+                  isPublic
+                    ? "bg-green-100 text-green-700 hover:bg-green-200"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {isPublic ? "Public" : "Privé"}
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-3 py-1.5 text-sm bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition"
+              >
+                Supprimer
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="bg-white rounded-lg shadow-sm p-8">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => handleTitleChange(e.target.value)}
-            placeholder="Titre du document"
-            className="w-full text-3xl font-bold text-gray-900 border-none outline-none placeholder-gray-300 mb-6"
-          />
+        <div className={`bg-white rounded-lg shadow-sm ${document.type === "EXCEL" || document.type === "TODO" ? "flex flex-col h-[calc(100vh-200px)]" : "p-8"}`}>
+          <div className={document.type === "EXCEL" || document.type === "TODO" ? "px-6 py-4 border-b border-gray-100" : ""}>
+            {isAuthenticated ? (
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => handleTitleChange(e.target.value)}
+                placeholder="Titre du document"
+                className={`w-full text-3xl font-bold text-gray-900 border-none outline-none placeholder-gray-300 ${document.type === "EXCEL" || document.type === "TODO" ? "" : "mb-6"}`}
+              />
+            ) : (
+              <h1 className={`text-3xl font-bold text-gray-900 ${document.type === "EXCEL" || document.type === "TODO" ? "" : "mb-6"}`}>
+                {title || "Sans titre"}
+              </h1>
+            )}
+          </div>
 
-          {isEditing ? (
+          {document.type === "EXCEL" ? (
+            <SpreadsheetEditor
+              data={text}
+              onChange={handleTextChange}
+              readOnly={!isAuthenticated}
+            />
+          ) : document.type === "TODO" ? (
+            <TodoEditor
+              data={text}
+              onChange={handleTextChange}
+              readOnly={!isAuthenticated}
+            />
+          ) : !isAuthenticated ? (
+            <div className="min-h-[60vh] prose prose-gray max-w-none">
+              {text ? (
+                <Markdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    input: ({ checked }) => (
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        readOnly
+                        className="mr-2 h-4 w-4 rounded border-gray-300 text-gray-800 focus:ring-gray-800"
+                      />
+                    ),
+                    h1: ({ children }) => (
+                      <h1 className="text-3xl font-bold text-gray-900 mt-6 mb-4 first:mt-0">
+                        {children}
+                      </h1>
+                    ),
+                    h2: ({ children }) => (
+                      <h2 className="text-2xl font-semibold text-gray-900 mt-5 mb-3">
+                        {children}
+                      </h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className="text-xl font-semibold text-gray-900 mt-4 mb-2">
+                        {children}
+                      </h3>
+                    ),
+                    p: ({ children }) => (
+                      <p className="text-gray-700 mb-4 leading-relaxed">
+                        {children}
+                      </p>
+                    ),
+                    ul: ({ children }) => (
+                      <ul className="list-disc list-inside mb-4 text-gray-700 space-y-1">
+                        {children}
+                      </ul>
+                    ),
+                    ol: ({ children }) => (
+                      <ol className="list-decimal list-inside mb-4 text-gray-700 space-y-1">
+                        {children}
+                      </ol>
+                    ),
+                    li: ({ children, className }) => (
+                      <li
+                        className={`ml-2 ${
+                          className?.includes("task-list-item")
+                            ? "list-none flex items-center"
+                            : ""
+                        }`}
+                      >
+                        {children}
+                      </li>
+                    ),
+                    blockquote: ({ children }) => (
+                      <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-600 my-4">
+                        {children}
+                      </blockquote>
+                    ),
+                    code: ({ className, children }) => {
+                      const isBlock = className?.includes("language-");
+                      return isBlock ? (
+                        <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto my-4">
+                          <code className="text-sm font-mono">{children}</code>
+                        </pre>
+                      ) : (
+                        <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">
+                          {children}
+                        </code>
+                      );
+                    },
+                    pre: ({ children }) => <>{children}</>,
+                    a: ({ href, children }) => (
+                      <a
+                        href={href}
+                        className="text-blue-600 hover:underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {children}
+                      </a>
+                    ),
+                    hr: () => <hr className="my-6 border-gray-200" />,
+                    strong: ({ children }) => (
+                      <strong className="font-semibold text-gray-900">
+                        {children}
+                      </strong>
+                    ),
+                    em: ({ children }) => (
+                      <em className="italic">{children}</em>
+                    ),
+                  }}
+                >
+                  {text}
+                </Markdown>
+              ) : (
+                <p className="text-gray-300">Aucun contenu</p>
+              )}
+            </div>
+          ) : isEditing ? (
             <div className="relative">
               <textarea
                 ref={textareaRef}
@@ -805,48 +932,52 @@ export const DocumentPage = () => {
             Dernière modification :{" "}
             {new Date(document.last_update).toLocaleString("fr-FR")}
           </p>
-          <button
-            onClick={handleOpenHistory}
-            className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 transition"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          {isAuthenticated && (
+            <button
+              onClick={handleOpenHistory}
+              className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 transition"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            Historique
-          </button>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              Historique
+            </button>
+          )}
         </div>
       </div>
 
       {/* AI Chat Toggle Button */}
-      <button
-        onClick={handleOpenAiChat}
-        className="fixed right-0 top-1/2 -translate-y-1/2 bg-gray-800 text-white p-3 rounded-l-lg shadow-lg hover:bg-gray-700 transition z-40"
-        title="Ouvrir le chat IA"
-      >
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+      {isAuthenticated && (
+        <button
+          onClick={handleOpenAiChat}
+          className="fixed right-0 top-1/2 -translate-y-1/2 bg-gray-800 text-white p-3 rounded-l-lg shadow-lg hover:bg-gray-700 transition z-40"
+          title="Ouvrir le chat IA"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 19l-7-7 7-7"
-          />
-        </svg>
-      </button>
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+        </button>
+      )}
 
       {/* AI Chat Panel */}
       <div

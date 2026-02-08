@@ -34,6 +34,7 @@ model Document {
   last_update       DateTime          @default(now())
   author            User              @relation(fields: [authorId], references: [id])
   authorId          Int
+  type              DocumentType      @default(TEXT)
   documentHistories DocumentHistory[]
   conversations     Conversation[]
 }
@@ -41,6 +42,29 @@ model Document {
 enum DocumentType {
   TEXT
   EXCEL
+  TODO
+}
+
+model ScrapingScheduler {
+  id                      Int                     @id @default(autoincrement())
+  title                   String
+  description             String?
+  InstanceScrapes         InstanceScrape[]
+  cron_expression         String? // "0 0 */2 * *" (tous les 2 jours à minuit)
+  start_at                DateTime?
+  last_run_at             DateTime?
+  next_run_at             DateTime?
+  status                  ScrapingSchedulerStatus @default(DESACTIVATE)
+  update_at               DateTime                @default(now())
+  created_at              DateTime                @default(now())
+  instanceScrapeHistories InstanceScrapeHistory[]
+}
+
+enum ScrapingSchedulerStatus {
+  DESACTIVATE
+  RUNNING
+  ERROR
+  ACTIVATE
 }
 
 model DocumentHistory {
@@ -68,12 +92,27 @@ model Scraper {
 }
 
 model InstanceScrape {
-  id          Int                  @id @default(autoincrement())
-  url         String
-  response    Json?
-  status      InstanceScrapeStatus @default(IN_QUEUE)
-  created_at  DateTime             @default(now())
-  last_update DateTime             @default(now())
+  id                      Int                     @id @default(autoincrement())
+  url                     String
+  response                Json?
+  status                  InstanceScrapeStatus    @default(IN_QUEUE)
+  created_at              DateTime                @default(now())
+  last_update             DateTime                @default(now())
+  scrapingScheduler       ScrapingScheduler?      @relation(fields: [scrapingSchedulerId], references: [id])
+  scrapingSchedulerId     Int?
+  instanceScrapeHistories InstanceScrapeHistory[]
+}
+
+model InstanceScrapeHistory {
+  id                  Int                  @id @default(autoincrement())
+  url                 String
+  response            Json
+  status              InstanceScrapeStatus
+  created_at          DateTime             @default(now())
+  instanceScrape      InstanceScrape       @relation(fields: [instanceScrapeId], references: [id])
+  instanceScrapeId    Int
+  scrapingScheduler   ScrapingScheduler?   @relation(fields: [scrapingSchedulerId], references: [id])
+  scrapingSchedulerId Int?
 }
 
 model Conversation {
@@ -120,4 +159,13 @@ model UserPermissions {
   accessInstancesScrapersPage Boolean @default(false)
   userId                      Int     @unique
   user                        User    @relation(fields: [userId], references: [id])
+}
+
+model Invitation {
+  id         Int      @id @default(autoincrement())
+  email      String
+  token      String   @unique
+  used       Boolean  @default(false)
+  expires_at DateTime
+  created_at DateTime @default(now())
 }

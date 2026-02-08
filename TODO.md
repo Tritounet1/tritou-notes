@@ -1,0 +1,5 @@
+- Important à faire, réorganiser le projet, documenter le (README et surtout la base de données), créer des github actions (+ bien configurer prettier et eslint), créer des tests backend.
+- améliorer le code du frontend
+- Connexion websocket pour la modifications des notes (avec la possibilité de la faire avec une autre personne et voir qui modifie quoi, ...)
+- Vérifier la sécurité des routes, des users peuvent accéder à des ressources qui ne devrait pas.
+- Faire fonctionner les permissions dans les routes/frontend

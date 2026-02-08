@@ -1,0 +1,33 @@
+{
+  "name": "tritou-notes",
+  "version": "1.0.0",
+  "description": "Application de prise note en ligne perso.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:worker\" \"npm run dev:app\"",
+    "dev:api": "cd api && npm run dev:api",
+    "dev:worker": "cd api && npm run dev:worker",
+    "dev:app": "cd app && npm run dev",
+    "build": "npm run build:api && npm run build:app",
+    "build:api": "cd api && npm run prod",
+    "build:app": "cd app && npm run build",
+    "lint": "npm run lint:api && npm run lint:app",
+    "lint:api": "cd api && npm run lint",
+    "lint:app": "cd app && npm run lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tritounet1/tritou-notes.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Tritounet1/tritou-notes/issues"
+  },
+  "homepage": "https://github.com/Tritounet1/tritou-notes#readme",
+  "dependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

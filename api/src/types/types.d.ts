@@ -2,6 +2,7 @@ interface user {
   id: number;
   email: string;
   username: string;
+  role: string;
 }
 
 declare namespace Express {

@@ -8,17 +8,22 @@ export const createInstanceScrape = async (
   next: NextFunction,
 ) => {
   try {
-    const { url } = req.body;
+    const { url, scrapingSchedulerId } = req.body;
 
     const instanceScrape = await prisma.instanceScrape.create({
       data: {
         url: url,
+        scrapingSchedulerId: scrapingSchedulerId
+          ? parseInt(scrapingSchedulerId, 10)
+          : undefined,
       },
     });
 
-    await scrapeQueue.add("scrape-url", {
-      id: instanceScrape.id,
-    });
+    if (!scrapingSchedulerId) {
+      await scrapeQueue.add("scrape-url", {
+        id: instanceScrape.id,
+      });
+    }
 
     res.status(201).json(instanceScrape);
   } catch (error) {
@@ -56,6 +61,24 @@ export const getInstancesScrapeById = async (
       return;
     }
     res.json(instanceScrape);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteInstanceScrape = async (
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const deletedInstanceScrape = await prisma.instanceScrape.delete({
+      where: {
+        id: id,
+      },
+    });
+    res.json(deletedInstanceScrape);
   } catch (error) {
     next(error);
   }

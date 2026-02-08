@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const instanceScrapeController_1 = require("../controllers/instanceScrapeController");
+const router = (0, express_1.Router)();
+router.get("/", instanceScrapeController_1.getInstancesScrape);
+router.get("/:id", instanceScrapeController_1.getInstancesScrapeById);
+router.post("/", instanceScrapeController_1.createInstanceScrape);
+router.delete("/:id", instanceScrapeController_1.deleteInstanceScrape);
+exports.default = router;

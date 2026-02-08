@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const scrapingSchedulerController_1 = require("../controllers/scrapingSchedulerController");
+const router = (0, express_1.Router)();
+router.get("/", scrapingSchedulerController_1.getScrapingScheduler);
+router.get("/:id", scrapingSchedulerController_1.getScrapingSchedulerById);
+router.post("/", scrapingSchedulerController_1.createScrapingScheduler);
+router.put("/:id", scrapingSchedulerController_1.updateScrapingScheduler);
+router.delete("/:id", scrapingSchedulerController_1.deleteScrapingScheduler);
+exports.default = router;

@@ -1,3 +1,4 @@
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import { authHandler } from "./middlewares/authMiddleware";
@@ -8,19 +9,30 @@ import authRoutes from "./routes/authRoutes";
 import conversationRoutes from "./routes/conversationRoutes";
 import documentHistoryRoutes from "./routes/documentHistoryRoutes";
 import documentRoutes from "./routes/documentRoutes";
+import instanceScrapeHistoryRoutes from "./routes/instanceScrapeHistoryRoutes";
 import instanceScrapeRoutes from "./routes/instanceScrapeRoutes";
 import scraperRoutes from "./routes/scraperRoutes";
+import scrapingSchedulerRoutes from "./routes/scrapingSchedulerRoutes";
 import userPermissionsRoutes from "./routes/userPermissionsRoutes";
+import userRoutes from "./routes/userRoutes";
 
 const app = express();
 
-app.use(cors());
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+
+app.use(
+  cors({
+    origin: FRONTEND_URL,
+    credentials: true,
+  }),
+);
+app.use(cookieParser());
 app.use(express.json());
 
 app.use("/health", (req, res) => res.sendStatus(200));
 
-// Routes for init the first user (admin user)
-app.use("/admin-auth", authAdminRoutes);
+// Routes for init the first user (admin user) and invitations
+app.use("/api/admin-auth", authAdminRoutes);
 
 // Routes without connection need
 app.use("/auth", authRoutes);
@@ -36,6 +48,9 @@ app.use("/api/scrapers", scraperRoutes);
 app.use("/api/instance-scrape", instanceScrapeRoutes);
 app.use("/api/user-permissions", userPermissionsRoutes);
 app.use("/api/ai-client", anthropicClientRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/scraping-schedulers", scrapingSchedulerRoutes);
+app.use("/api/instance-scrape-histories", instanceScrapeHistoryRoutes);
 
 // Global error handler (should be after routes)
 app.use(errorHandler);

@@ -16,4 +16,4 @@ RUN npm run build
 EXPOSE 3000
 
 # Run database sync then start the server
-CMD sh -c "npm run sync-database && npm run start"
+CMD sh -c "npm run sync-database && npm run start:api"
