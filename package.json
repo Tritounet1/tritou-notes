@@ -29,5 +29,8 @@
   "homepage": "https://github.com/Tritounet1/tritou-notes#readme",
   "dependencies": {
     "concurrently": "^9.2.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2"
   }
 }
