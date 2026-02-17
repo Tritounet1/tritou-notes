@@ -1,6 +1,7 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
+import { prisma } from "./config/prismaClient";
 import { authHandler } from "./middlewares/authMiddleware";
 import { errorHandler } from "./middlewares/errorHandler";
 import anthropicClientRoutes from "./routes/anthropicClientRoutes";
@@ -13,12 +14,30 @@ import instanceScrapeHistoryRoutes from "./routes/instanceScrapeHistoryRoutes";
 import instanceScrapeRoutes from "./routes/instanceScrapeRoutes";
 import scraperRoutes from "./routes/scraperRoutes";
 import scrapingSchedulerRoutes from "./routes/scrapingSchedulerRoutes";
+import settingsRoutes from "./routes/settingsRoutes";
 import userPermissionsRoutes from "./routes/userPermissionsRoutes";
 import userRoutes from "./routes/userRoutes";
 
 const app = express();
 
+// TODO: move to config.ts
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+
+const initAppSettings = async () => {
+  try {
+    await prisma.settings.findFirstOrThrow({
+      where: {
+        id: 1,
+      },
+    });
+  } catch {
+    await prisma.settings.create({
+      data: {},
+    });
+  }
+};
+
+initAppSettings();
 
 app.use(
   cors({
@@ -26,6 +45,7 @@ app.use(
     credentials: true,
   }),
 );
+
 app.use(cookieParser());
 app.use(express.json());
 
@@ -51,6 +71,7 @@ app.use("/api/ai-client", anthropicClientRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/scraping-schedulers", scrapingSchedulerRoutes);
 app.use("/api/instance-scrape-histories", instanceScrapeHistoryRoutes);
+app.use("/api/settings", settingsRoutes);
 
 // Global error handler (should be after routes)
 app.use(errorHandler);

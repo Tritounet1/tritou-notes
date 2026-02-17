@@ -11,6 +11,7 @@ interface Config {
   smtpPassword: string;
   smtpHost: string;
   smtpPort: number;
+  encryptionKey: string;
 }
 
 const config: Config = {
@@ -23,6 +24,7 @@ const config: Config = {
   smtpPassword: process.env.SMTP_PASSWORD || "",
   smtpHost: process.env.SMTP_HOST || "",
   smtpPort: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 587,
+  encryptionKey: process.env.ENCRYPTION_KEY || "",
 };
 
 export default config;

@@ -88,13 +88,6 @@ export const Dashboard = () => {
               <h2 className="text-lg font-semibold text-gray-900">
                 Mes documents
               </h2>
-              <button
-                onClick={() => setShowNewDocModal(true)}
-                disabled={creating}
-                className="px-4 py-2 text-sm bg-gray-800 text-white rounded-md hover:bg-gray-700 transition disabled:opacity-50"
-              >
-                {creating ? "Création..." : "+ Nouveau document"}
-              </button>
             </div>
 
             <div className="flex items-center gap-6">
@@ -255,6 +248,33 @@ export const Dashboard = () => {
             )}
           </div>
         </div>
+
+        {/* Bouton Nouveau document */}
+        <button
+          type="button"
+          onClick={() => setShowNewDocModal(true)}
+          disabled={creating}
+          className="w-full mt-4 py-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-gray-400 hover:text-gray-600 hover:bg-white transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+        >
+          <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center transition">
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              />
+            </svg>
+          </div>
+          <span className="font-medium">
+            {creating ? "Création..." : "Nouveau document"}
+          </span>
+        </button>
       </div>
 
       {/* Modal nouveau document */}

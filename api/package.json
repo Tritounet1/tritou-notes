@@ -46,6 +46,7 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "cron-parser": "^5.5.0",
+    "crypto": "^1.0.1",
     "ioredis": "^5.9.2",
     "jsonwebtoken": "^9.0.3",
     "nodemailer": "^8.0.1",

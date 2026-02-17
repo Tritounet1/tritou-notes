@@ -14,6 +14,7 @@ import { ScrapingSchedulerPage } from "./ScrapingSchedulerPage";
 import { ScrapingSchedulersPage } from "./ScrapingSchedulersPage";
 import { UserPage } from "./UserPage";
 import { UsersPage } from "./UsersPage";
+import { SettingsPage } from "./SettingsPage";
 
 export const App = () => {
   return (
@@ -87,6 +88,14 @@ export const App = () => {
             element={
               <ProtectedRoute>
                 <UserPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
               </ProtectedRoute>
             }
           />
