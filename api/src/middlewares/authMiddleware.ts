@@ -54,7 +54,7 @@ export const authHandler: RequestHandler = async (
     }
 
     throw "Authentication is required";
-  } catch (error) {
+  } catch (_error) {
     return res.status(401).json({ message: "Authorization required" });
   }
 };

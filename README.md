@@ -103,3 +103,16 @@ api/
 ├── .eslintrc.js             // ESLint configuration
 └── .prettierrc              // Prettier configuration
 ```
+
+### Test ci
+
+```sh
+brew install act
+```
+
+Et pour le lancer :
+
+```sh
+act
+act --container-architecture linux/amd64
+```

@@ -48,7 +48,11 @@ const parseCellKey = (key: string): { row: number; col: number } | null => {
   return { row, col };
 };
 
-export const SpreadsheetEditor = ({ data, onChange, readOnly = false }: SpreadsheetEditorProps) => {
+export const SpreadsheetEditor = ({
+  data,
+  onChange,
+  readOnly = false,
+}: SpreadsheetEditorProps) => {
   const [cells, setCells] = useState<SpreadsheetData>(() => {
     try {
       return data ? JSON.parse(data) : {};
@@ -75,80 +79,99 @@ export const SpreadsheetEditor = ({ data, onChange, readOnly = false }: Spreadsh
   }, [cells, data, onChange]);
 
   // Calculate cell value (handle formulas)
-  const calculateValue = useCallback((cellKey: string, visited: Set<string> = new Set()): string => {
-    const cell = cells[cellKey];
-    if (!cell) return "";
+  const calculateValue = useCallback(
+    (cellKey: string, visited: Set<string> = new Set()): string => {
+      const cell = cells[cellKey];
+      if (!cell) return "";
 
-    const value = cell.formula || cell.value;
+      const value = cell.formula || cell.value;
 
-    if (!value.startsWith("=")) {
-      return value;
-    }
-
-    // Prevent circular references
-    if (visited.has(cellKey)) {
-      return "#CIRCULAR!";
-    }
-    visited.add(cellKey);
-
-    const formula = value.slice(1).toUpperCase();
-
-    try {
-      // Handle SUM function
-      const sumMatch = formula.match(/^SUM\(([A-Z]+\d+):([A-Z]+\d+)\)$/);
-      if (sumMatch) {
-        const start = parseCellKey(sumMatch[1]);
-        const end = parseCellKey(sumMatch[2]);
-        if (!start || !end) return "#REF!";
-
-        let sum = 0;
-        for (let r = Math.min(start.row, end.row); r <= Math.max(start.row, end.row); r++) {
-          for (let c = Math.min(start.col, end.col); c <= Math.max(start.col, end.col); c++) {
-            const key = getCellKey(r, c);
-            const val = parseFloat(calculateValue(key, new Set(visited)));
-            if (!isNaN(val)) sum += val;
-          }
-        }
-        return sum.toString();
+      if (!value.startsWith("=")) {
+        return value;
       }
 
-      // Handle AVERAGE function
-      const avgMatch = formula.match(/^AVERAGE\(([A-Z]+\d+):([A-Z]+\d+)\)$/);
-      if (avgMatch) {
-        const start = parseCellKey(avgMatch[1]);
-        const end = parseCellKey(avgMatch[2]);
-        if (!start || !end) return "#REF!";
+      // Prevent circular references
+      if (visited.has(cellKey)) {
+        return "#CIRCULAR!";
+      }
+      visited.add(cellKey);
 
-        let sum = 0;
-        let count = 0;
-        for (let r = Math.min(start.row, end.row); r <= Math.max(start.row, end.row); r++) {
-          for (let c = Math.min(start.col, end.col); c <= Math.max(start.col, end.col); c++) {
-            const key = getCellKey(r, c);
-            const val = parseFloat(calculateValue(key, new Set(visited)));
-            if (!isNaN(val)) {
-              sum += val;
-              count++;
+      const formula = value.slice(1).toUpperCase();
+
+      try {
+        // Handle SUM function
+        const sumMatch = formula.match(/^SUM\(([A-Z]+\d+):([A-Z]+\d+)\)$/);
+        if (sumMatch) {
+          const start = parseCellKey(sumMatch[1]);
+          const end = parseCellKey(sumMatch[2]);
+          if (!start || !end) return "#REF!";
+
+          let sum = 0;
+          for (
+            let r = Math.min(start.row, end.row);
+            r <= Math.max(start.row, end.row);
+            r++
+          ) {
+            for (
+              let c = Math.min(start.col, end.col);
+              c <= Math.max(start.col, end.col);
+              c++
+            ) {
+              const key = getCellKey(r, c);
+              const val = parseFloat(calculateValue(key, new Set(visited)));
+              if (!isNaN(val)) sum += val;
             }
           }
+          return sum.toString();
         }
-        return count > 0 ? (sum / count).toString() : "0";
+
+        // Handle AVERAGE function
+        const avgMatch = formula.match(/^AVERAGE\(([A-Z]+\d+):([A-Z]+\d+)\)$/);
+        if (avgMatch) {
+          const start = parseCellKey(avgMatch[1]);
+          const end = parseCellKey(avgMatch[2]);
+          if (!start || !end) return "#REF!";
+
+          let sum = 0;
+          let count = 0;
+          for (
+            let r = Math.min(start.row, end.row);
+            r <= Math.max(start.row, end.row);
+            r++
+          ) {
+            for (
+              let c = Math.min(start.col, end.col);
+              c <= Math.max(start.col, end.col);
+              c++
+            ) {
+              const key = getCellKey(r, c);
+              const val = parseFloat(calculateValue(key, new Set(visited)));
+              if (!isNaN(val)) {
+                sum += val;
+                count++;
+              }
+            }
+          }
+          return count > 0 ? (sum / count).toString() : "0";
+        }
+
+        // Handle simple cell references and arithmetic
+        const expression = formula.replace(/([A-Z]+\d+)/g, (match) => {
+          const val = calculateValue(match, new Set(visited));
+          const num = parseFloat(val);
+          return isNaN(num) ? "0" : num.toString();
+        });
+
+        // Evaluate simple arithmetic
+
+        const result = new Function(`return ${expression}`)();
+        return isNaN(result) ? "#ERROR!" : result.toString();
+      } catch {
+        return "#ERROR!";
       }
-
-      // Handle simple cell references and arithmetic
-      let expression = formula.replace(/([A-Z]+\d+)/g, (match) => {
-        const val = calculateValue(match, new Set(visited));
-        const num = parseFloat(val);
-        return isNaN(num) ? "0" : num.toString();
-      });
-
-      // Evaluate simple arithmetic
-      // eslint-disable-next-line no-new-func
-      const result = new Function(`return ${expression}`)();
-      return isNaN(result) ? "#ERROR!" : result.toString();
-    } catch {
-      return "#ERROR!";
-    }
-  }, [cells]);
+    },
+    [cells],
+  );
 
   const handleCellClick = (cellKey: string, e: React.MouseEvent) => {
     if (e.shiftKey && selectedCell) {
@@ -244,8 +267,16 @@ export const SpreadsheetEditor = ({ data, onChange, readOnly = false }: Spreadsh
         if (start && end) {
           setCells((prev) => {
             const newCells = { ...prev };
-            for (let r = Math.min(start.row, end.row); r <= Math.max(start.row, end.row); r++) {
-              for (let c = Math.min(start.col, end.col); c <= Math.max(start.col, end.col); c++) {
+            for (
+              let r = Math.min(start.row, end.row);
+              r <= Math.max(start.row, end.row);
+              r++
+            ) {
+              for (
+                let c = Math.min(start.col, end.col);
+                c <= Math.max(start.col, end.col);
+                c++
+              ) {
                 delete newCells[getCellKey(r, c)];
               }
             }
@@ -292,8 +323,12 @@ export const SpreadsheetEditor = ({ data, onChange, readOnly = false }: Spreadsh
     const minCol = Math.min(start.col, end.col);
     const maxCol = Math.max(start.col, end.col);
 
-    return current.row >= minRow && current.row <= maxRow &&
-           current.col >= minCol && current.col <= maxCol;
+    return (
+      current.row >= minRow &&
+      current.row <= maxRow &&
+      current.col >= minCol &&
+      current.col <= maxCol
+    );
   };
 
   return (
@@ -310,7 +345,13 @@ export const SpreadsheetEditor = ({ data, onChange, readOnly = false }: Spreadsh
         <div className="w-px h-5 bg-gray-300" />
         <input
           type="text"
-          value={editingCell ? editValue : (cells[selectedCell || ""]?.formula || cells[selectedCell || ""]?.value || "")}
+          value={
+            editingCell
+              ? editValue
+              : cells[selectedCell || ""]?.formula ||
+                cells[selectedCell || ""]?.value ||
+                ""
+          }
           onChange={(e) => {
             if (readOnly) return;
             if (editingCell) {
@@ -326,16 +367,17 @@ export const SpreadsheetEditor = ({ data, onChange, readOnly = false }: Spreadsh
             }
           }}
           className="flex-1 px-2 py-1 text-sm font-mono border-none outline-none bg-transparent"
-          placeholder={readOnly ? "" : "Entrez une valeur ou une formule (=SUM, =AVERAGE...)"}
+          placeholder={
+            readOnly
+              ? ""
+              : "Entrez une valeur ou une formule (=SUM, =AVERAGE...)"
+          }
           readOnly={readOnly}
         />
       </div>
 
       {/* Grid */}
-      <div
-        ref={gridRef}
-        className="flex-1 overflow-auto"
-      >
+      <div ref={gridRef} className="flex-1 overflow-auto">
         <table className="border-collapse min-w-full">
           <thead className="sticky top-0 z-10">
             <tr>
@@ -369,7 +411,7 @@ export const SpreadsheetEditor = ({ data, onChange, readOnly = false }: Spreadsh
                       key={colIndex}
                       className={`
                         w-24 min-w-24 h-7 border border-gray-200 p-0 relative
-                        ${isSelected ? "outline outline-2 outline-blue-500 z-10" : ""}
+                        ${isSelected ? "outline-2 outline-blue-500 z-10" : ""}
                         ${inSelection && !isSelected ? "bg-blue-50" : ""}
                         ${!isSelected && !inSelection ? "hover:bg-gray-50" : ""}
                       `}

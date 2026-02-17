@@ -91,10 +91,36 @@ export const UsersPage = () => {
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Liste des utilisateurs */}
         <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-100">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">
               Tous les utilisateurs ({users.length})
             </h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  // TODO: Exporter les utilisateurs
+                  console.log("TODO: Export users");
+                }}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition"
+                title="Exporter les utilisateurs"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </button>
+              <button
+                onClick={() => {
+                  // TODO: Importer des utilisateurs
+                  console.log("TODO: Import users");
+                }}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition"
+                title="Importer des utilisateurs"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {users.length === 0 ? (

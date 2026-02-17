@@ -31,10 +31,10 @@ export const updateSettings = async (
       },
       data: {
         anthropicApiKey: encrypt(anthropicApiKey),
-        smtpUser: smtpUser,
-        smtpPassword: smtpPassword,
-        smtpHost: smtpHost,
-        smtpPort: smtpPort,
+        smtpUser: encrypt(smtpUser),
+        smtpPassword: encrypt(smtpPassword),
+        smtpHost: encrypt(smtpHost),
+        smtpPort: parseInt(encrypt(smtpPort.toString())),
       },
     });
     res.json(settings);
