@@ -2,9 +2,10 @@ import crypto from "crypto";
 import config from "../config/config";
 
 const algorithm = "aes-256-gcm";
-const masterKey = Buffer.from(config.encryptionKey, "hex");
 
 export function encrypt(text: string) {
+  const masterKey = Buffer.from(config.encryptionKey, "hex");
+
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv(algorithm, masterKey, iv);
 
@@ -19,6 +20,8 @@ export function encrypt(text: string) {
 }
 
 export function decrypt(data: string) {
+  const masterKey = Buffer.from(config.encryptionKey, "hex");
+
   const b = Buffer.from(data, "base64");
 
   const iv = b.subarray(0, 12);
