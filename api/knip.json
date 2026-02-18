@@ -1,0 +1,3 @@
+{
+  "entry": ["src/server.ts", "src/worker.ts"]
+}

@@ -6,13 +6,14 @@ import {
   getUsers,
   updateUser,
 } from "../controllers/userController";
+import { adminMiddleware } from "../middlewares/adminMiddleware";
 
 const router = Router();
 
-router.get("/", getUsers);
-router.get("/:id", getUserById);
-router.post("/", createUser);
-router.put("/:id", updateUser);
-router.delete("/:id", deleteUser);
+router.get("/", adminMiddleware(), getUsers);
+router.get("/:id", adminMiddleware(), getUserById);
+router.post("/", adminMiddleware(), createUser);
+router.put("/:id", adminMiddleware(), updateUser);
+router.delete("/:id", adminMiddleware(), deleteUser);
 
 export default router;

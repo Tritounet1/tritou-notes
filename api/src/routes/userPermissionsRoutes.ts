@@ -3,10 +3,11 @@ import {
   getUserPermissionsByUserId,
   updateUserPermissions,
 } from "../controllers/userPermissionsController";
+import { adminMiddleware } from "../middlewares/adminMiddleware";
 
 const router = Router();
 
-router.get("/:id", getUserPermissionsByUserId);
-router.put("/:id", updateUserPermissions);
+router.get("/:id", adminMiddleware(), getUserPermissionsByUserId);
+router.put("/:id", adminMiddleware(), updateUserPermissions);
 
 export default router;
