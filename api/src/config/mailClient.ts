@@ -1,14 +1,28 @@
 import nodemailer from "nodemailer";
-import config from "./config";
+import SMTPTransport from "nodemailer/lib/smtp-transport";
+import { decrypt } from "../utils/utils";
+import { prisma } from "./prismaClient";
 
-const configOptions = {
-  host: config.smtpHost,
-  port: config.smtpPort,
-  secure: config.smtpPort === 465,
-  auth: {
-    user: config.smtpUser,
-    pass: config.smtpPassword,
-  },
+type ConfigOptions = SMTPTransport.Options | null;
+
+const getSmtpOptions = async (): Promise<ConfigOptions> => {
+  const settings = await prisma.settings.findFirst({
+    where: { id: 1 },
+  });
+
+  if (!settings) {
+    return null;
+  }
+
+  return {
+    host: settings.smtpHost ? decrypt(settings.smtpHost) : undefined,
+    port: settings.smtpPort ?? undefined,
+    secure: settings.smtpPort === 465,
+    auth: {
+      user: settings.smtpUser ? decrypt(settings.smtpUser) : undefined,
+      pass: settings.smtpPassword ? decrypt(settings.smtpPassword) : undefined,
+    },
+  };
 };
 
 export const sendEmail = async (
@@ -16,9 +30,13 @@ export const sendEmail = async (
   subject: string,
   content: string,
 ) => {
-  console.log("smtp : ", config.smtpHost);
+  const options = await getSmtpOptions();
 
-  const transporter = nodemailer.createTransport(configOptions);
+  if (!options) {
+    throw new Error("SMTP not configured");
+  }
+
+  const transporter = nodemailer.createTransport(options);
 
   try {
     await transporter.verify();
@@ -27,7 +45,7 @@ export const sendEmail = async (
   }
 
   const mailOptions = {
-    from: `tristan@tritounet.fr`,
+    from: options?.auth?.user ?? `tritou-notes@gmail.com`,
     to: to,
     subject: subject,
     html: content,

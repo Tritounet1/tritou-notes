@@ -412,31 +412,6 @@ export const SettingsPage = () => {
               </div>
             </div>
           </div>
-
-          {/* Future Settings Placeholder */}
-          <div className="bg-white rounded-lg shadow-sm p-6 border-2 border-dashed border-gray-200">
-            <div className="flex items-center gap-3 text-gray-400">
-              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                  />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold">Autres parametres</h2>
-                <p className="text-sm">A venir...</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

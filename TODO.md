@@ -13,3 +13,4 @@
 - modifier le mot de passe en prod du compte admin
 - Rajouter une vérification quand on invite un user sur l’e-mail (pour pas dupliquer et voir si c’est unique dans le schéma prima)
 - Voir avec nano banana pour créer un logo pour mon app Tritou Notes (voir insérer un chatbot pour créer des images)
+- Pouvoir mettre des images dans les documents textes
