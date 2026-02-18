@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "./api";
+import { useAuth } from "./hooks/useAuth";
 
 interface ScrapingScheduler {
   id: number;
@@ -16,6 +17,7 @@ interface ScrapingScheduler {
 
 export const ScrapingSchedulersPage = () => {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
   const [schedulers, setSchedulers] = useState<ScrapingScheduler[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -213,28 +215,30 @@ export const ScrapingSchedulersPage = () => {
         </div>
 
         {/* Bouton Nouveau planificateur */}
-        <button
-          type="button"
-          onClick={() => setShowModal(true)}
-          className="w-full mt-4 py-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-gray-400 hover:text-gray-600 hover:bg-white transition-all flex items-center justify-center gap-2 group"
-        >
-          <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center transition">
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-              />
-            </svg>
-          </div>
-          <span className="font-medium">Nouveau planificateur</span>
-        </button>
+        {hasPermission("modifyScraperStatus") && (
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="w-full mt-4 py-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-gray-400 hover:text-gray-600 hover:bg-white transition-all flex items-center justify-center gap-2 group"
+          >
+            <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center transition">
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                />
+              </svg>
+            </div>
+            <span className="font-medium">Nouveau planificateur</span>
+          </button>
+        )}
       </div>
 
       {/* Modal de creation */}

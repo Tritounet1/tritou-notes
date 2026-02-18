@@ -2,7 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
 export const Navigation = () => {
-  const { isAuthenticated, logout, user, isAdmin } = useAuth();
+  const { isAuthenticated, logout, user, isAdmin, hasPermission } = useAuth();
   const location = useLocation();
 
   if (!isAuthenticated) {
@@ -44,25 +44,31 @@ export const Navigation = () => {
           </Link>
 
           {/* Scrapers */}
-          <Link to="/scrapers" className={iconLinkClass("/scrapers")} title="Scrapers">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-            </svg>
-          </Link>
+          {hasPermission("accessScrapersPage") && (
+            <Link to="/scrapers" className={iconLinkClass("/scrapers")} title="Scrapers">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+              </svg>
+            </Link>
+          )}
 
           {/* Instances */}
-          <Link to="/instances" className={iconLinkClass("/instances")} title="Instances">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-            </svg>
-          </Link>
+          {hasPermission("accessInstancesScrapersPage") && (
+            <Link to="/instances" className={iconLinkClass("/instances")} title="Instances">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+              </svg>
+            </Link>
+          )}
 
           {/* Planificateurs */}
-          <Link to="/scraping-schedulers" className={iconLinkClass("/scraping-schedulers")} title="Planificateurs">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </Link>
+          {hasPermission("accessScrapersPage") && (
+            <Link to="/scraping-schedulers" className={iconLinkClass("/scraping-schedulers")} title="Planificateurs">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </Link>
+          )}
 
           {/* Utilisateurs */}
           {isAdmin && (

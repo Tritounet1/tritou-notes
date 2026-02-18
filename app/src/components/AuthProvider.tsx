@@ -1,6 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { apiFetch } from "../api";
-import { AuthContext, type User } from "../context/AuthContext";
+import { AuthContext, type PermissionKey, type User } from "../context/AuthContext";
 
 function getInitialUser(): User | null {
   if (typeof window === "undefined") return null;
@@ -49,6 +49,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const isAdmin = user?.role === "ADMIN";
 
+  const hasPermission = useCallback(
+    (...permissions: PermissionKey[]) => {
+      if (isAdmin) return true;
+      if (!user?.userPermissions) return false;
+      return permissions.every((perm) => user.userPermissions![perm]);
+    },
+    [user, isAdmin],
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -59,7 +68,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, isAuthenticated: !!user, isAdmin }}
+      value={{ user, login, logout, isAuthenticated: !!user, isAdmin, hasPermission }}
     >
       {children}
     </AuthContext.Provider>

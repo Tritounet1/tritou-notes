@@ -3,10 +3,11 @@ import {
   getModels,
   sendMessage,
 } from "../controllers/anthropicClientController";
+import { requirePermission } from "../middlewares/permissionsMiddleware";
 
 const router = Router();
 
-router.get("/", getModels);
-router.post("/", sendMessage);
+router.get("/", requirePermission("useAiChatBot"), getModels);
+router.post("/", requirePermission("useAiChatBot"), sendMessage);
 
 export default router;

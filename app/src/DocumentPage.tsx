@@ -110,7 +110,7 @@ function computeDiff(oldText: string, newText: string): DiffLine[] {
 export const DocumentPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, hasPermission } = useAuth();
   const [document, setDocument] = useState<Document | null>(null);
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
@@ -626,29 +626,43 @@ export const DocumentPage = () => {
               {saving && (
                 <span className="text-xs text-gray-400">Sauvegarde...</span>
               )}
-              <button
-                onClick={handleTogglePublic}
-                className={`px-3 py-1.5 text-sm rounded-md transition ${
-                  isPublic
-                    ? "bg-green-100 text-green-700 hover:bg-green-200"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                {isPublic ? "Public" : "Privé"}
-              </button>
-              <button
-                onClick={handleDelete}
-                className="px-3 py-1.5 text-sm bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition"
-              >
-                Supprimer
-              </button>
+              {hasPermission("modifyDocument") ? (
+                <button
+                  onClick={handleTogglePublic}
+                  className={`px-3 py-1.5 text-sm rounded-md transition ${
+                    isPublic
+                      ? "bg-green-100 text-green-700 hover:bg-green-200"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {isPublic ? "Public" : "Privé"}
+                </button>
+              ) : (
+                <span
+                  className={`px-3 py-1.5 text-sm rounded-md ${
+                    isPublic
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {isPublic ? "Public" : "Privé"}
+                </span>
+              )}
+              {hasPermission("deleteDocument") && (
+                <button
+                  onClick={handleDelete}
+                  className="px-3 py-1.5 text-sm bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition"
+                >
+                  Supprimer
+                </button>
+              )}
             </div>
           </div>
         )}
 
         <div className={`bg-white rounded-lg shadow-sm ${document.type === "EXCEL" || document.type === "TODO" ? "flex flex-col h-[calc(100vh-200px)]" : "p-8"}`}>
           <div className={document.type === "EXCEL" || document.type === "TODO" ? "px-6 py-4 border-b border-gray-100" : ""}>
-            {isAuthenticated ? (
+            {isAuthenticated && hasPermission("modifyDocument") ? (
               <input
                 type="text"
                 value={title}
@@ -667,15 +681,15 @@ export const DocumentPage = () => {
             <SpreadsheetEditor
               data={text}
               onChange={handleTextChange}
-              readOnly={!isAuthenticated}
+              readOnly={!isAuthenticated || !hasPermission("modifyDocument")}
             />
           ) : document.type === "TODO" ? (
             <TodoEditor
               data={text}
               onChange={handleTextChange}
-              readOnly={!isAuthenticated}
+              readOnly={!isAuthenticated || !hasPermission("modifyDocument")}
             />
-          ) : !isAuthenticated ? (
+          ) : !isAuthenticated || !hasPermission("modifyDocument") ? (
             <div className="min-h-[60vh] prose prose-gray max-w-none">
               {text ? (
                 <Markdown
@@ -957,7 +971,7 @@ export const DocumentPage = () => {
       </div>
 
       {/* AI Chat Toggle Button */}
-      {isAuthenticated && (
+      {isAuthenticated && hasPermission("useAiChatBot") && (
         <button
           onClick={handleOpenAiChat}
           className="fixed right-0 top-1/2 -translate-y-1/2 bg-gray-800 text-white p-3 rounded-l-lg shadow-lg hover:bg-gray-700 transition z-40"

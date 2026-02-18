@@ -23,12 +23,15 @@ export interface User {
   userPermissions?: UserPermissions | null;
 }
 
+export type PermissionKey = keyof Omit<UserPermissions, "id" | "userId">;
+
 export interface AuthContextType {
   user: User | null;
   login: (user: User) => void;
   logout: () => void;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  hasPermission: (...permissions: PermissionKey[]) => boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
