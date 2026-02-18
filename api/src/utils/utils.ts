@@ -6,6 +6,9 @@ const algorithm = "aes-256-gcm";
 export function encrypt(text: string) {
   const masterKey = Buffer.from(config.encryptionKey, "hex");
 
+  console.log("encryptionKey : ", config.encryptionKey);
+  console.log("text : ", text);
+
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv(algorithm, masterKey, iv);
 

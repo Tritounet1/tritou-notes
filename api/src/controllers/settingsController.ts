@@ -25,17 +25,17 @@ export const updateSettings = async (
     const { anthropicApiKey, smtpUser, smtpPassword, smtpHost, smtpPort } =
       req.body;
 
+    const data: Record<string, string | number | null | undefined> = {};
+
+    if (anthropicApiKey !== undefined) data.anthropicApiKey = anthropicApiKey ? encrypt(anthropicApiKey) : null;
+    if (smtpUser !== undefined) data.smtpUser = smtpUser ? encrypt(smtpUser) : null;
+    if (smtpPassword !== undefined) data.smtpPassword = smtpPassword ? encrypt(smtpPassword) : null;
+    if (smtpHost !== undefined) data.smtpHost = smtpHost ? encrypt(smtpHost) : null;
+    if (smtpPort !== undefined) data.smtpPort = smtpPort || null;
+
     const settings = await prisma.settings.update({
-      where: {
-        id: id,
-      },
-      data: {
-        anthropicApiKey: encrypt(anthropicApiKey),
-        smtpUser: encrypt(smtpUser),
-        smtpPassword: encrypt(smtpPassword),
-        smtpHost: encrypt(smtpHost),
-        smtpPort: parseInt(encrypt(smtpPort.toString())),
-      },
+      where: { id },
+      data,
     });
     res.json(settings);
   } catch (error) {
