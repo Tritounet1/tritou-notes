@@ -104,6 +104,13 @@ api/
 └── .prettierrc              // Prettier configuration
 ```
 
+### Run backend test
+
+```sh
+cd api/
+npm run test
+```
+
 ### Test ci
 
 ```sh
