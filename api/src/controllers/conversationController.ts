@@ -1,37 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
 
-export const createConversation = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const { message, response, model_id, document_id } = req.body;
-    const author = await prisma.user.findFirst({ where: { id: req.user.id } });
-
-    if (!author) {
-      throw new Error("Utilisateur introuvable");
-    }
-    const conversation = await prisma.conversation.create({
-      data: {
-        message: message,
-        response: response,
-        model_id: model_id,
-        author: {
-          connect: { id: author.id },
-        },
-        document: {
-          connect: { id: document_id },
-        },
-      },
-    });
-    res.status(201).json(conversation);
-  } catch (error) {
-    next(error);
-  }
-};
-
 export const getConversations = async (
   req: Request,
   res: Response,

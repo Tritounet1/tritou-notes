@@ -1,3 +1,4 @@
 {
-  "entry": ["src/server.ts", "src/worker.ts"]
+  "entry": ["src/server.ts", "src/worker.ts"],
+  "ignoreDependencies": ["@prisma/client"]
 }

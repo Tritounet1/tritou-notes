@@ -2,10 +2,6 @@ import { NextFunction, Request, RequestHandler, Response } from "express";
 import { prisma } from "../config/prismaClient";
 import { decodeToken } from "../utils/jwtUtils";
 
-export interface AppError extends Error {
-  status?: number;
-}
-
 export const authHandler: RequestHandler = async (
   req: Request,
   res: Response,
