@@ -32,8 +32,7 @@ Priorité à revoir
 - Mettre le README en anglais
 - Pouvoir appeler les scrapers dans le frontend et trouver un moyen pour que ça s’affiche pas en données brute (pouvoir que l’user choisi l’affichage avec un espèce de builder)
 - Faire la version mobile (l’ajuster car plein de truc sont cassés)
-- modifier le mot de passe en prod du compte admin
-- Voir avec nano banana pour créer un logo pour mon app Tritou Notes (voir insérer un chatbot pour créer des images)
+- Voir avec nano banana pour créer un logo pour mon app Tritou Notes
 - Pouvoir mettre des images dans les documents textes
 - Système de sous page
 - Système de dossier / sous dossier

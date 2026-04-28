@@ -66,6 +66,7 @@ export const login = async (
   }
 };
 
+/*
 export const register = async (
   req: Request,
   res: Response,
@@ -128,6 +129,7 @@ export const register = async (
     next(error);
   }
 };
+*/
 
 export const logout = async (
   req: Request,
@@ -172,7 +174,10 @@ export const changePassword = async (
     }
 
     const hashed = await hashPassword(newPassword);
-    await prisma.user.update({ where: { id: user.id }, data: { password: hashed } });
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashed },
+    });
 
     res.status(200).json({ message: "Mot de passe mis a jour" });
   } catch (error) {

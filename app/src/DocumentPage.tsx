@@ -299,6 +299,14 @@ export const DocumentPage = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
+  // Auto-resize textarea height to content
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
+    }
+  }, [text, isEditing]);
+
   // Mention system for @file
   const mentions = [
     {
@@ -896,7 +904,7 @@ export const DocumentPage = () => {
                 onKeyDown={handleKeyDown}
                 onBlur={handleStopEditing}
                 placeholder="Commencez à écrire en Markdown... (tapez / pour les commandes)"
-                className="w-full min-h-[60vh] text-gray-700 border-none outline-none resize-none placeholder-gray-300 leading-relaxed font-mono text-sm"
+                className="w-full min-h-[200px] text-gray-700 border-none outline-none resize-none overflow-hidden placeholder-gray-300 leading-relaxed font-mono text-sm"
               />
 
               {showCommands && filteredCommands.length > 0 && (

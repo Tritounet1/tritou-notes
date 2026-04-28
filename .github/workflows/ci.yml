@@ -7,7 +7,47 @@ on:
     branches: [main]
 
 jobs:
-  # Stage 1 : Lint
+  # Stage 1 : Lint + Unused dependencies
+  check-deps-backend:
+    name: Check Dependencies Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install dependencies
+        working-directory: api
+        run: npm ci --legacy-peer-deps
+
+      - name: Run knip
+        working-directory: api
+        run: npm run knip
+
+  check-deps-frontend:
+    name: Check Dependencies Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Run knip
+        working-directory: app
+        run: npm run knip
+
   lint-backend:
     name: Lint Backend
     runs-on: ubuntu-latest
@@ -51,7 +91,7 @@ jobs:
   # Stage 2 : Tests
   test-backend:
     name: Test Backend
-    needs: lint-backend
+    needs: [lint-backend, check-deps-backend]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,7 +138,7 @@ jobs:
 
   build-frontend:
     name: Build Frontend
-    needs: lint-frontend
+    needs: [lint-frontend, check-deps-frontend]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
