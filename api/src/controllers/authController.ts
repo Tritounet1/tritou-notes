@@ -142,6 +142,44 @@ export const logout = async (
   }
 };
 
+export const changePassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Non authentifie" });
+      return;
+    }
+
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ error: "Champs manquants" });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user) {
+      res.status(404).json({ error: "Utilisateur introuvable" });
+      return;
+    }
+
+    const isValid = await verifyPassword(currentPassword, user.password);
+    if (!isValid) {
+      res.status(401).json({ error: "Mot de passe actuel incorrect" });
+      return;
+    }
+
+    const hashed = await hashPassword(newPassword);
+    await prisma.user.update({ where: { id: user.id }, data: { password: hashed } });
+
+    res.status(200).json({ message: "Mot de passe mis a jour" });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const me = async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
