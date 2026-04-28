@@ -1,12 +1,11 @@
 import { NextFunction, Request, Response } from "express";
+import config from "../config/config";
 import { sendEmail } from "../config/mailClient";
 import { prisma } from "../config/prismaClient";
 import { hashPassword } from "../utils/bcryptUtils";
 import { setAuthCookie } from "../utils/cookieUtils";
 import { createToken } from "../utils/jwtUtils";
 import { makeid } from "../utils/utils";
-
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
 // Envoyer une invitation par email
 export const sendInvitation = async (
@@ -45,7 +44,7 @@ export const sendInvitation = async (
       },
     });
 
-    const inviteLink = `${FRONTEND_URL}/register?token=${token}`;
+    const inviteLink = `${config.frontendUrl}/register?token=${token}`;
 
     // Envoyer l'email
     await sendEmail(

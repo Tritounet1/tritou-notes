@@ -10,6 +10,10 @@ Prioritiés max :
 - Pouvoir installer l'app en une commande comme dokploy (docker)
 - Revoir le style de l'app
 - Revoir le code des scrapers / worker
+- Rajouter/Implémenter la route pour modifier le mot de passe dans les configurations
+- Faudrait qu'un user non admin puisse accéder au settings pour modifier son mot de passe
+- Revoir la page de création de scraper (documentation pas incroyable, et de l'autocomplétion dans la partie code serait bien) + rajouter un moyen de directement tester le scraper dans la page de scraper. (sans créer d'instance de scrape ?)
+- Dans une note TODO pour déplacer les tâches pour l'ordre
 
 Pour les tests :
 

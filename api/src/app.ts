@@ -1,6 +1,7 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
+import config from "./config/config";
 import { prisma } from "./config/prismaClient";
 import { authHandler } from "./middlewares/authMiddleware";
 import { errorHandler } from "./middlewares/errorHandler";
@@ -20,9 +21,6 @@ import userRoutes from "./routes/userRoutes";
 
 const app = express();
 
-// TODO: move to config.ts
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
-
 const initAppSettings = async () => {
   try {
     await prisma.settings.findFirstOrThrow({
@@ -41,7 +39,7 @@ initAppSettings();
 
 app.use(
   cors({
-    origin: FRONTEND_URL,
+    origin: config.frontendUrl,
     credentials: true,
   }),
 );
@@ -54,13 +52,13 @@ app.use("/health", (req, res) => res.sendStatus(200));
 // Routes for init the first user (admin user) and invitations
 app.use("/api/admin-auth", authAdminRoutes);
 
-// Routes without connection need
+// Routes without connection needed
 app.use("/auth", authRoutes);
 
 // Auth middleware for check if user is connected
 app.use(authHandler);
 
-// Routes with connection need
+// Routes with connection needed
 app.use("/api/documents", documentRoutes);
 app.use("/api/document-histories", documentHistoryRoutes);
 app.use("/api/conversations", conversationRoutes);
@@ -73,7 +71,7 @@ app.use("/api/scraping-schedulers", scrapingSchedulerRoutes);
 app.use("/api/instance-scrape-histories", instanceScrapeHistoryRoutes);
 app.use("/api/settings", settingsRoutes);
 
-// Global error handler (should be after routes)
+// Global error handler
 app.use(errorHandler);
 
 export default app;
