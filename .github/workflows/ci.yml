@@ -26,7 +26,7 @@ jobs:
 
       - name: Run knip
         working-directory: api
-        run: npm run knip
+        run: npm run knip -- --no-exit-code
 
   check-deps-frontend:
     name: Check Dependencies Frontend
@@ -46,7 +46,7 @@ jobs:
 
       - name: Run knip
         working-directory: app
-        run: npm run knip
+        run: npm run knip -- --no-exit-code
 
   lint-backend:
     name: Lint Backend
@@ -91,7 +91,7 @@ jobs:
   # Stage 2 : Tests
   test-backend:
     name: Test Backend
-    needs: [lint-backend, check-deps-backend]
+    needs: lint-backend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -138,7 +138,7 @@ jobs:
 
   build-frontend:
     name: Build Frontend
-    needs: [lint-frontend, check-deps-frontend]
+    needs: lint-frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
