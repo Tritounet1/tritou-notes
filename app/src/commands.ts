@@ -1,6 +1,7 @@
 export interface SlashCommand {
   name: string;
   description: string;
+  opensModal?: boolean;
   execute: (currentText: string, cursorPosition: number, commandStart: number) => {
     newText: string;
     newCursorPosition: number;
@@ -8,6 +9,19 @@ export interface SlashCommand {
 }
 
 export const slashCommands: SlashCommand[] = [
+  {
+    name: "scrape",
+    description: "Scrape une URL",
+    opensModal: true,
+    execute: (currentText, cursorPosition, commandStart) => {
+      const beforeCommand = currentText.slice(0, commandStart);
+      const afterCursor = currentText.slice(cursorPosition);
+      return {
+        newText: beforeCommand + afterCursor,
+        newCursorPosition: beforeCommand.length,
+      };
+    },
+  },
   {
     name: "hello",
     description: "Insère Hello,World!",

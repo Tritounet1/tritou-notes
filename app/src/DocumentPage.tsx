@@ -8,6 +8,7 @@ import { SpreadsheetEditor } from "./components/SpreadsheetEditor";
 import { TodoEditor } from "./components/TodoEditor";
 import { useAuth } from "./hooks/useAuth";
 import { useDebounce } from "./hooks/useDebounce";
+import { jsonToMarkdownTable } from "./utils/jsonToMarkdown";
 
 interface Document {
   id: number;
@@ -145,6 +146,13 @@ export const DocumentPage = () => {
   const [mentionSearch, setMentionSearch] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const aiTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Scrape modal state
+  const [showScrapeModal, setShowScrapeModal] = useState(false);
+  const [scrapeUrl, setScrapeUrl] = useState("");
+  const [scrapeLoading, setScrapeLoading] = useState(false);
+  const [scrapeError, setScrapeError] = useState("");
+  const scrapeInsertPosRef = useRef<number>(0);
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -451,6 +459,88 @@ export const DocumentPage = () => {
     }
   };
 
+  const SCRAPE_PLACEHOLDER = "\u23F3 Scraping en cours...";
+
+  const handleScrape = async () => {
+    if (!scrapeUrl.trim()) return;
+    setScrapeLoading(true);
+    setScrapeError("");
+
+    // Insert placeholder at the saved cursor position
+    const insertPos = scrapeInsertPosRef.current;
+    const beforeInsert = text.slice(0, insertPos);
+    const afterInsert = text.slice(insertPos);
+    const textWithPlaceholder = beforeInsert + SCRAPE_PLACEHOLDER + afterInsert;
+    setText(textWithPlaceholder);
+    debouncedSave(title, textWithPlaceholder, isPublic);
+    setShowScrapeModal(false);
+
+    try {
+      // Create the scrape instance
+      const createResponse = await apiFetch("/api/instance-scrape", {
+        method: "POST",
+        body: JSON.stringify({ url: scrapeUrl.trim() }),
+      });
+
+      if (!createResponse.ok) {
+        throw new Error("Erreur lors de la creation du scrape");
+      }
+
+      const instance = await createResponse.json();
+      const instanceId = instance.id;
+
+      // Poll for result
+      const poll = async () => {
+        const res = await apiFetch(`/api/instance-scrape/${instanceId}`);
+        if (!res.ok) throw new Error("Erreur lors du polling");
+        return res.json();
+      };
+
+      const pollInterval = setInterval(async () => {
+        try {
+          const data = await poll();
+
+          if (data.status === "FINISHED") {
+            clearInterval(pollInterval);
+            const markdown = jsonToMarkdownTable(data.response);
+            setText((current) => current.replace(SCRAPE_PLACEHOLDER, markdown));
+            // Save after replacing placeholder
+            setText((current) => {
+              debouncedSave(title, current, isPublic);
+              return current;
+            });
+            setScrapeLoading(false);
+          } else if (data.status === "ERROR") {
+            clearInterval(pollInterval);
+            const errorMsg = `**Erreur de scraping** : impossible de scraper ${scrapeUrl}`;
+            setText((current) => current.replace(SCRAPE_PLACEHOLDER, errorMsg));
+            setText((current) => {
+              debouncedSave(title, current, isPublic);
+              return current;
+            });
+            setScrapeLoading(false);
+          }
+        } catch {
+          clearInterval(pollInterval);
+          setText((current) => current.replace(SCRAPE_PLACEHOLDER, "**Erreur** : le scraping a echoue"));
+          setText((current) => {
+            debouncedSave(title, current, isPublic);
+            return current;
+          });
+          setScrapeLoading(false);
+        }
+      }, 3000);
+    } catch {
+      // Replace placeholder with error
+      setText((current) => current.replace(SCRAPE_PLACEHOLDER, "**Erreur** : impossible de lancer le scraping"));
+      setText((current) => {
+        debouncedSave(title, current, isPublic);
+        return current;
+      });
+      setScrapeLoading(false);
+    }
+  };
+
   // Filter commands based on search
   const filteredCommands = slashCommands.filter((cmd) =>
     cmd.name.toLowerCase().startsWith(commandSearch.toLowerCase()),
@@ -472,6 +562,14 @@ export const DocumentPage = () => {
     debouncedSave(title, result.newText, isPublic);
     setShowCommands(false);
     setCommandSearch("");
+
+    if (command.opensModal && command.name === "scrape") {
+      scrapeInsertPosRef.current = result.newCursorPosition;
+      setScrapeUrl("");
+      setScrapeError("");
+      setShowScrapeModal(true);
+      return;
+    }
 
     // Set cursor position after state update
     setTimeout(() => {
@@ -1182,6 +1280,72 @@ export const DocumentPage = () => {
           className="fixed inset-0 bg-black/20 z-40"
           onClick={() => setShowAiChat(false)}
         />
+      )}
+
+      {/* Scrape Modal */}
+      {showScrapeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Scrape une URL
+              </h2>
+              <button
+                onClick={() => setShowScrapeModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <input
+              type="url"
+              value={scrapeUrl}
+              onChange={(e) => setScrapeUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleScrape();
+                }
+              }}
+              placeholder="https://example.com/page"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-800 mb-4"
+              autoFocus
+            />
+
+            {scrapeError && (
+              <p className="text-sm text-red-500 mb-4">{scrapeError}</p>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowScrapeModal(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleScrape}
+                disabled={!scrapeUrl.trim() || scrapeLoading}
+                className="px-4 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Scraper
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showHistory && (

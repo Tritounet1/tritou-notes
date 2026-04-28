@@ -2,6 +2,7 @@
 
 Tritou Notes est une application très personnel (donc sur mes envies), de prise de notes et de veille, l'application regroupe plusieurs fonctionnalités dont :
 
+- Création de note simple (style word classique), de tableau excel et de liste TODO.
 - Récupération de données en ligne, avec des scrapers programmables.
 - Intégration de l'ia pour l'écriture / modification des documents.
 

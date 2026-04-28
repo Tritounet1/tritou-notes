@@ -140,6 +140,15 @@ export const registerWithInvitation = async (
       return;
     }
 
+    // Verifier si l'email est deja utilise
+    const existingUser = await prisma.user.findUnique({
+      where: { email: invitation.email },
+    });
+    if (existingUser) {
+      res.status(400).json({ error: "Cet email est deja utilise" });
+      return;
+    }
+
     // Creer l'utilisateur
     const hashedPassword = await hashPassword(password);
 

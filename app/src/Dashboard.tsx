@@ -99,8 +99,18 @@ export const Dashboard = () => {
                   className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition"
                   title="Exporter les documents"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
                   </svg>
                 </button>
                 <button
@@ -111,8 +121,18 @@ export const Dashboard = () => {
                   className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition"
                   title="Importer des documents"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                    />
                   </svg>
                 </button>
               </div>
@@ -364,9 +384,6 @@ export const Dashboard = () => {
                   <h4 className="text-base font-semibold text-gray-900 mb-1">
                     Document Texte
                   </h4>
-                  <p className="text-xs text-gray-500">
-                    Markdown, commandes slash et chat IA.
-                  </p>
                 </button>
 
                 {/* Document Excel */}
@@ -392,9 +409,6 @@ export const Dashboard = () => {
                   <h4 className="text-base font-semibold text-gray-900 mb-1">
                     Tableur Excel
                   </h4>
-                  <p className="text-xs text-gray-500">
-                    Cellules, formules et donnees.
-                  </p>
                 </button>
 
                 {/* Liste TODO */}
@@ -420,9 +434,6 @@ export const Dashboard = () => {
                   <h4 className="text-base font-semibold text-gray-900 mb-1">
                     Liste TODO
                   </h4>
-                  <p className="text-xs text-gray-500">
-                    Gerez vos taches facilement.
-                  </p>
                 </button>
               </div>
             </div>

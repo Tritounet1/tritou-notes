@@ -178,3 +178,9 @@ model Settings {
   smtpHost        String?
   smtpPort        Int?
 }
+
+model Images {
+  id         Int      @id @default(autoincrement())
+  name       String
+  created_at DateTime @default(now())
+}
