@@ -8,7 +8,7 @@ export const createToken = (
   role: string,
 ) => {
   if (config.secretKey === "") {
-    // TODO: must need to return a error cause SECRET_KEY is not in env ):
+    console.error("SECRET_KEY is not define in .env file.");
     return;
   }
 
@@ -25,7 +25,7 @@ export const createToken = (
 
 export const decodeToken = (token: string) => {
   if (!config.secretKey) {
-    // TODO: must need to return a error cause SECRET_KEY is not in env ):
+    console.error("SECRET_KEY is not define in .env file.");
     return;
   }
 

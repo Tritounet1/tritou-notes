@@ -1,4 +1,5 @@
 import { Router } from "express";
+import config from "../config/config";
 import { prisma } from "../config/prismaClient";
 import {
   registerWithInvitation,
@@ -86,9 +87,8 @@ const initFirstAdmin = async () => {
       }
     });
 
-    // TODO: replace localhost par l'url du site à voir la variable d'env
     console.log(
-      "admin auth page : http://localhost:5173/admin-auth?code=" + randomUrl,
+      `admin auth page : ${config.frontendUrl}/admin-auth?code=` + randomUrl,
     );
   }
 };
