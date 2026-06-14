@@ -32,23 +32,23 @@ npm run build
 1. `prisma generate` — génère le client TypeScript dans `src/generated/prisma/` à partir du schéma
 2. `tsc` — compile tout le TypeScript vers `dist/`
 
-## Configuration
+## Deux modes de fonctionnement
 
-Crée un fichier `.env` à la racine du dossier `mcp/` (copie `.env.example`) :
+Le serveur démarre en mode **stdio** (local) ou **HTTP** (production) selon la variable `MCP_HTTP_PORT`.
 
-```env
-DATABASE_URL=postgresql://user:password@localhost:5432/tritou_notes
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
-REDIS_USERNAME=
-REDIS_PASSWORD=
-```
+| Variable | Rôle |
+|---|---|
+| `DATABASE_URL` | Connexion PostgreSQL |
+| `REDIS_HOST` / `REDIS_PORT` | Connexion Redis |
+| `MCP_HTTP_PORT` | Si défini → mode HTTP sur ce port. Absent → mode stdio. |
+| `MCP_AUTH_TOKEN` | Token Bearer obligatoire en mode HTTP |
 
-Les valeurs sont les mêmes que dans `api/.env`.
+---
 
-## Ajout dans Claude Desktop
+## Mode local (stdio) — Claude Desktop sur la même machine que la DB
 
-Ouvre `~/Library/Application Support/Claude/claude_desktop_config.json` et ajoute :
+Crée `mcp/.env` (copie `.env.example`) avec tes valeurs, puis ouvre  
+`~/Library/Application Support/Claude/claude_desktop_config.json` :
 
 ```json
 {
@@ -66,8 +66,63 @@ Ouvre `~/Library/Application Support/Claude/claude_desktop_config.json` et ajout
 }
 ```
 
-Remplace `/chemin/absolu/vers/tritou-notes` par le chemin réel sur ta machine.  
-Redémarre Claude Desktop ensuite.
+Redémarre Claude Desktop.
+
+---
+
+## Mode production (HTTP) — DB sur un serveur distant
+
+### 1. Déployer le service MCP sur le serveur
+
+Ajoute `MCP_AUTH_TOKEN` dans un fichier `.env` à la racine du projet (même que les autres services) :
+
+```env
+MCP_AUTH_TOKEN=un_secret_long_et_aleatoire
+```
+
+Puis lance le service avec Docker Compose :
+
+```bash
+docker-compose up -d mcp
+```
+
+Le MCP tourne sur le port **3001** à l'intérieur du réseau Docker.
+
+### 2. Exposer via nginx (HTTPS obligatoire)
+
+Ajoute un bloc dans ta config nginx sur le serveur :
+
+```nginx
+location /mcp {
+    proxy_pass http://localhost:3001;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    proxy_buffering off;
+    proxy_cache off;
+}
+```
+
+Le `/health` ne nécessite pas de token : `https://ton-domaine.com/mcp/health` doit répondre `{"ok":true}`.
+
+### 3. Configurer Claude Desktop
+
+Dans `~/Library/Application Support/Claude/claude_desktop_config.json` :
+
+```json
+{
+  "mcpServers": {
+    "tritou-notes": {
+      "url": "https://ton-domaine.com/mcp",
+      "headers": {
+        "Authorization": "Bearer un_secret_long_et_aleatoire"
+      }
+    }
+  }
+}
+```
+
+Redémarre Claude Desktop.
 
 ## Après un changement de schéma Prisma
 
