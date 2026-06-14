@@ -1,4 +1,4 @@
-import { TemplateBlock } from "../types/scraper";
+import type { TemplateBlock } from "../types/scraper";
 
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) return "";

@@ -1,4 +1,4 @@
-import { TemplateBlock } from "../types/scraper";
+import type { TemplateBlock } from "../types/scraper";
 
 interface ScraperTemplateRendererProps {
   data: Record<string, unknown> | Record<string, unknown>[] | null;

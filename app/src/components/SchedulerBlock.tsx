@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { apiFetch } from "../api";
-import { TemplateBlock } from "../types/scraper";
+import type { TemplateBlock } from "../types/scraper";
 import { jsonToMarkdownTable } from "../utils/jsonToMarkdown";
 import { ScraperTemplateRenderer } from "./ScraperTemplateRenderer";
 

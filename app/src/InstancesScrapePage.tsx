@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "./api";
 import { ScraperTemplateRenderer } from "./components/ScraperTemplateRenderer";
-import { TemplateBlock } from "./types/scraper";
+import type { TemplateBlock } from "./types/scraper";
 
 interface InstanceScrape {
   id: number;

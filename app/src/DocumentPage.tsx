@@ -975,7 +975,7 @@ export const DocumentPage = () => {
                       {isEditingThis ? (
                         <div className="relative">
                           <textarea
-                            ref={el => textareaRefs.current.set(segIndex, el)}
+                            ref={el => { textareaRefs.current.set(segIndex, el); }}
                             value={seg.content}
                             onChange={e => handleSegmentChange(segIndex, e.target.value)}
                             onKeyDown={handleKeyDown}

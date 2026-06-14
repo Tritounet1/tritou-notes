@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiFetch } from "./api";
 import { useDebounce } from "./hooks/useDebounce";
-import { TemplateBlock } from "./types/scraper";
+import type { TemplateBlock } from "./types/scraper";
 
 interface Scraper {
   id: number;
