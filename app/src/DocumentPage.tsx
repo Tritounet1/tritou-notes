@@ -4,11 +4,62 @@ import { useNavigate, useParams } from "react-router-dom";
 import remarkGfm from "remark-gfm";
 import { apiFetch } from "./api";
 import { slashCommands } from "./commands";
+import { SchedulerBlock } from "./components/SchedulerBlock";
 import { SpreadsheetEditor } from "./components/SpreadsheetEditor";
 import { TodoEditor } from "./components/TodoEditor";
 import { useAuth } from "./hooks/useAuth";
 import { useDebounce } from "./hooks/useDebounce";
-import { jsonToMarkdownTable } from "./utils/jsonToMarkdown";
+import { jsonToMarkdownTable, templateToMarkdown } from "./utils/jsonToMarkdown";
+
+// ── Segment types for mixed text/scheduler documents ──────────────────────────
+type TextSegment = { type: "text"; content: string };
+type SchedulerSegment = { type: "scheduler"; id: number };
+type Segment = TextSegment | SchedulerSegment;
+
+const SCHEDULER_RE = /::scheduler\[(\d+)\]::/g;
+
+function parseSegments(text: string): Segment[] {
+  const segments: Segment[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  SCHEDULER_RE.lastIndex = 0;
+  while ((m = SCHEDULER_RE.exec(text)) !== null) {
+    if (m.index > last) segments.push({ type: "text", content: text.slice(last, m.index) });
+    segments.push({ type: "scheduler", id: parseInt(m[1]) });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) segments.push({ type: "text", content: text.slice(last) });
+  return segments.length ? segments : [{ type: "text", content: text }];
+}
+
+// Ensures a text segment exists before/after every scheduler segment so there
+// is always somewhere to type.
+function normalizeSegments(segs: Segment[]): Segment[] {
+  if (!segs.length) return [{ type: "text", content: "" }];
+  const out: Segment[] = [];
+  for (let i = 0; i < segs.length; i++) {
+    if (i === 0 && segs[i].type === "scheduler") out.push({ type: "text", content: "" });
+    out.push(segs[i]);
+    if (segs[i].type === "scheduler") {
+      const next = segs[i + 1];
+      if (!next || next.type === "scheduler") out.push({ type: "text", content: "" });
+    }
+  }
+  return out;
+}
+
+function segmentsToText(segs: Segment[]): string {
+  return segs.map(s => s.type === "text" ? s.content : `::scheduler[${s.id}]::`).join("");
+}
+
+function segmentGlobalOffset(segs: Segment[], upTo: number): number {
+  let offset = 0;
+  for (let i = 0; i < upTo; i++) {
+    const s = segs[i];
+    offset += s.type === "text" ? s.content.length : `::scheduler[${s.id}]::`.length;
+  }
+  return offset;
+}
 
 interface Document {
   id: number;
@@ -125,8 +176,8 @@ export const DocumentPage = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
 
-  const [isEditing, setIsEditing] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [editingSegmentIndex, setEditingSegmentIndex] = useState<number | null>(null);
+  const textareaRefs = useRef<Map<number, HTMLTextAreaElement | null>>(new Map());
 
   // Slash commands state
   const [showCommands, setShowCommands] = useState(false);
@@ -134,6 +185,12 @@ export const DocumentPage = () => {
   const [commandStartPos, setCommandStartPos] = useState(0);
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const commandMenuRef = useRef<HTMLDivElement>(null);
+
+  // Scheduler modal state
+  const [showSchedulerModal, setShowSchedulerModal] = useState(false);
+  const [schedulerList, setSchedulerList] = useState<{ id: number; title: string; status: string }[]>([]);
+  const [schedulerListLoading, setSchedulerListLoading] = useState(false);
+  const schedulerInsertRef = useRef<{ segIndex: number; cursorPos: number } | null>(null);
 
   // AI Chat state
   const [showAiChat, setShowAiChat] = useState(false);
@@ -299,13 +356,16 @@ export const DocumentPage = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
-  // Auto-resize textarea height to content
+  // Auto-resize active segment textarea
   useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
+    if (editingSegmentIndex !== null) {
+      const el = textareaRefs.current.get(editingSegmentIndex);
+      if (el) {
+        el.style.height = "auto";
+        el.style.height = el.scrollHeight + "px";
+      }
     }
-  }, [text, isEditing]);
+  }, [text, editingSegmentIndex]);
 
   // Mention system for @file
   const mentions = [
@@ -454,17 +514,58 @@ export const DocumentPage = () => {
     debouncedSave(title, newText, isPublic);
   };
 
-  const handleStartEditing = () => {
-    setIsEditing(true);
+  const handleStartEditing = (segIndex: number) => {
+    setEditingSegmentIndex(segIndex);
     setTimeout(() => {
-      textareaRef.current?.focus();
+      textareaRefs.current.get(segIndex)?.focus();
     }, 0);
   };
 
   const handleStopEditing = () => {
-    if (!showCommands) {
-      setIsEditing(false);
+    if (!showCommands && !showSchedulerModal) {
+      setEditingSegmentIndex(null);
     }
+  };
+
+  const fetchSchedulerList = async () => {
+    setSchedulerListLoading(true);
+    try {
+      const res = await apiFetch("/api/scraping-schedulers");
+      if (res.ok) setSchedulerList(await res.json());
+    } catch { /* ignore */ } finally {
+      setSchedulerListLoading(false);
+    }
+  };
+
+  const handleSelectScheduler = (schedulerId: number) => {
+    const ref = schedulerInsertRef.current;
+    if (!ref) return;
+    const segs = normalizeSegments(parseSegments(text));
+    const activeSeg = segs[ref.segIndex];
+    if (!activeSeg || activeSeg.type !== "text") return;
+
+    const before = activeSeg.content.slice(0, ref.cursorPos);
+    const after = activeSeg.content.slice(ref.cursorPos);
+    const newSegs: Segment[] = [
+      ...segs.slice(0, ref.segIndex),
+      { type: "text", content: before },
+      { type: "scheduler", id: schedulerId },
+      { type: "text", content: after },
+      ...segs.slice(ref.segIndex + 1),
+    ];
+    const newText = segmentsToText(newSegs);
+    setText(newText);
+    debouncedSave(title, newText, isPublic);
+    setShowSchedulerModal(false);
+    setEditingSegmentIndex(null);
+    schedulerInsertRef.current = null;
+  };
+
+  const handleDeleteSegment = (segIndex: number) => {
+    const segs = normalizeSegments(parseSegments(text));
+    const newSegs = segs.filter((_, i) => i !== segIndex);
+    const newText = segmentsToText(newSegs);
+    handleTextChange(newText);
   };
 
   const SCRAPE_PLACEHOLDER = "\u23F3 Scraping en cours...";
@@ -510,7 +611,11 @@ export const DocumentPage = () => {
 
           if (data.status === "FINISHED") {
             clearInterval(pollInterval);
-            const markdown = jsonToMarkdownTable(data.response);
+            const tmpl = data.scraper?.display_template;
+            const markdown =
+              tmpl && tmpl.length > 0
+                ? templateToMarkdown(data.response, tmpl)
+                : jsonToMarkdownTable(data.response);
             setText((current) => current.replace(SCRAPE_PLACEHOLDER, markdown));
             // Save after replacing placeholder
             setText((current) => {
@@ -561,57 +666,66 @@ export const DocumentPage = () => {
 
   const executeCommand = (commandIndex: number) => {
     const command = filteredCommands[commandIndex];
-    if (!command) return;
+    if (!command || editingSegmentIndex === null) return;
 
-    const cursorPosition = textareaRef.current?.selectionStart || text.length;
-    const result = command.execute(text, cursorPosition, commandStartPos);
+    const segs = normalizeSegments(parseSegments(text));
+    const activeSeg = segs[editingSegmentIndex];
+    if (!activeSeg || activeSeg.type !== "text") return;
 
-    setText(result.newText);
-    debouncedSave(title, result.newText, isPublic);
+    const el = textareaRefs.current.get(editingSegmentIndex);
+    const cursorPos = el?.selectionStart ?? activeSeg.content.length;
+    const result = command.execute(activeSeg.content, cursorPos, commandStartPos);
+
+    const newSegs = segs.map((s, i) =>
+      i === editingSegmentIndex ? { type: "text" as const, content: result.newText } : s
+    );
+    const newText = segmentsToText(newSegs);
+    setText(newText);
+    debouncedSave(title, newText, isPublic);
     setShowCommands(false);
     setCommandSearch("");
 
+    if (command.opensModal && command.name === "planificateur") {
+      schedulerInsertRef.current = { segIndex: editingSegmentIndex, cursorPos: result.newCursorPosition };
+      fetchSchedulerList();
+      setShowSchedulerModal(true);
+      return;
+    }
+
     if (command.opensModal && command.name === "scrape") {
-      scrapeInsertPosRef.current = result.newCursorPosition;
+      const globalOffset = segmentGlobalOffset(segs, editingSegmentIndex);
+      scrapeInsertPosRef.current = globalOffset + result.newCursorPosition;
       setScrapeUrl("");
       setScrapeError("");
       setShowScrapeModal(true);
       return;
     }
 
-    // Set cursor position after state update
     setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.selectionStart = result.newCursorPosition;
-        textareaRef.current.selectionEnd = result.newCursorPosition;
-        textareaRef.current.focus();
+      const activeEl = textareaRefs.current.get(editingSegmentIndex);
+      if (activeEl) {
+        activeEl.selectionStart = result.newCursorPosition;
+        activeEl.selectionEnd = result.newCursorPosition;
+        activeEl.focus();
       }
     }, 0);
   };
 
-  const handleTextInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newText = e.target.value;
-    const cursorPos = e.target.selectionStart;
-
-    // Find if we're in a slash command context
-    const textBeforeCursor = newText.slice(0, cursorPos);
+  const handleSegmentChange = (segIndex: number, newContent: string) => {
+    const cursorPos = textareaRefs.current.get(segIndex)?.selectionStart ?? newContent.length;
+    const textBeforeCursor = newContent.slice(0, cursorPos);
     const lastSlashIndex = textBeforeCursor.lastIndexOf("/");
 
     if (lastSlashIndex !== -1) {
       const textAfterSlash = textBeforeCursor.slice(lastSlashIndex + 1);
-
-      // Check if there's a space right after the slash (cancel command mode)
       if (textAfterSlash.startsWith(" ")) {
         setShowCommands(false);
         setCommandSearch("");
-      }
-      // Check if the slash is at start of line or after a space/newline
-      else if (
+      } else if (
         lastSlashIndex === 0 ||
-        newText[lastSlashIndex - 1] === " " ||
-        newText[lastSlashIndex - 1] === "\n"
+        newContent[lastSlashIndex - 1] === " " ||
+        newContent[lastSlashIndex - 1] === "\n"
       ) {
-        // Check if there's no space in the command search (only letters)
         if (!/\s/.test(textAfterSlash)) {
           setShowCommands(true);
           setCommandSearch(textAfterSlash);
@@ -629,7 +743,11 @@ export const DocumentPage = () => {
       setCommandSearch("");
     }
 
-    handleTextChange(newText);
+    const segs = normalizeSegments(parseSegments(text));
+    const newSegs = segs.map((s, i) =>
+      i === segIndex ? { type: "text" as const, content: newContent } : s
+    );
+    handleTextChange(segmentsToText(newSegs));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -702,6 +820,42 @@ export const DocumentPage = () => {
       </div>
     );
   }
+
+  // Shared markdown component map (avoids duplication between view modes)
+  const mdComponents = {
+    input: ({ checked }: { checked?: boolean }) => (
+      <input type="checkbox" checked={checked} readOnly className="mr-2 h-4 w-4 rounded border-gray-300 text-gray-800 focus:ring-gray-800" />
+    ),
+    h1: ({ children }: { children?: React.ReactNode }) => <h1 className="text-3xl font-bold text-gray-900 mt-6 mb-4 first:mt-0">{children}</h1>,
+    h2: ({ children }: { children?: React.ReactNode }) => <h2 className="text-2xl font-semibold text-gray-900 mt-5 mb-3">{children}</h2>,
+    h3: ({ children }: { children?: React.ReactNode }) => <h3 className="text-xl font-semibold text-gray-900 mt-4 mb-2">{children}</h3>,
+    p: ({ children }: { children?: React.ReactNode }) => <p className="text-gray-700 mb-4 leading-relaxed">{children}</p>,
+    ul: ({ children }: { children?: React.ReactNode }) => <ul className="list-disc list-inside mb-4 text-gray-700 space-y-1">{children}</ul>,
+    ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal list-inside mb-4 text-gray-700 space-y-1">{children}</ol>,
+    li: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
+      <li className={`ml-2 ${className?.includes("task-list-item") ? "list-none flex items-center" : ""}`}>{children}</li>
+    ),
+    blockquote: ({ children }: { children?: React.ReactNode }) => (
+      <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-600 my-4">{children}</blockquote>
+    ),
+    code: ({ className, children }: { className?: string; children?: React.ReactNode }) => {
+      const isBlock = className?.includes("language-");
+      return isBlock ? (
+        <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto my-4">
+          <code className="text-sm font-mono">{children}</code>
+        </pre>
+      ) : (
+        <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>
+      );
+    },
+    pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+    a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+      <a href={href} className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">{children}</a>
+    ),
+    hr: () => <hr className="my-6 border-gray-200" />,
+    strong: ({ children }: { children?: React.ReactNode }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+    em: ({ children }: { children?: React.ReactNode }) => <em className="italic">{children}</em>,
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -795,254 +949,85 @@ export const DocumentPage = () => {
               onChange={handleTextChange}
               readOnly={!isAuthenticated || !hasPermission("modifyDocument")}
             />
-          ) : !isAuthenticated || !hasPermission("modifyDocument") ? (
-            <div className="min-h-[60vh] prose prose-gray max-w-none">
-              {text ? (
-                <Markdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    input: ({ checked }) => (
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        readOnly
-                        className="mr-2 h-4 w-4 rounded border-gray-300 text-gray-800 focus:ring-gray-800"
-                      />
-                    ),
-                    h1: ({ children }) => (
-                      <h1 className="text-3xl font-bold text-gray-900 mt-6 mb-4 first:mt-0">
-                        {children}
-                      </h1>
-                    ),
-                    h2: ({ children }) => (
-                      <h2 className="text-2xl font-semibold text-gray-900 mt-5 mb-3">
-                        {children}
-                      </h2>
-                    ),
-                    h3: ({ children }) => (
-                      <h3 className="text-xl font-semibold text-gray-900 mt-4 mb-2">
-                        {children}
-                      </h3>
-                    ),
-                    p: ({ children }) => (
-                      <p className="text-gray-700 mb-4 leading-relaxed">
-                        {children}
-                      </p>
-                    ),
-                    ul: ({ children }) => (
-                      <ul className="list-disc list-inside mb-4 text-gray-700 space-y-1">
-                        {children}
-                      </ul>
-                    ),
-                    ol: ({ children }) => (
-                      <ol className="list-decimal list-inside mb-4 text-gray-700 space-y-1">
-                        {children}
-                      </ol>
-                    ),
-                    li: ({ children, className }) => (
-                      <li
-                        className={`ml-2 ${
-                          className?.includes("task-list-item")
-                            ? "list-none flex items-center"
-                            : ""
-                        }`}
-                      >
-                        {children}
-                      </li>
-                    ),
-                    blockquote: ({ children }) => (
-                      <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-600 my-4">
-                        {children}
-                      </blockquote>
-                    ),
-                    code: ({ className, children }) => {
-                      const isBlock = className?.includes("language-");
-                      return isBlock ? (
-                        <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto my-4">
-                          <code className="text-sm font-mono">{children}</code>
-                        </pre>
-                      ) : (
-                        <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">
-                          {children}
-                        </code>
-                      );
-                    },
-                    pre: ({ children }) => <>{children}</>,
-                    a: ({ href, children }) => (
-                      <a
-                        href={href}
-                        className="text-blue-600 hover:underline"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {children}
-                      </a>
-                    ),
-                    hr: () => <hr className="my-6 border-gray-200" />,
-                    strong: ({ children }) => (
-                      <strong className="font-semibold text-gray-900">
-                        {children}
-                      </strong>
-                    ),
-                    em: ({ children }) => (
-                      <em className="italic">{children}</em>
-                    ),
-                  }}
-                >
-                  {text}
-                </Markdown>
-              ) : (
-                <p className="text-gray-300">Aucun contenu</p>
-              )}
-            </div>
-          ) : isEditing ? (
-            <div className="relative">
-              <textarea
-                ref={textareaRef}
-                value={text}
-                onChange={handleTextInputChange}
-                onKeyDown={handleKeyDown}
-                onBlur={handleStopEditing}
-                placeholder="Commencez à écrire en Markdown... (tapez / pour les commandes)"
-                className="w-full min-h-[200px] text-gray-700 border-none outline-none resize-none overflow-hidden placeholder-gray-300 leading-relaxed font-mono text-sm"
-              />
-
-              {showCommands && filteredCommands.length > 0 && (
-                <div
-                  ref={commandMenuRef}
-                  className="absolute left-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg py-2 min-w-64 z-50"
-                >
-                  <div className="px-3 py-1 text-xs text-gray-400 border-b border-gray-100 mb-1">
-                    Commandes
-                  </div>
-                  {filteredCommands.map((cmd, index) => (
-                    <button
-                      key={cmd.name}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        executeCommand(index);
-                      }}
-                      className={`w-full px-3 py-2 text-left flex items-center gap-3 transition ${
-                        index === selectedCommandIndex
-                          ? "bg-gray-100"
-                          : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <span className="text-gray-400 font-mono text-sm">
-                        /{cmd.name}
-                      </span>
-                      <span className="text-gray-600 text-sm">
-                        {cmd.description}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
           ) : (
-            <div
-              onClick={handleStartEditing}
-              className="min-h-[60vh] cursor-text prose prose-gray max-w-none"
-            >
-              {text ? (
-                <Markdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    input: ({ checked }) => (
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        readOnly
-                        className="mr-2 h-4 w-4 rounded border-gray-300 text-gray-800 focus:ring-gray-800"
+            // TEXT document — segmented renderer (text + scheduler blocks)
+            <div className="min-h-[60vh]">
+              {(() => {
+                const canEdit = isAuthenticated && hasPermission("modifyDocument");
+                const segs = normalizeSegments(parseSegments(text));
+
+                return segs.map((seg, segIndex) => {
+                  if (seg.type === "scheduler") {
+                    return (
+                      <SchedulerBlock
+                        key={`sched-${seg.id}-${segIndex}`}
+                        schedulerId={seg.id}
+                        onDelete={canEdit ? () => handleDeleteSegment(segIndex) : undefined}
                       />
-                    ),
-                    h1: ({ children }) => (
-                      <h1 className="text-3xl font-bold text-gray-900 mt-6 mb-4 first:mt-0">
-                        {children}
-                      </h1>
-                    ),
-                    h2: ({ children }) => (
-                      <h2 className="text-2xl font-semibold text-gray-900 mt-5 mb-3">
-                        {children}
-                      </h2>
-                    ),
-                    h3: ({ children }) => (
-                      <h3 className="text-xl font-semibold text-gray-900 mt-4 mb-2">
-                        {children}
-                      </h3>
-                    ),
-                    p: ({ children }) => (
-                      <p className="text-gray-700 mb-4 leading-relaxed">
-                        {children}
-                      </p>
-                    ),
-                    ul: ({ children }) => (
-                      <ul className="list-disc list-inside mb-4 text-gray-700 space-y-1">
-                        {children}
-                      </ul>
-                    ),
-                    ol: ({ children }) => (
-                      <ol className="list-decimal list-inside mb-4 text-gray-700 space-y-1">
-                        {children}
-                      </ol>
-                    ),
-                    li: ({ children, className }) => (
-                      <li
-                        className={`ml-2 ${
-                          className?.includes("task-list-item")
-                            ? "list-none flex items-center"
-                            : ""
-                        }`}
-                      >
-                        {children}
-                      </li>
-                    ),
-                    blockquote: ({ children }) => (
-                      <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-600 my-4">
-                        {children}
-                      </blockquote>
-                    ),
-                    code: ({ className, children }) => {
-                      const isBlock = className?.includes("language-");
-                      return isBlock ? (
-                        <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto my-4">
-                          <code className="text-sm font-mono">{children}</code>
-                        </pre>
+                    );
+                  }
+
+                  const isEditingThis = canEdit && editingSegmentIndex === segIndex;
+                  const isOnlySegment = segs.length === 1;
+
+                  return (
+                    <div key={`text-${segIndex}`}>
+                      {isEditingThis ? (
+                        <div className="relative">
+                          <textarea
+                            ref={el => textareaRefs.current.set(segIndex, el)}
+                            value={seg.content}
+                            onChange={e => handleSegmentChange(segIndex, e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            onBlur={handleStopEditing}
+                            placeholder={isOnlySegment
+                              ? "Commencez à écrire en Markdown… (tapez / pour les commandes)"
+                              : "Tapez ici… (/ pour les commandes)"}
+                            className="w-full min-h-[50px] text-gray-700 border-none outline-none resize-none overflow-hidden placeholder-gray-300 leading-relaxed font-mono text-sm"
+                          />
+                          {showCommands && filteredCommands.length > 0 && (
+                            <div
+                              ref={commandMenuRef}
+                              className="absolute left-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg py-2 min-w-64 z-50"
+                            >
+                              <div className="px-3 py-1 text-xs text-gray-400 border-b border-gray-100 mb-1">
+                                Commandes
+                              </div>
+                              {filteredCommands.map((cmd, index) => (
+                                <button
+                                  key={cmd.name}
+                                  onMouseDown={e => { e.preventDefault(); executeCommand(index); }}
+                                  className={`w-full px-3 py-2 text-left flex items-center gap-3 transition ${
+                                    index === selectedCommandIndex ? "bg-gray-100" : "hover:bg-gray-50"
+                                  }`}
+                                >
+                                  <span className="text-gray-400 font-mono text-sm">/{cmd.name}</span>
+                                  <span className="text-gray-600 text-sm">{cmd.description}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       ) : (
-                        <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">
-                          {children}
-                        </code>
-                      );
-                    },
-                    pre: ({ children }) => <>{children}</>,
-                    a: ({ href, children }) => (
-                      <a
-                        href={href}
-                        className="text-blue-600 hover:underline"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {children}
-                      </a>
-                    ),
-                    hr: () => <hr className="my-6 border-gray-200" />,
-                    strong: ({ children }) => (
-                      <strong className="font-semibold text-gray-900">
-                        {children}
-                      </strong>
-                    ),
-                    em: ({ children }) => (
-                      <em className="italic">{children}</em>
-                    ),
-                  }}
-                >
-                  {text}
-                </Markdown>
-              ) : (
-                <p className="text-gray-300">
-                  Cliquez pour écrire en Markdown...
-                </p>
-              )}
+                        <div
+                          onClick={canEdit ? () => handleStartEditing(segIndex) : undefined}
+                          className={`${canEdit ? "cursor-text" : ""} ${seg.content ? "prose prose-gray max-w-none" : "min-h-[40px]"}`}
+                        >
+                          {seg.content ? (
+                            <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                              {seg.content}
+                            </Markdown>
+                          ) : canEdit ? (
+                            <p className="text-gray-300 text-sm py-1">
+                              {isOnlySegment ? "Cliquez pour écrire en Markdown…" : "Cliquez pour ajouter du texte…"}
+                            </p>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </div>
           )}
         </div>
@@ -1288,6 +1273,64 @@ export const DocumentPage = () => {
           className="fixed inset-0 bg-black/20 z-40"
           onClick={() => setShowAiChat(false)}
         />
+      )}
+
+      {/* Scheduler picker modal */}
+      {showSchedulerModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Lier un planificateur</h2>
+              <button
+                onClick={() => setShowSchedulerModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {schedulerListLoading ? (
+              <p className="text-sm text-gray-400 text-center py-6">Chargement…</p>
+            ) : schedulerList.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-6">Aucun planificateur disponible.</p>
+            ) : (
+              <div className="space-y-2 max-h-72 overflow-y-auto">
+                {schedulerList.map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => handleSelectScheduler(s.id)}
+                    className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition text-left"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{s.title}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">ID #{s.id}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      s.status === "ACTIVATE"
+                        ? "bg-green-100 text-green-700"
+                        : s.status === "RUNNING"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-gray-100 text-gray-500"
+                    }`}>
+                      {s.status === "ACTIVATE" ? "Actif" : s.status === "RUNNING" ? "En cours" : "Inactif"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={() => setShowSchedulerModal(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Scrape Modal */}

@@ -8,7 +8,7 @@ export const createInstanceScrape = async (
   next: NextFunction,
 ) => {
   try {
-    const { url, scrapingSchedulerId } = req.body;
+    const { url, scrapingSchedulerId, scraperId } = req.body;
 
     const instanceScrape = await prisma.instanceScrape.create({
       data: {
@@ -16,6 +16,7 @@ export const createInstanceScrape = async (
         scrapingSchedulerId: scrapingSchedulerId
           ? parseInt(scrapingSchedulerId, 10)
           : undefined,
+        scraperId: scraperId ? parseInt(scraperId, 10) : undefined,
       },
     });
 
@@ -37,7 +38,11 @@ export const getInstancesScrape = async (
   next: NextFunction,
 ) => {
   try {
-    const instanceScrapes = await prisma.instanceScrape.findMany();
+    const instanceScrapes = await prisma.instanceScrape.findMany({
+      include: {
+        scraper: { select: { id: true, name: true, display_template: true } },
+      },
+    });
     res.json(instanceScrapes);
   } catch (error) {
     next(error);
@@ -54,6 +59,9 @@ export const getInstancesScrapeById = async (
     const instanceScrape = await prisma.instanceScrape.findUnique({
       where: {
         id: id,
+      },
+      include: {
+        scraper: { select: { id: true, name: true, display_template: true } },
       },
     });
     if (!instanceScrape) {

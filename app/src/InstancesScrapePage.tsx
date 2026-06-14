@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "./api";
+import { ScraperTemplateRenderer } from "./components/ScraperTemplateRenderer";
+import { TemplateBlock } from "./types/scraper";
 
 interface InstanceScrape {
   id: number;
@@ -8,6 +10,11 @@ interface InstanceScrape {
   response: Record<string, unknown> | null;
   created_at: string;
   last_update: string;
+  scraper: {
+    id: number;
+    name: string;
+    display_template: TemplateBlock[] | null;
+  } | null;
 }
 
 const STATUS_CONFIG = {
@@ -26,6 +33,7 @@ export const InstancesScrapePage = () => {
   const [newUrl, setNewUrl] = useState("");
   const [creating, setCreating] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [renderedViews, setRenderedViews] = useState<Record<number, boolean>>({});
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -226,17 +234,35 @@ export const InstancesScrapePage = () => {
                     {isExpanded && (
                       <div className="px-6 pb-4">
                         <div className="bg-gray-50 rounded-lg p-4">
-                          <p className="text-xs font-medium text-gray-500 uppercase mb-2">
-                            Réponse
-                          </p>
-                          {instance.response ? (
+                          {/* Toggle only when template exists and status is FINISHED */}
+                          {instance.status === "FINISHED" && instance.scraper?.display_template && instance.scraper.display_template.length > 0 && (
+                            <div className="flex items-center gap-2 mb-3">
+                              <button
+                                onClick={() => setRenderedViews((prev) => ({ ...prev, [instance.id]: false }))}
+                                className={`px-3 py-1 text-xs rounded-md transition ${!renderedViews[instance.id] ? "bg-gray-800 text-white" : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"}`}
+                              >
+                                JSON brut
+                              </button>
+                              <button
+                                onClick={() => setRenderedViews((prev) => ({ ...prev, [instance.id]: true }))}
+                                className={`px-3 py-1 text-xs rounded-md transition ${renderedViews[instance.id] ? "bg-gray-800 text-white" : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"}`}
+                              >
+                                Vue structurée
+                              </button>
+                            </div>
+                          )}
+
+                          {renderedViews[instance.id] && instance.scraper?.display_template && instance.scraper.display_template.length > 0 ? (
+                            <ScraperTemplateRenderer
+                              data={instance.response as Record<string, unknown> | Record<string, unknown>[]}
+                              template={instance.scraper.display_template}
+                            />
+                          ) : instance.response ? (
                             <pre className="text-sm bg-white border border-gray-200 text-gray-800 p-4 rounded-lg overflow-x-auto font-mono">
                               {JSON.stringify(instance.response, null, 2)}
                             </pre>
                           ) : (
-                            <p className="text-sm text-gray-500 italic">
-                              Aucune réponse disponible
-                            </p>
+                            <p className="text-sm text-gray-500 italic">Aucune réponse disponible</p>
                           )}
                         </div>
                       </div>

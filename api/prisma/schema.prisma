@@ -80,15 +80,17 @@ model DocumentHistory {
 }
 
 model Scraper {
-  id          Int           @id @default(autoincrement())
-  name        String
-  description String?       @default("")
-  code        String?       @default("")
-  browser     Boolean       @default(false)
-  base_url    String[]
-  status      ScraperStatus @default(DISABLE)
-  created_at  DateTime      @default(now())
-  last_update DateTime      @default(now())
+  id               Int              @id @default(autoincrement())
+  name             String
+  description      String?          @default("")
+  code             String?          @default("")
+  browser          Boolean          @default(false)
+  base_url         String[]
+  status           ScraperStatus    @default(DISABLE)
+  created_at       DateTime         @default(now())
+  last_update      DateTime         @default(now())
+  display_template Json?
+  instanceScrapes  InstanceScrape[]
 }
 
 model InstanceScrape {
@@ -101,6 +103,8 @@ model InstanceScrape {
   scrapingScheduler       ScrapingScheduler?      @relation(fields: [scrapingSchedulerId], references: [id])
   scrapingSchedulerId     Int?
   instanceScrapeHistories InstanceScrapeHistory[]
+  scraper                 Scraper?                @relation(fields: [scraperId], references: [id])
+  scraperId               Int?
 }
 
 model InstanceScrapeHistory {

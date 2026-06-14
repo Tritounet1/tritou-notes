@@ -63,7 +63,7 @@ export const updateScraper = async (
 ) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const { name, description, code, browser, base_url, status } = req.body;
+    const { name, description, code, browser, base_url, status, display_template } = req.body;
 
     const previous_scraper = await prisma.scraper.findFirst({
       where: { id: id },
@@ -85,6 +85,7 @@ export const updateScraper = async (
         base_url: base_url,
         status: status,
         last_update: new Date(),
+        display_template: display_template ?? undefined,
       },
     });
 

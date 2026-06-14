@@ -106,6 +106,11 @@ const scrapeInstance = async (
     throw "Error: Scraper not found";
   }
 
+  await prisma.instanceScrape.update({
+    where: { id: instanceId },
+    data: { scraperId: scraper.id },
+  });
+
   if (!scraper.code) {
     throw "Error: Scraper don't have code.";
   }

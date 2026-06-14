@@ -33,6 +33,8 @@ export const TodoEditor = ({ data, onChange, readOnly = false }: TodoEditorProps
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   // Sync changes to parent
   useEffect(() => {
@@ -105,6 +107,35 @@ export const TodoEditor = ({ data, onChange, readOnly = false }: TodoEditorProps
     setTodos(todos.filter(todo => todo.id !== id));
   };
 
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggingId(id);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (id !== draggingId) setDragOverId(id);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!draggingId || draggingId === targetId) return;
+    const fromIndex = todos.findIndex((t) => t.id === draggingId);
+    const toIndex = todos.findIndex((t) => t.id === targetId);
+    const reordered = [...todos];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    setTodos(reordered);
+    setDraggingId(null);
+    setDragOverId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    setDragOverId(null);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -159,104 +190,136 @@ export const TodoEditor = ({ data, onChange, readOnly = false }: TodoEditorProps
           </div>
         ) : (
           <div className="space-y-3">
-            {todos.map((todo) => (
-              <div
-                key={todo.id}
-                className={`group bg-white border rounded-xl p-4 transition-all ${
-                  todo.completed
-                    ? "border-gray-200 bg-gray-50"
-                    : "border-gray-200 hover:border-purple-300 hover:shadow-sm"
-                }`}
-              >
-                {editingId === todo.id ? (
-                  // Mode edition
-                  <div className="space-y-3">
-                    <input
-                      type="text"
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Titre de la tache..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      autoFocus
-                    />
-                    <textarea
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Description (optionnel)..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-                      rows={2}
-                    />
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={handleCancelEdit}
-                        className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition"
-                      >
-                        Annuler
-                      </button>
-                      <button
-                        onClick={handleSaveEdit}
-                        className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
-                      >
-                        Enregistrer
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  // Mode affichage
-                  <div className="flex gap-3">
-                    {/* Checkbox */}
-                    <button
-                      onClick={() => handleToggleComplete(todo.id)}
-                      disabled={readOnly}
-                      className={`flex-shrink-0 w-6 h-6 mt-0.5 rounded-full border-2 flex items-center justify-center transition ${
-                        todo.completed
-                          ? "bg-purple-500 border-purple-500"
-                          : "border-gray-300 hover:border-purple-400"
-                      } ${readOnly ? "cursor-default" : "cursor-pointer"}`}
-                    >
-                      {todo.completed && (
-                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </button>
+            {todos.map((todo) => {
+              const isDragging = draggingId === todo.id;
+              const isDragOver = dragOverId === todo.id;
+              const canDrag = !readOnly && editingId !== todo.id;
 
-                    {/* Contenu */}
-                    <div
-                      className={`flex-1 min-w-0 ${!readOnly ? "cursor-pointer" : ""}`}
-                      onClick={() => !readOnly && handleStartEdit(todo)}
-                    >
-                      <p className={`font-medium ${todo.completed ? "text-gray-400 line-through" : "text-gray-900"}`}>
-                        {todo.title || "Sans titre"}
-                      </p>
-                      {todo.description && (
-                        <p className={`text-sm mt-1 ${todo.completed ? "text-gray-400" : "text-gray-500"}`}>
-                          {todo.description}
+              return (
+                <div
+                  key={todo.id}
+                  draggable={canDrag}
+                  onDragStart={(e) => canDrag && handleDragStart(e, todo.id)}
+                  onDragOver={(e) => handleDragOver(e, todo.id)}
+                  onDrop={(e) => handleDrop(e, todo.id)}
+                  onDragEnd={handleDragEnd}
+                  className={`group bg-white border rounded-xl p-4 transition-all ${
+                    isDragging ? "opacity-40 scale-[0.98]" : ""
+                  } ${
+                    isDragOver && !isDragging
+                      ? "border-purple-400 shadow-md ring-1 ring-purple-300"
+                      : todo.completed
+                        ? "border-gray-200 bg-gray-50"
+                        : "border-gray-200 hover:border-purple-300 hover:shadow-sm"
+                  }`}
+                >
+                  {editingId === todo.id ? (
+                    // Mode edition
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Titre de la tache..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        autoFocus
+                      />
+                      <textarea
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Description (optionnel)..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                        rows={2}
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={handleCancelEdit}
+                          className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          onClick={handleSaveEdit}
+                          className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+                        >
+                          Enregistrer
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    // Mode affichage
+                    <div className="flex gap-3 items-start">
+                      {/* Poignée de déplacement */}
+                      {!readOnly && (
+                        <div
+                          className="flex-shrink-0 mt-0.5 text-gray-300 group-hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                          title="Déplacer"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+                            <circle cx="5.5" cy="3.5" r="1.2" />
+                            <circle cx="10.5" cy="3.5" r="1.2" />
+                            <circle cx="5.5" cy="8" r="1.2" />
+                            <circle cx="10.5" cy="8" r="1.2" />
+                            <circle cx="5.5" cy="12.5" r="1.2" />
+                            <circle cx="10.5" cy="12.5" r="1.2" />
+                          </svg>
+                        </div>
+                      )}
+
+                      {/* Checkbox */}
+                      <button
+                        onClick={() => handleToggleComplete(todo.id)}
+                        disabled={readOnly}
+                        className={`flex-shrink-0 w-6 h-6 mt-0.5 rounded-full border-2 flex items-center justify-center transition ${
+                          todo.completed
+                            ? "bg-purple-500 border-purple-500"
+                            : "border-gray-300 hover:border-purple-400"
+                        } ${readOnly ? "cursor-default" : "cursor-pointer"}`}
+                      >
+                        {todo.completed && (
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+
+                      {/* Contenu */}
+                      <div
+                        className={`flex-1 min-w-0 ${!readOnly ? "cursor-pointer" : ""}`}
+                        onClick={() => !readOnly && handleStartEdit(todo)}
+                      >
+                        <p className={`font-medium ${todo.completed ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                          {todo.title || "Sans titre"}
                         </p>
-                      )}
-                      <p className="text-xs text-gray-400 mt-2">
-                        Cree le {formatDate(todo.createdAt)}
-                      </p>
-                    </div>
+                        {todo.description && (
+                          <p className={`text-sm mt-1 ${todo.completed ? "text-gray-400" : "text-gray-500"}`}>
+                            {todo.description}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-400 mt-2">
+                          Cree le {formatDate(todo.createdAt)}
+                        </p>
+                      </div>
 
-                    {/* Actions */}
-                    {!readOnly && (
-                      <button
-                        onClick={() => handleDeleteTodo(todo.id)}
-                        className="flex-shrink-0 p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Supprimer"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+                      {/* Supprimer */}
+                      {!readOnly && (
+                        <button
+                          onClick={() => handleDeleteTodo(todo.id)}
+                          className="flex-shrink-0 p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Supprimer"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

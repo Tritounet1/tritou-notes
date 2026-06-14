@@ -162,6 +162,48 @@ export const updateScrapingScheduler = async (
   }
 };
 
+export const getScrapingSchedulerPreview = async (
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const scheduler = await prisma.scrapingScheduler.findUnique({
+      where: { id },
+      include: {
+        InstanceScrapes: {
+          where: { status: "FINISHED" },
+          orderBy: { created_at: "desc" },
+          take: 1,
+          include: {
+            scraper: {
+              select: { id: true, name: true, display_template: true },
+            },
+          },
+        },
+      },
+    });
+    if (!scheduler) {
+      res.status(404).json({ message: "Scheduler not found" });
+      return;
+    }
+    const latest = scheduler.InstanceScrapes[0] ?? null;
+    res.json({
+      id: scheduler.id,
+      title: scheduler.title,
+      description: scheduler.description,
+      status: scheduler.status,
+      last_run_at: scheduler.last_run_at,
+      latestData: latest
+        ? { response: latest.response, scraper: latest.scraper }
+        : null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const deleteScrapingScheduler = async (
   req: Request<{ id: string }>,
   res: Response,

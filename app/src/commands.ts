@@ -10,6 +10,19 @@ export interface SlashCommand {
 
 export const slashCommands: SlashCommand[] = [
   {
+    name: "planificateur",
+    description: "Lier un planificateur (données live)",
+    opensModal: true,
+    execute: (currentText, cursorPosition, commandStart) => {
+      const beforeCommand = currentText.slice(0, commandStart);
+      const afterCursor = currentText.slice(cursorPosition);
+      return {
+        newText: beforeCommand + afterCursor,
+        newCursorPosition: beforeCommand.length,
+      };
+    },
+  },
+  {
     name: "scrape",
     description: "Scrape une URL",
     opensModal: true,
