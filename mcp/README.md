@@ -3,7 +3,7 @@
 Serveur [MCP (Model Context Protocol)](https://modelcontextprotocol.io) qui expose les données de Tritou Notes à Claude.  
 Claude peut ainsi lire et modifier les documents, scrapers, instances, planificateurs et utilisateurs directement depuis une conversation.
 
-## Outils disponibles (21)
+## Outils disponibles (22)
 
 | Domaine        | Outils                                                                                         |
 | -------------- | ---------------------------------------------------------------------------------------------- |
@@ -12,6 +12,7 @@ Claude peut ainsi lire et modifier les documents, scrapers, instances, planifica
 | Instances      | `list_instances`, `get_instance`, `run_scrape`, `delete_instance`                              |
 | Planificateurs | `list_schedulers`, `get_scheduler`, `create_scheduler`, `update_scheduler`, `delete_scheduler` |
 | Utilisateurs   | `list_users`, `get_user`                                                                       |
+| Éditeur        | `list_slash_commands`                                                                          |
 
 ## Prérequis
 
@@ -36,12 +37,12 @@ npm run build
 
 Le serveur démarre en mode **stdio** (local) ou **HTTP** (production) selon la variable `MCP_HTTP_PORT`.
 
-| Variable | Rôle |
-|---|---|
-| `DATABASE_URL` | Connexion PostgreSQL |
-| `REDIS_HOST` / `REDIS_PORT` | Connexion Redis |
-| `MCP_HTTP_PORT` | Si défini → mode HTTP sur ce port. Absent → mode stdio. |
-| `MCP_AUTH_TOKEN` | Token Bearer obligatoire en mode HTTP |
+| Variable                    | Rôle                                                    |
+| --------------------------- | ------------------------------------------------------- |
+| `DATABASE_URL`              | Connexion PostgreSQL                                    |
+| `REDIS_HOST` / `REDIS_PORT` | Connexion Redis                                         |
+| `MCP_HTTP_PORT`             | Si défini → mode HTTP sur ce port. Absent → mode stdio. |
+| `MCP_AUTH_TOKEN`            | Token Bearer obligatoire en mode HTTP                   |
 
 ---
 
@@ -80,11 +81,7 @@ Ajoute `MCP_AUTH_TOKEN` dans un fichier `.env` à la racine du projet (même que
 MCP_AUTH_TOKEN=un_secret_long_et_aleatoire
 ```
 
-Puis lance le service avec Docker Compose :
-
-```bash
-docker-compose up -d mcp
-```
+Puis lance le service avec Docker Compose ou le Dockerfile.
 
 Le MCP tourne sur le port **3001** à l'intérieur du réseau Docker.
 
@@ -107,16 +104,22 @@ Le `/health` ne nécessite pas de token : `https://ton-domaine.com/mcp/health` d
 
 ### 3. Configurer Claude Desktop
 
+Claude Desktop ne supporte pas encore le format `url` natif — il faut passer par `mcp-remote`, un proxy stdio qui fait le lien avec le serveur HTTP. Il sera téléchargé automatiquement via `npx`.
+
 Dans `~/Library/Application Support/Claude/claude_desktop_config.json` :
 
 ```json
 {
   "mcpServers": {
     "tritou-notes": {
-      "url": "https://ton-domaine.com/mcp",
-      "headers": {
-        "Authorization": "Bearer un_secret_long_et_aleatoire"
-      }
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://ton-domaine.com/mcp",
+        "--header",
+        "Authorization: Bearer un_secret_long_et_aleatoire"
+      ]
     }
   }
 }
@@ -133,15 +136,3 @@ cd mcp
 npm run db:generate
 npm run build
 ```
-
-## Pourquoi Prisma est installé ici ?
-
-Prisma se divise en deux paquets avec des rôles distincts :
-
-**`prisma` (devDependency) — le CLI**  
-Contient la commande `prisma generate`. Elle lit `prisma/schema.prisma` et génère des fichiers TypeScript dans `src/generated/prisma/` qui correspondent exactement à tes modèles. Sans cette étape, ce dossier n'existe pas et le build échoue.
-
-**`@prisma/client` (dependency) — le runtime**  
-Fournit la classe `PrismaClient` utilisée dans le code. Elle s'appuie sur les fichiers générés pour offrir un accès typé à la base.
-
-En Prisma 7, le client n'est plus un module JavaScript pré-compilé livré avec le paquet npm — c'est du TypeScript généré spécifiquement pour ton schéma, compilé avec le reste du projet. Le CLI est donc toujours nécessaire pour produire ce code avant le build.
