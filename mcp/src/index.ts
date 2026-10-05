@@ -14,6 +14,7 @@ import { scraperTools, handleScraperTool } from "./tools/scrapers";
 import { instanceTools, handleInstanceTool } from "./tools/instances";
 import { schedulerTools, handleSchedulerTool } from "./tools/schedulers";
 import { userTools, handleUserTool } from "./tools/users";
+import { commandTools, handleCommandTool } from "./tools/commands";
 
 const allTools = [
   ...documentTools,
@@ -21,6 +22,7 @@ const allTools = [
   ...instanceTools,
   ...schedulerTools,
   ...userTools,
+  ...commandTools,
 ];
 
 const documentToolNames = new Set(documentTools.map((t) => t.name));
@@ -28,6 +30,7 @@ const scraperToolNames = new Set(scraperTools.map((t) => t.name));
 const instanceToolNames = new Set(instanceTools.map((t) => t.name));
 const schedulerToolNames = new Set(schedulerTools.map((t) => t.name));
 const userToolNames = new Set(userTools.map((t) => t.name));
+const commandToolNames = new Set(commandTools.map((t) => t.name));
 
 function buildServer(): Server {
   const server = new Server(
@@ -53,6 +56,8 @@ function buildServer(): Server {
         result = await handleSchedulerTool(name, args as Record<string, unknown>);
       } else if (userToolNames.has(name)) {
         result = await handleUserTool(name, args as Record<string, unknown>);
+      } else if (commandToolNames.has(name)) {
+        result = await handleCommandTool(name);
       } else {
         throw new Error(`Unknown tool: ${name}`);
       }
