@@ -36,19 +36,6 @@ export const slashCommands: SlashCommand[] = [
     },
   },
   {
-    name: "hello",
-    description: "Insère Hello,World!",
-    execute: (currentText, cursorPosition, commandStart) => {
-      const beforeCommand = currentText.slice(0, commandStart);
-      const afterCursor = currentText.slice(cursorPosition);
-      const insertedText = "Hello,World!";
-      return {
-        newText: beforeCommand + insertedText + afterCursor,
-        newCursorPosition: beforeCommand.length + insertedText.length,
-      };
-    },
-  },
-  {
     name: "date",
     description: "Insère la date du jour",
     execute: (currentText, cursorPosition, commandStart) => {

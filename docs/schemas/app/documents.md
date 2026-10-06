@@ -50,6 +50,6 @@ La page consulte aussi `/api/document-histories/:id` pour les anciennes versions
 
 ## Commandes de l’éditeur
 
-`app/src/commands.ts` définit `/planificateur`, `/scrape`, `/hello`, `/date`, `/time`, `/divider`, `/code`, `/quote`, `/list` et `/checkbox`. Les deux premières ouvrent une fenêtre de sélection ou de saisie ; les autres insèrent du texte. `/scrape` crée une instance, interroge son statut périodiquement et exploite le résultat.
+`app/src/commands.ts` définit `/planificateur`, `/scrape`, `/date`, `/time`, `/divider`, `/code`, `/quote`, `/list` et `/checkbox`. Les deux premières ouvrent une fenêtre de sélection ou de saisie ; les autres insèrent du texte. `/scrape` crée une instance, interroge son statut périodiquement et exploite le résultat.
 
 Sources : [page document](../../../app/src/DocumentPage.tsx), [bloc de code](../../../app/src/components/CodeBlock.tsx), [segments](../../../app/src/utils/documentSegments.ts), [commandes](../../../app/src/commands.ts), [temporisation](../../../app/src/hooks/useDebounce.ts), [bloc planificateur](../../../app/src/components/SchedulerBlock.tsx), [contrôleur document](../../../api/src/controllers/documentController.ts).

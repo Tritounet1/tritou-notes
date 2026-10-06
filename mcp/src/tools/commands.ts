@@ -13,7 +13,6 @@ export const commandTools: Tool[] = [
 const slashCommands = [
   { name: "planificateur", description: "Lier un planificateur (données live)", opensModal: true },
   { name: "scrape", description: "Scrape une URL", opensModal: true },
-  { name: "hello", description: "Insère Hello,World!" },
   { name: "date", description: "Insère la date du jour" },
   { name: "time", description: "Insère l'heure actuelle" },
   { name: "divider", description: "Insère une ligne de séparation (---)" },
