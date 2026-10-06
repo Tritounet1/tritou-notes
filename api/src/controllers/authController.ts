@@ -155,12 +155,18 @@ export const changePassword = async (
       return;
     }
 
-    const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword) {
-      res.status(400).json({ error: "Champs manquants" });
+    const { currentPassword, newPassword } = req.body ?? {};
+    if (typeof currentPassword !== "string" || typeof newPassword !== "string" || !currentPassword || !newPassword) {
+      res.status(400).json({ error: "Mots de passe manquants ou invalides" });
       return;
     }
 
+    if (newPassword.length < 8 || Buffer.byteLength(newPassword, "utf8") > 72) {
+      res.status(400).json({ error: "Le nouveau mot de passe doit contenir au moins 8 caractères et au maximum 72 octets." });
+      return;
+    }
+
+    // The target account always comes from the authenticated session, never the body.
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
     if (!user) {
       res.status(404).json({ error: "Utilisateur introuvable" });

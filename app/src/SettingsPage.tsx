@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "./api";
+import { useAuth } from "./hooks/useAuth";
 
 interface Settings {
   id: number;
@@ -11,6 +12,7 @@ interface Settings {
 }
 
 export const SettingsPage = () => {
+  const { isAdmin } = useAuth();
   const [settingsId, setSettingsId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -39,10 +41,12 @@ export const SettingsPage = () => {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!isAdmin) return;
+    const controller = new AbortController();
     const fetchSettings = async () => {
       try {
-        const response = await apiFetch("/api/settings");
-        if (response.ok) {
+        const response = await apiFetch("/api/settings", { signal: controller.signal });
+        if (response.ok && !controller.signal.aborted) {
           const data: Settings[] = await response.json();
           if (data.length > 0) {
             const s = data[0];
@@ -55,13 +59,14 @@ export const SettingsPage = () => {
           }
         }
       } catch (err) {
-        console.error(err);
+        if (!controller.signal.aborted) console.error(err);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
     fetchSettings();
-  }, []);
+    return () => controller.abort();
+  }, [isAdmin]);
 
   const showFeedback = (type: "success" | "error", message: string) => {
     if (type === "success") {
@@ -78,7 +83,7 @@ export const SettingsPage = () => {
   };
 
   const saveSettings = async (data: Partial<Settings>) => {
-    if (!settingsId) return;
+    if (!isAdmin || !settingsId || saving) return;
     setSaving(true);
     try {
       const response = await apiFetch(`/api/settings/${settingsId}`, {
@@ -102,6 +107,15 @@ export const SettingsPage = () => {
   };
 
   const handleChangePassword = async () => {
+    if (saving) return;
+    if (!currentPassword || newPassword.length < 8) {
+      showFeedback("error", "Saisissez votre mot de passe actuel et un nouveau mot de passe d’au moins 8 caractères.");
+      return;
+    }
+    if (new TextEncoder().encode(newPassword).length > 72) {
+      showFeedback("error", "Le nouveau mot de passe est trop long (72 octets maximum).");
+      return;
+    }
     if (newPassword !== confirmPassword) {
       showFeedback("error", "Les mots de passe ne correspondent pas");
       return;
@@ -137,7 +151,7 @@ export const SettingsPage = () => {
     });
   };
 
-  if (loading) {
+  if (isAdmin && loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <p className="text-gray-500">Chargement...</p>
@@ -165,7 +179,7 @@ export const SettingsPage = () => {
 
         <div className="space-y-6">
           {/* Anthropic API Key */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          {isAdmin && <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
                 <svg
@@ -216,7 +230,7 @@ export const SettingsPage = () => {
                 </button>
               </div>
             </div>
-          </div>
+          </div>}
 
           {/* Change Password */}
           <div className="bg-white rounded-lg shadow-sm p-6">
@@ -241,7 +255,7 @@ export const SettingsPage = () => {
                   Mot de passe
                 </h2>
                 <p className="text-sm text-gray-500">
-                  Modifier votre mot de passe
+                  Modifier votre mot de passe personnel (au moins 8 caractères)
                 </p>
               </div>
             </div>
@@ -253,6 +267,7 @@ export const SettingsPage = () => {
                 </label>
                 <input
                   type="password"
+                  autoComplete="current-password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent"
@@ -267,6 +282,8 @@ export const SettingsPage = () => {
                   <div className="relative">
                     <input
                       type={showNewPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      minLength={8}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent"
@@ -296,6 +313,7 @@ export const SettingsPage = () => {
                   <div className="relative">
                     <input
                       type={showConfirmPassword ? "text" : "password"}
+                      autoComplete="new-password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent"
@@ -323,7 +341,8 @@ export const SettingsPage = () => {
               <div className="flex justify-end">
                 <button
                   onClick={handleChangePassword}
-                  className="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-md hover:bg-gray-700 transition"
+                  disabled={saving || !currentPassword || !newPassword || !confirmPassword}
+                  className="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-md hover:bg-gray-700 transition disabled:opacity-50"
                 >
                   Modifier le mot de passe
                 </button>
@@ -332,7 +351,7 @@ export const SettingsPage = () => {
           </div>
 
           {/* SMTP Settings */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          {isAdmin && <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
                 <svg
@@ -505,7 +524,7 @@ export const SettingsPage = () => {
                 </button>
               </div>
             </div>
-          </div>
+          </div>}
         </div>
       </div>
     </div>
