@@ -14,6 +14,7 @@ interface Document {
   authorId: number;
   type: "TEXT" | "EXCEL" | "TODO";
   parentId: number | null;
+  folderId: number | null;
 }
 
 type SortOption = "date" | "name";
@@ -22,6 +23,7 @@ export const Dashboard = () => {
   const navigate = useNavigate();
   const { user, hasPermission } = useAuth();
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [folders, setFolders] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("date");
@@ -29,6 +31,7 @@ export const Dashboard = () => {
 
   useEffect(() => {
     fetchDocuments();
+    apiFetch("/api/folders").then((res) => (res.ok ? res.json() : [])).then(setFolders).catch(console.error);
   }, []);
 
   const fetchDocuments = async () => {
@@ -72,6 +75,7 @@ export const Dashboard = () => {
   };
 
   const titleById = new Map(documents.map((doc) => [doc.id, doc.title]));
+  const folderNames = new Map(folders.map((folder) => [folder.id, folder.name]));
   const filteredDocuments = documents
     .filter((doc) => doc.title.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
@@ -391,9 +395,11 @@ export const Dashboard = () => {
                             >
                               <span className={`w-2 h-2 rounded-[3px] shrink-0 ${style.dot}`} />
                               <span className="truncate">{doc.title || "Sans titre"}</span>
-                              {doc.parentId !== null && titleById.has(doc.parentId) && (
+                              {doc.parentId !== null && titleById.has(doc.parentId) ? (
                                 <span className="truncate text-xs font-normal text-muted">dans {titleById.get(doc.parentId) || "Sans titre"}</span>
-                              )}
+                              ) : doc.folderId !== null && folderNames.has(doc.folderId) ? (
+                                <span className="truncate text-xs font-normal text-muted">dans {folderNames.get(doc.folderId)}</span>
+                              ) : null}
                             </Link>
                           </td>
                           <td className="px-4 py-[11px]">

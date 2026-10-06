@@ -11,7 +11,7 @@ import { apiFetch } from "./api";
 import { slashCommands } from "./commands";
 import { SchedulerBlock } from "./components/SchedulerBlock";
 import { SubPageBlock, type SubPage } from "./components/SubPageBlock";
-import { MovePageModal } from "./components/MovePageModal";
+import { MovePageModal, type PageLocation } from "./components/MovePageModal";
 import { SpreadsheetEditor } from "./components/SpreadsheetEditor";
 import { TodoEditor } from "./components/TodoEditor";
 import { useAuth } from "./hooks/useAuth";
@@ -36,6 +36,9 @@ interface Document {
   authorId: number;
   type: "TEXT" | "EXCEL" | "TODO";
   parentId: number | null;
+  folderId: number | null;
+  /** Folder path of the page's top-level ancestor, root first (GET only). */
+  folders?: { id: number; name: string }[];
   /** Parent chain, root first (only on GET /api/documents/:id). */
   ancestors?: { id: number; title: string }[];
   children?: SubPage[];
@@ -307,8 +310,8 @@ export const DocumentPage = () => {
     }
   };
 
-  const handleMoved = (parentId: number | null, ancestors: { id: number; title: string }[]) => {
-    setDocument((previous) => (previous ? { ...previous, parentId, ancestors } : previous));
+  const handleMoved = (location: PageLocation) => {
+    setDocument((previous) => (previous ? { ...previous, ...location } : previous));
     setShowMoveModal(false);
     notifyDocumentsChanged();
   };
@@ -816,7 +819,7 @@ export const DocumentPage = () => {
     <div className={`flex flex-wrap items-stretch xl:h-[calc(100vh-20px)] ${isAuthenticated ? "" : "paper m-2.5 min-h-[calc(100vh-20px)] overflow-hidden"}`}>
       {confirmDialog}
       {showMoveModal && (
-        <MovePageModal documentId={document.id} currentParentId={document.parentId} onMoved={handleMoved} onClose={() => setShowMoveModal(false)} />
+        <MovePageModal documentId={document.id} currentParentId={document.parentId} currentFolderId={document.folderId} onMoved={handleMoved} onClose={() => setShowMoveModal(false)} />
       )}
       {showAiImageModal && (
         <AiImageModal documentId={document.id} onInsert={handleInsertImages} onClose={() => setShowAiImageModal(false)} />
@@ -830,6 +833,12 @@ export const DocumentPage = () => {
             <nav aria-label="Fil d’Ariane" className="flex min-w-0 items-center gap-1.5 text-sm text-muted">
               <Link to="/dashboard" className="shrink-0 hover:text-ink">Pages</Link>
               <span aria-hidden="true">/</span>
+              {document.folders?.map((folder) => (
+                <span key={`f${folder.id}`} className="flex min-w-0 items-center gap-1.5">
+                  <span className="max-w-[140px] truncate">{folder.name}</span>
+                  <span aria-hidden="true">/</span>
+                </span>
+              ))}
               {document.ancestors?.map((ancestor) => (
                 <span key={ancestor.id} className="flex min-w-0 items-center gap-1.5">
                   <Link to={`/document/${ancestor.id}`} className="max-w-[160px] truncate hover:text-ink">{ancestor.title || "Sans titre"}</Link>
