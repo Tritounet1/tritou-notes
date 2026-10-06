@@ -19,6 +19,7 @@ const Icon = ({ d, className = "w-[17px] h-[17px]" }: { d: string; className?: s
 );
 
 const icons = {
+  search: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-3.5-3.5",
   home: "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
   code: "m8 8-5 4 5 4M16 8l5 4-5 4M14 4l-4 16",
   database: "M4 5c0 1.7 3.6 3 8 3s8-1.3 8-3-3.6-3-8-3-8 1.3-8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
@@ -30,11 +31,13 @@ const icons = {
 };
 
 
+const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+
 const SectionLabel = ({ children }: { children: ReactNode }) => (
   <div className="eyebrow px-2.5 pb-1">{children}</div>
 );
 
-export const Navigation = () => {
+export const Navigation = ({ onSearch }: { onSearch: () => void }) => {
   const { isAuthenticated, logout, user, isAdmin, hasPermission } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -109,6 +112,17 @@ export const Navigation = () => {
       </Link>
 
       <div className="flex flex-col gap-0.5">
+        <button
+          type="button"
+          onClick={onSearch}
+          className="flex items-center gap-2.5 px-2.5 min-h-9 mb-0.5 rounded-[9px] border border-line-strong bg-paper-soft text-sm text-muted hover:text-ink transition cursor-pointer"
+        >
+          <Icon d={icons.search} className="w-4 h-4" />
+          <span className="flex-1 text-left">Rechercher</span>
+          <kbd className="font-mono text-[11px] px-1.5 py-0.5 rounded-[5px] bg-paper border border-line-strong">
+            {isMac ? "⌘K" : "Ctrl K"}
+          </kbd>
+        </button>
         {navItem("/dashboard", icons.home, "Accueil")}
       </div>
 

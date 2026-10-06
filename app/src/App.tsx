@@ -16,18 +16,34 @@ import { UserPage } from "./UserPage";
 import { UsersPage } from "./UsersPage";
 import { SettingsPage } from "./SettingsPage";
 import { useAuth } from "./hooks/useAuth";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { CommandPalette } from "./components/CommandPalette";
 
 // Signed-in pages sit on a white "paper" sheet next to the sidebar; auth pages get the bare frame.
 const Shell = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated } = useAuth();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isAuthenticated]);
+
   if (!isAuthenticated) return <>{children}</>;
   return (
     <div className="min-h-screen flex flex-wrap items-start">
       <div className="flex-[1_1_248px] max-w-full min-[840px]:sticky min-[840px]:top-0 min-[840px]:max-h-screen min-[840px]:overflow-y-auto">
-        <Navigation />
+        <Navigation onSearch={() => setPaletteOpen(true)} />
       </div>
       <main className="paper flex-[999_1_560px] min-w-0 m-2.5 min-h-[calc(100vh-20px)] overflow-hidden">{children}</main>
+      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
     </div>
   );
 };
