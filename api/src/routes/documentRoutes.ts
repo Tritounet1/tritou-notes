@@ -8,7 +8,12 @@ import {
 } from "../controllers/documentController";
 import { requirePermission } from "../middlewares/permissionsMiddleware";
 
+import { getDocumentImage, uploadDocumentImage } from "../controllers/documentImageController";
+import { documentImageUpload } from "../middlewares/documentImageUpload";
+
 const router = Router();
+router.get("/:id/images/:imageId", getDocumentImage);
+router.post("/:id/images", requirePermission("modifyDocument"), documentImageUpload, uploadDocumentImage);
 
 router.get("/", getDocuments);
 router.get("/:id", getDocumentById);

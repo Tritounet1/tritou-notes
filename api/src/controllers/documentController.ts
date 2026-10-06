@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
+import { removeDocumentImages } from "../utils/documentImageStorage";
 
 export const createDocument = async (
   req: Request,
@@ -142,6 +143,8 @@ export const deleteDocument = async (
         id: id,
       },
     });
+    // Metadata is removed by the cascading DocumentImage relation.
+    await removeDocumentImages(id).catch(error => console.error("Image cleanup failed for document", id, error));
     res.json(deletedDocument);
   } catch (error) {
     next(error);

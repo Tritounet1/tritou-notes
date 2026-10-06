@@ -5,10 +5,12 @@
 ```mermaid
 flowchart TD
     Page["DocumentPage : chargement par identifiant"] --> Type{"Document.type"}
-    Type -->|TEXT| Segments["Segments de texte, code, liens et planificateurs"]
+    Type -->|TEXT| Segments["Segments de texte, code, liens, images et planificateurs"]
     Type -->|EXCEL| Sheet["SpreadsheetEditor"]
     Type -->|TODO| Todo["TodoEditor"]
     Segments --> Markdown["Rendu Markdown / édition du texte"]
+    Segments --> Images["ImageBlock : largeur et légende"]
+    Images --> Save
     Segments --> Links["WebLinkBlock : URL, embed ou aperçu"]
     Links --> Save
     Segments --> Code["CodeBlock : CodeMirror et choix du langage"]
@@ -35,6 +37,10 @@ La commande `/code` insère un bloc dédié, éditable avec CodeMirror. La barre
 
 Un lien seul peut être affiché comme URL, embed ou aperçu visuel. Voir [le parcours et le format de sauvegarde](liens-web.md).
 
+## Images locales
+
+La commande `/image` ouvre le sélecteur. Le dépôt de fichiers est disponible à l’intérieur de cette fenêtre. Les fichiers passent par Express et sont stockés localement ; aucun service supplémentaire n’est nécessaire. Voir [upload, accès et sauvegardes](images.md).
+
 ## Sauvegarde et historique
 
 ```mermaid
@@ -56,6 +62,6 @@ La page consulte aussi `/api/document-histories/:id` pour les anciennes versions
 
 ## Commandes de l’éditeur
 
-`app/src/commands.ts` définit `/planificateur`, `/scrape`, `/date`, `/time`, `/divider`, `/code`, `/quote`, `/list` et `/checkbox`. Les deux premières ouvrent une fenêtre de sélection ou de saisie ; les autres insèrent du texte. `/scrape` crée une instance, interroge son statut périodiquement et exploite le résultat.
+`app/src/commands.ts` définit `/image`, `/planificateur`, `/scrape`, `/date`, `/time`, `/divider`, `/code`, `/quote`, `/list` et `/checkbox`. Les trois premières ouvrent une fenêtre de sélection ou de saisie ; les autres insèrent du texte. `/scrape` crée une instance, interroge son statut périodiquement et exploite le résultat.
 
 Sources : [page document](../../../app/src/DocumentPage.tsx), [bloc de code](../../../app/src/components/CodeBlock.tsx), [segments](../../../app/src/utils/documentSegments.ts), [commandes](../../../app/src/commands.ts), [temporisation](../../../app/src/hooks/useDebounce.ts), [bloc planificateur](../../../app/src/components/SchedulerBlock.tsx), [contrôleur document](../../../api/src/controllers/documentController.ts).

@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 
-const models = ["user", "userPermissions", "invitation", "document", "documentHistory", "conversation", "scraper", "instanceScrape", "instanceScrapeHistory", "scrapingScheduler", "settings", "images"] as const;
+const models = ["user", "userPermissions", "invitation", "document", "documentImage", "documentHistory", "conversation", "scraper", "instanceScrape", "instanceScrapeHistory", "scrapingScheduler", "settings", "images"] as const;
 const methods = ["findUnique", "findFirst", "findFirstOrThrow", "findMany", "create", "update", "delete", "deleteMany", "count"] as const;
 export const db = Object.fromEntries(models.map(model => [model, Object.fromEntries(methods.map(method => [method, vi.fn()]))])) as Record<typeof models[number], Record<typeof methods[number], ReturnType<typeof vi.fn>>>;
 export const user = { id: 7, email: "user@example.com", username: "user", role: "ADMIN", password: "stored-hash" };

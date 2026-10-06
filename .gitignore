@@ -7,3 +7,6 @@ CLAUDE.md
 
 # Generated test reports
 coverage/
+
+# Local document image files
+api/uploads/

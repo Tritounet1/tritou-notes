@@ -21,11 +21,12 @@ Les tests rapides utilisent Vitest et ne nécessitent ni base de données, ni Re
 - Autorisation : matrice des routes protégées, rôles administrateurs, permissions stockées, invitations et initialisation du premier administrateur.
 - Contrôleurs : utilisateurs, documents et historiques, conversations, scrapers, instances, planifications, configuration, images et IA; propagation des erreurs des dépendances.
 - Worker : extraction HTML, archivage, transitions de statut, erreurs, poursuite des autres instances et fermeture du navigateur.
+- Images de documents : vrais pixels JPEG/PNG/WebP/GIF, limites d’upload, stockage isolé, accès privé/public et suppression en cascade.
 - Utilitaires : chiffrement authentifié, génération de tokens, stockage S3 et protection SSRF des aperçus, redirections, limites de taille et formats YouTube.
 
 ## Tests d’intégration isolés
 
-`test:integration` lance PostgreSQL 18 et Redis 7 avec `docker-compose.test.yml`, génère le client Prisma, applique le schéma, puis teste l’API via HTTP. Il vérifie notamment les mots de passe réels, les relations et historiques PostgreSQL, les permissions, les inscriptions et les jobs récurrents/consommés dans Redis.
+`test:integration` lance PostgreSQL 18 et Redis 7 avec `docker-compose.test.yml`, génère le client Prisma, applique le schéma, puis teste l’API via HTTP. Il vérifie notamment les mots de passe réels, les relations et historiques PostgreSQL, les permissions, les inscriptions, les uploads multipart et les jobs récurrents/consommés dans Redis.
 
 Docker doit fonctionner; les ports locaux `55432` et `56379` doivent être libres. Le script impose ses propres identifiants et adresses de test, indépendamment de `api/.env`. La base utilise un stockage temporaire; les conteneurs du projet `tritou-notes-backend-tests` sont supprimés à la fin, y compris après un échec normal. Ne pas lancer deux suites d’intégration simultanément.
 

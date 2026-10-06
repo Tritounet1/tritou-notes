@@ -31,6 +31,7 @@ model Document {
   type              DocumentType      @default(TEXT)
   documentHistories DocumentHistory[]
   conversations     Conversation[]
+  images            DocumentImage[]
 }
 
 enum DocumentType {
@@ -181,4 +182,19 @@ model Images {
   id         Int      @id @default(autoincrement())
   name       String
   created_at DateTime @default(now())
+}
+
+// Files are stored locally by the Express API; removing a document deletes its metadata.
+model DocumentImage {
+  id         String   @id @default(uuid()) @db.Uuid
+  documentId Int
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  filename   String
+  mimeType   String
+  size       Int
+  width      Int
+  height     Int
+  created_at DateTime @default(now())
+
+  @@index([documentId])
 }

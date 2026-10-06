@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import { useNavigate, useParams } from "react-router-dom";
 import remarkGfm from "remark-gfm";
+import { ImageBlock } from "./components/ImageBlock";
+import { ImageUploadModal } from "./components/ImageUploadModal";
+import { insertImageBlocks, serializeDocumentImage, type DocumentImageBlock } from "./utils/documentImages";
 import { apiFetch } from "./api";
 import { slashCommands } from "./commands";
 import { SchedulerBlock } from "./components/SchedulerBlock";
@@ -122,6 +125,9 @@ export const DocumentPage = () => {
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [focusCodeIndex, setFocusCodeIndex] = useState<number | null>(null);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const imageInsertRef = useRef({ start: 0, end: 0, source: "" });
   const [pendingLinkId, setPendingLinkId] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -479,7 +485,7 @@ export const DocumentPage = () => {
   };
 
   const handleStopEditing = () => {
-    if (!showCommands && !showSchedulerModal) {
+    if (!showCommands && !showSchedulerModal && !showImageModal) {
       const converted = convertStandaloneLinks(text);
       if (converted.ids.length) {
         handleTextChange(converted.text);
@@ -506,6 +512,32 @@ export const DocumentPage = () => {
     setEditingSegmentIndex(null);
     setShowCommands(false);
     setPendingLinkId(inserted.data.id);
+  };
+
+  const openImageUpload = (files: File[] = [], start = text.length, end = start, source = text) => {
+    if (!isAuthenticated || !hasPermission("modifyDocument") || document?.type !== "TEXT") return;
+    imageInsertRef.current = { start, end, source };
+    setImageFiles(files);
+    setShowImageModal(true);
+    setShowCommands(false);
+    setEditingSegmentIndex(null);
+  };
+
+  const handleInsertImages = (images: DocumentImageBlock[]) => {
+    const insertion = imageInsertRef.current;
+    // Background scraping may have changed the text while uploading. Preserve it.
+    const start = insertion.source === text ? insertion.start : text.length;
+    const end = insertion.source === text ? insertion.end : text.length;
+    const next = insertImageBlocks(text, start, end, images);
+    const position = next.length - (text.length - end);
+    imageInsertRef.current = { start: position, end: position, source: next };
+    handleTextChange(next);
+  };
+
+  const handleImageChange = (data: DocumentImageBlock) => {
+    const updated = parseSegments(text).map(segment => segment.type === "image" && segment.data.id === data.id
+      ? { ...segment, data, source: serializeDocumentImage(data) } : segment);
+    handleTextChange(segmentsToText(updated));
   };
 
   const handleWebLinkChange = (data: WebLink) => {
@@ -676,6 +708,12 @@ export const DocumentPage = () => {
     debouncedSave(title, newText, isPublic);
     setShowCommands(false);
     setCommandSearch("");
+
+    if (command.name === "image") {
+      const offset = segmentGlobalOffset(segs, editingSegmentIndex) + result.newCursorPosition;
+      openImageUpload([], offset, offset, newText);
+      return;
+    }
 
     if (command.name === "code") {
       const insertedOffset = segmentGlobalOffset(segs, editingSegmentIndex) + commandStartPos;
@@ -868,6 +906,8 @@ export const DocumentPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {showImageModal && <ImageUploadModal key={document.id} documentId={document.id} initialFiles={imageFiles}
+        onInsert={handleInsertImages} onClose={() => setShowImageModal(false)} />}
       <div className="max-w-6xl mx-auto px-6 py-8">
         {isAuthenticated && (
           <div className="flex items-center justify-between mb-6">
@@ -974,6 +1014,11 @@ export const DocumentPage = () => {
                         onDelete={canEdit ? () => handleDeleteSegment(segIndex) : undefined}
                       />
                     );
+                  }
+
+                  if (seg.type === "image") {
+                    return <ImageBlock key={seg.data.id} documentId={document.id} data={seg.data} readOnly={!canEdit}
+                      onChange={handleImageChange} onDelete={canEdit ? () => handleDeleteSegment(segIndex) : undefined} />;
                   }
 
                   if (seg.type === "link") {

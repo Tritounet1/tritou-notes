@@ -1,3 +1,5 @@
+import sharp from "sharp";
+import { access } from "node:fs/promises";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { once } from "node:events";
@@ -19,6 +21,7 @@ let regularToken: string;
 let regularId: number;
 let documentId: number;
 let instanceId: number;
+let documentImageId: string;
 let schedulerId: number;
 
 async function request(path: string, method = "GET", body?: unknown, auth = token) {
@@ -109,6 +112,52 @@ describe("real HTTP + PostgreSQL + Redis", () => {
     expect((await request(`/api/documents/${documentId}`, "DELETE", undefined, "")).status).toBe(401);
     expect((await request(`/api/document-histories/${documentId}`, "GET", undefined, "")).status).toBe(401);
   });
+  it("uploads and reads real image pixels through multipart HTTP", async () => {
+    const bytes = await sharp({ create: { width: 8, height: 4, channels: 3, background: "red" } }).png().toBuffer();
+    const form = new FormData(); form.append("image", new Blob([new Uint8Array(bytes)], { type: "image/png" }), "photo.png");
+    const response = await fetch(`${base}/api/documents/${documentId}/images`, { method: "POST", headers: { Authorization: `Bearer ${regularToken}` }, body: form });
+    expect(response.status).toBe(201);
+    const data = await response.json();
+    documentImageId = data.id;
+    expect(data).toMatchObject({ documentId, filename: "photo.png", mimeType: "image/webp", width: 8, height: 4 });
+    const imageResponse = await fetch(`${base}${data.url}`);
+    expect(imageResponse.status).toBe(200);
+    expect(imageResponse.headers.get("cache-control")).toBe("private, no-store");
+    expect(imageResponse.headers.get("x-content-type-options")).toBe("nosniff");
+    expect((await sharp(Buffer.from(await imageResponse.arrayBuffer())).metadata()).format).toBe("webp");
+  });
+  it("denies anonymous uploads and mismatched document references", async () => {
+    expect((await request(`/api/documents/${documentId}/images`, "POST", {} , "")).status).toBe(401);
+    expect((await request(`/api/documents/${documentId + 1}/images/${documentImageId}`)).status).toBe(404);
+    expect((await request(`/api/documents/${documentId}/images/${documentImageId}`, "PUT", {} , "")).status).toBe(401);
+  });
+  it("revokes anonymous image reads when the document becomes private", async () => {
+    await request(`/api/documents/${documentId}`, "PUT", { title: "Private", text: "Content", is_public: false }, regularToken);
+    expect((await request(`/api/documents/${documentId}/images/${documentImageId}`, "GET", undefined, "")).status).toBe(401);
+    const authenticated = await fetch(`${base}/api/documents/${documentId}/images/${documentImageId}`, { headers: { Authorization: `Bearer ${regularToken}` } });
+    expect(authenticated.status).toBe(200);
+    await authenticated.arrayBuffer();
+  });
+  it("retains image files for earlier document versions after block removal", async () => {
+    const marker = `::image[${encodeURIComponent(JSON.stringify({ id: documentImageId, caption: "Photo", width: 100, alt: "photo" }))}]::`;
+    await request(`/api/documents/${documentId}`, "PUT", { title: "Photo", text: marker }, regularToken);
+    await request(`/api/documents/${documentId}`, "PUT", { title: "No photo", text: "Removed" }, regularToken);
+    expect(await prisma.documentImage.findUnique({ where: { id: documentImageId } })).not.toBeNull();
+    expect((await prisma.documentHistory.findMany({ where: { documentId } })).some(version => version.text === marker)).toBe(true);
+    const { imagePath } = await import("../../utils/documentImageStorage");
+    await expect(access(imagePath(documentId, documentImageId))).resolves.toBeUndefined();
+  });
+  it.each(["invalid image", "unexpected field", "multiple files", "oversized file"])("rejects multipart %s without creating metadata", async scenario => {
+    const form = new FormData();
+    const bytes = scenario === "oversized file" ? new Uint8Array(10 * 1024 * 1024 + 1) : new TextEncoder().encode("<svg>not a raster image</svg>");
+    form.append(scenario === "unexpected field" ? "other" : "image", new Blob([bytes], { type: "image/png" }), "fake.png");
+    if (scenario === "multiple files") form.append("image", new Blob([bytes]), "second.png");
+    const before = await prisma.documentImage.count();
+    const response = await fetch(`${base}/api/documents/${documentId}/images`, { method: "POST", body: form, headers: { Authorization: `Bearer ${regularToken}` } });
+    expect(response.status).toBe(scenario === "oversized file" ? 413 : scenario === "invalid image" ? 415 : 400);
+    await response.text();
+    expect(await prisma.documentImage.count()).toBe(before);
+  });
   it("creates a scrape and enqueues its persisted ID in Redis", async () => {
     const response = await request("/api/instance-scrape", "POST", { url: "https://example.com" });
     expect(response.status).toBe(201);
@@ -162,5 +211,8 @@ describe("real HTTP + PostgreSQL + Redis", () => {
     expect((await request(`/api/documents/${documentId}`, "DELETE", undefined, regularToken)).status).toBe(200);
     expect(await prisma.document.findUnique({ where: { id: documentId } })).toBeNull();
     expect(await prisma.documentHistory.count({ where: { documentId } })).toBe(0);
+    expect(await prisma.documentImage.count({ where: { documentId } })).toBe(0);
+    const { imagePath } = await import("../../utils/documentImageStorage");
+    await expect(access(imagePath(documentId, documentImageId))).rejects.toMatchObject({ code: "ENOENT" });
   });
 });

@@ -1,5 +1,7 @@
 import { isWebUrl, parseWebLink, serializeWebLink, type WebLink } from "./webLinks.ts";
 
+import { parseDocumentImage, type DocumentImageBlock } from "./documentImages.ts";
+
 export type TextSegment = { type: "text"; content: string };
 export type SchedulerSegment = { type: "scheduler"; id: number };
 export type CodeSegment = {
@@ -10,17 +12,20 @@ export type CodeSegment = {
   closing: string;
 };
 export type LinkSegment = { type: "link"; data: WebLink; source: string };
-export type Segment = TextSegment | SchedulerSegment | CodeSegment | LinkSegment;
+export type ImageSegment = { type: "image"; data: DocumentImageBlock; source: string };
+export type Segment = TextSegment | SchedulerSegment | CodeSegment | LinkSegment | ImageSegment;
 
 function parseText(text: string): Segment[] {
   const segments: Segment[] = [];
-  const pattern = /::scheduler\[(\d+)\]::|^::link\[[^\r\n]*?\]::(?=\r?$)/gm;
+  const pattern = /::scheduler\[(\d+)\]::|^::(?:link|image)\[[^\r\n]*?\]::(?=\r?$)/gm;
   let last = 0;
   for (const match of text.matchAll(pattern)) {
     if (match.index > last) segments.push({ type: "text", content: text.slice(last, match.index) });
     const data = match[1] ? null : parseWebLink(match[0]);
+    const image = match[1] ? null : parseDocumentImage(match[0]);
     if (match[1]) segments.push({ type: "scheduler", id: Number(match[1]) });
     else if (data) segments.push({ type: "link", data, source: match[0] });
+    else if (image) segments.push({ type: "image", data: image, source: match[0] });
     else segments.push({ type: "text", content: match[0] });
     last = match.index + match[0].length;
   }
@@ -73,7 +78,7 @@ export function normalizeSegments(segments: Segment[]): Segment[] {
 function segmentToText(segment: Segment): string {
   if (segment.type === "text") return segment.content;
   if (segment.type === "scheduler") return `::scheduler[${segment.id}]::`;
-  if (segment.type === "link") return segment.source;
+  if (segment.type === "link" || segment.type === "image") return segment.source;
   return segment.opening + segment.content + segment.closing;
 }
 

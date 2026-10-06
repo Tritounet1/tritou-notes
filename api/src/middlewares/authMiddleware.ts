@@ -40,7 +40,7 @@ export const authHandler: RequestHandler = async (
     }
 
     // Permettre l'acces aux documents publics sans auth
-    if (req.path.startsWith("/api/documents/")) {
+    if (req.method === "GET" && /^\/api\/documents\/\d+(?:\/images\/[0-9a-f-]{36})?\/?$/i.test(req.path)) {
       const documentId = req.path.split("/")[3];
       if (documentId) {
         const document = await prisma.document.findFirst({

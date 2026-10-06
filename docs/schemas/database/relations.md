@@ -1,6 +1,6 @@
 # Tables et relations PostgreSQL
 
-Le schéma Prisma contient 12 modèles. Ce diagramme reprend leurs champs persistés et leurs relations ; les champs de navigation Prisma ne sont pas des colonnes SQL.
+Le schéma Prisma contient 13 modèles. Ce diagramme reprend leurs champs persistés et leurs relations ; les champs de navigation Prisma ne sont pas des colonnes SQL.
 
 ```mermaid
 erDiagram
@@ -20,6 +20,16 @@ erDiagram
         DateTime last_update
         Int authorId FK
         DocumentType type
+    }
+    DocumentImage {
+        UUID id PK
+        Int documentId FK
+        String filename
+        String mimeType
+        Int size
+        Int width
+        Int height
+        DateTime created_at
     }
     ScrapingScheduler {
         Int id PK
@@ -118,6 +128,7 @@ erDiagram
         DateTime created_at
     }
     User ||--o{ Document : authorId
+    Document ||--o{ DocumentImage : "documentId (cascade)"
     Document ||--o{ DocumentHistory : documentId
     User ||--o{ DocumentHistory : authorId
     ScrapingScheduler |o--o{ InstanceScrape : scrapingSchedulerId
@@ -136,6 +147,8 @@ erDiagram
 - `nullable` : champ optionnel. `String[]` représente un tableau PostgreSQL.
 - `UserPermissions.userId` est unique : un utilisateur possède au maximum une ligne de permissions.
 - Les liens de `Conversation` vers un utilisateur et un document sont optionnels, comme les liens des instances vers un scraper ou un planificateur.
+
+Les fichiers de `DocumentImage` sont stockés localement par Express, hors PostgreSQL. La relation `documentId` supprime les métadonnées en cascade ; le contrôleur supprime aussi le dossier du document.
 
 `Invitation`, `Settings` et `Images` n’ont aucune clé étrangère. Il n’existe pas de relation SQL entre `Document` et `ScrapingScheduler` : le frontend stocke une référence textuelle `::scheduler[id]::` dans `Document.text`.
 

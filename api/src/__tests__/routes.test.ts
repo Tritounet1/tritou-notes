@@ -1,3 +1,7 @@
+vi.mock("../utils/documentImageStorage", async importOriginal => ({
+  ...await importOriginal<typeof import("../utils/documentImageStorage")>(),
+  removeDocumentImages: async () => {},
+}));
 import type { Router } from "express";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db, resetDatabase, user } from "./helpers/database";

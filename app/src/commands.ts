@@ -10,6 +10,15 @@ export interface SlashCommand {
 
 export const slashCommands: SlashCommand[] = [
   {
+    name: "image",
+    description: "Ajouter des images depuis votre appareil",
+    opensModal: true,
+    execute: (currentText, cursorPosition, commandStart) => ({
+      newText: currentText.slice(0, commandStart) + currentText.slice(cursorPosition),
+      newCursorPosition: commandStart,
+    }),
+  },
+  {
     name: "planificateur",
     description: "Lier un planificateur (données live)",
     opensModal: true,

@@ -15,6 +15,8 @@ flowchart LR
     Worker --> DB
     Worker --> Browser["Puppeteer + Cheerio"]
     Browser --> Web["Sites à scraper"]
+    App -->|multipart images| Express
+    Controllers --> Files["Disque API : document-images"]
     Controllers --> AI["Anthropic"]
     Controllers --> Mail["SMTP : invitations"]
     MCP["Serveur MCP distinct"] --> DB
@@ -37,7 +39,7 @@ flowchart TD
     Controller -->|Erreur transmise à next| Errors["errorHandler"]
 ```
 
-`/auth/me`, `/auth/change-password` et `/api/admin-auth/invite` appliquent leur propre middleware d’authentification. Le middleware global autorise aussi l’accès sans jeton à un document public via `/api/documents/:id`. Les droits de mutation restent contrôlés par les routes.
+`/auth/me`, `/auth/change-password` et `/api/admin-auth/invite` appliquent leur propre middleware d’authentification. Le middleware global autorise aussi l’accès sans jeton à un document public via `/api/documents/:id`. Les images de ce document sont aussi lisibles par `GET /api/documents/:id/images/:imageId`. Les droits de mutation restent contrôlés par les routes.
 
 ## Routeurs montés
 
@@ -48,7 +50,7 @@ Les chemins ci-dessous sont les préfixes réels, sans préfixe `/api` implicite
 | `/health` | Disponibilité HTTP |
 | `/auth` | Connexion, déconnexion, profil, mot de passe |
 | `/api/admin-auth` | Premier administrateur et invitations |
-| `/api/documents` | Lecture ; création, modification, suppression avec droits dédiés |
+| `/api/documents` | Lecture ; mutations avec droits dédiés ; upload et lecture des images locales |
 | `/api/document-histories` | Lecture des versions de documents |
 | `/api/conversations` | Lecture et suppression ; `useAiChatBot` |
 | `/api/ai-client` | Modèles et messages IA ; `useAiChatBot` |
