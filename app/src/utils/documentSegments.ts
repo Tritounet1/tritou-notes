@@ -87,8 +87,27 @@ function segmentToText(segment: Segment): string {
   return segment.opening + segment.content + segment.closing;
 }
 
+/** Blocks the parser only recognises on a line of their own. */
+const LINE_BLOCKS = new Set<Segment["type"]>(["code", "link", "image"]);
+
+/**
+ * Text typed right before or after a line block must stay off the block's lines,
+ * otherwise the block is read back as plain text (typing "t" above a fence gave
+ * "t```ts"). Returns `content` with the missing line breaks added.
+ */
+export function keepBlocksOnOwnLine(content: string, previous?: Segment, next?: Segment): string {
+  if (!content) return content;
+  let result = content;
+  if (previous && LINE_BLOCKS.has(previous.type) && !segmentToText(previous).endsWith("\n") && !result.startsWith("\n")) result = "\n" + result;
+  if (next && LINE_BLOCKS.has(next.type) && !result.endsWith("\n")) result += "\n";
+  return result;
+}
+
 export function segmentsToText(segments: Segment[]): string {
-  return segments.map(segmentToText).join("");
+  // Safety net for programmatic edits; the editor already fixes text as it is typed.
+  return segments
+    .map((segment, i) => (segment.type === "text" ? keepBlocksOnOwnLine(segment.content, segments[i - 1], segments[i + 1]) : segmentToText(segment)))
+    .join("");
 }
 
 export function segmentGlobalOffset(segments: Segment[], upTo: number): number {

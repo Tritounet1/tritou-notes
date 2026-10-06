@@ -19,11 +19,12 @@ import { useDebounce } from "./hooks/useDebounce";
 import { jsonToMarkdownTable, templateToMarkdown } from "./utils/jsonToMarkdown";
 import { docTypeStyles } from "./utils/docTypes";
 import { notifyDocumentsChanged } from "./utils/documentEvents";
+import { caretTop, scrollParent, sourceOffsetFromPoint } from "./utils/caretFromClick";
 
 import { CodeBlock } from "./components/CodeBlock";
 import { WebLinkBlock } from "./components/WebLinkBlock";
 import { insertPastedWebLink, webUrlOnLine, serializeWebLink, type WebLink } from "./utils/webLinks";
-import { codeValue, convertStandaloneLinks, normalizeSegments, parseSegments, segmentGlobalOffset, segmentsToText, updateCodeSegment, type Segment } from "./utils/documentSegments";
+import { codeValue, convertStandaloneLinks, keepBlocksOnOwnLine, normalizeSegments, parseSegments, segmentGlobalOffset, segmentsToText, updateCodeSegment, type Segment } from "./utils/documentSegments";
 import { useConfirm } from "./hooks/useConfirm";
 
 interface Document {
@@ -312,14 +313,26 @@ export const DocumentPage = () => {
     notifyDocumentsChanged();
   };
 
-  const handleStartEditing = (segIndex: number, atEnd = false) => {
+  /**
+   * Switches a text segment to its Markdown editor. `offset` places the caret where the
+   * user clicked; `clickY` keeps that line under the pointer although the raw Markdown
+   * is laid out differently from the rendered text.
+   */
+  const handleStartEditing = (segIndex: number, atEnd = false, { offset, clickY }: { offset?: number | null; clickY?: number } = {}) => {
     setEditingSegmentIndex(segIndex);
     setTimeout(() => {
       const textarea = textareaRefs.current.get(segIndex);
-      textarea?.focus({ preventScroll: true });
-      if (textarea && atEnd) {
-        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-      }
+      if (!textarea) return;
+      textarea.focus({ preventScroll: true });
+      const position = offset ?? (atEnd ? textarea.value.length : null);
+      if (position === null) return;
+      textarea.setSelectionRange(position, position);
+      if (clickY === undefined) return;
+      textarea.style.height = "auto";
+      textarea.style.height = `${textarea.scrollHeight}px`;
+      const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 24;
+      const caretY = textarea.getBoundingClientRect().top + caretTop(textarea, position) + lineHeight / 2;
+      scrollParent(textarea).scrollBy({ top: caretY - clickY });
     }, 0);
   };
 
@@ -648,8 +661,14 @@ export const DocumentPage = () => {
     }
 
     const segs = normalizeSegments(parseSegments(text));
+    // Keep code fences and link / image blocks on their own lines, without moving the caret.
+    const content = keepBlocksOnOwnLine(newContent, segs[segIndex - 1], segs[segIndex + 1]);
+    if (content !== newContent) {
+      const caret = cursorPos + (content.startsWith("\n") && !newContent.startsWith("\n") ? 1 : 0);
+      setTimeout(() => textareaRefs.current.get(segIndex)?.setSelectionRange(caret, caret), 0);
+    }
     const newSegs = segs.map((s, i) =>
-      i === segIndex ? { type: "text" as const, content: newContent } : s
+      i === segIndex ? { type: "text" as const, content } : s
     );
     handleTextChange(segmentsToText(newSegs));
   };
@@ -969,9 +988,9 @@ export const DocumentPage = () => {
                   const isLastSegment = segIndex === segs.length - 1;
 
                   return (
-                    <div key={`text-${segIndex}`} className={isLastSegment ? "flex flex-col flex-1" : undefined}>
+                    <div key={`text-${segIndex}`} className={isLastSegment ? "flex grow flex-col" : undefined}>
                       {isEditingThis ? (
-                        <div className={`relative ${isLastSegment ? "flex flex-col flex-1" : ""}`}>
+                        <div className={`relative ${isLastSegment ? "flex grow flex-col" : ""}`}>
                           <textarea
                             ref={el => { textareaRefs.current.set(segIndex, el); }}
                             value={seg.content}
@@ -983,7 +1002,7 @@ export const DocumentPage = () => {
                               ? "Commencez à écrire en Markdown… (tapez / pour les commandes)"
                               : "Tapez ici… (/ pour les commandes)"}
                             aria-label="Contenu du document"
-                            className={`w-full min-h-[50px] resize-none overflow-hidden border-none bg-transparent font-mono text-sm leading-[1.7] text-ink outline-none placeholder:text-muted/60 caret-indigo ${isLastSegment ? "flex-1" : ""}`}
+                            className={`w-full min-h-[50px] resize-none overflow-hidden border-none bg-transparent font-mono text-sm leading-[1.7] text-ink outline-none placeholder:text-muted/60 caret-indigo ${isLastSegment ? "grow" : ""}`}
                           />
                           {showCommands && filteredCommands.length > 0 && (
                             <div
@@ -1020,7 +1039,17 @@ export const DocumentPage = () => {
                         </div>
                       ) : (
                         <div
-                          onClick={canEdit ? event => handleStartEditing(segIndex, event.target === event.currentTarget) : undefined}
+                          onClick={canEdit ? event => {
+                            // Let links open, and let a drag-selection stay a selection (to copy text).
+                            if ((event.target as HTMLElement).closest("a")) return;
+                            const selection = window.getSelection();
+                            if (selection && !selection.isCollapsed && event.currentTarget.contains(selection.anchorNode)) return;
+                            const onBackground = event.target === event.currentTarget;
+                            handleStartEditing(segIndex, onBackground, {
+                              offset: onBackground ? null : sourceOffsetFromPoint(event.currentTarget, event.clientX, event.clientY, seg.content),
+                              clickY: event.clientY,
+                            });
+                          } : undefined}
                           tabIndex={canEdit ? 0 : undefined}
                           onKeyDown={canEdit ? event => {
                             if (event.target === event.currentTarget && event.key === "Enter") {
@@ -1029,7 +1058,7 @@ export const DocumentPage = () => {
                             }
                           } : undefined}
                           aria-label={canEdit ? "Modifier le texte du document" : undefined}
-                          className={`rounded-md outline-none focus-visible:ring-2 focus-visible:ring-indigo-soft ${canEdit ? "cursor-text" : ""} ${isLastSegment ? "flex-1" : ""} ${seg.content ? "" : "min-h-[40px]"}`}
+                          className={`rounded-md outline-none focus-visible:ring-2 focus-visible:ring-indigo-soft ${canEdit ? "cursor-text" : ""} ${isLastSegment ? "grow" : ""} ${seg.content ? "" : "min-h-[40px]"}`}
                         >
                           {seg.content ? (
                             <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
@@ -1064,6 +1093,15 @@ export const DocumentPage = () => {
             </section>
           );
         })()}
+
+        {/* Room to scroll past the end, like Notion; clicking it resumes writing at the end. */}
+        {document.type === "TEXT" && (
+          <div
+            aria-hidden="true"
+            onClick={canModify ? () => handleStartEditing(normalizeSegments(parseSegments(text)).length - 1, true) : undefined}
+            className={`h-[45vh] ${canModify ? "cursor-text" : ""}`}
+          />
+        )}
       </div>
 
       {/* AI Chat Panel */}
