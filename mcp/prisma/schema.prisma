@@ -182,6 +182,9 @@ model Settings {
   smtpPassword    String?
   smtpHost        String?
   smtpPort        Int?
+  // SHA-256 of the MCP server's bearer token; the token itself is shown once and never stored.
+  mcpTokenHash      String?
+  mcpTokenCreatedAt DateTime?
 }
 
 model Images {

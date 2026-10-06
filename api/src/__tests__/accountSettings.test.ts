@@ -3,12 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   findUser: vi.fn(), updateUser: vi.fn(), verifyPassword: vi.fn(), hashPassword: vi.fn(), decodeToken: vi.fn(),
-  getSettings: vi.fn(), updateSettings: vi.fn(),
+  getSettings: vi.fn(), updateSettings: vi.fn(), createMcpToken: vi.fn(), deleteMcpToken: vi.fn(),
 }));
 vi.mock("../config/prismaClient", () => ({ prisma: { user: { findUnique: mocks.findUser, update: mocks.updateUser } } }));
 vi.mock("../utils/bcryptUtils", () => ({ verifyPassword: mocks.verifyPassword, hashPassword: mocks.hashPassword }));
 vi.mock("../utils/jwtUtils", () => ({ decodeToken: mocks.decodeToken, createToken: vi.fn() }));
-vi.mock("../controllers/settingsController", () => ({ getSettings: mocks.getSettings, updateSettings: mocks.updateSettings }));
+vi.mock("../controllers/settingsController", () => ({ getSettings: mocks.getSettings, updateSettings: mocks.updateSettings, createMcpToken: mocks.createMcpToken, deleteMcpToken: mocks.deleteMcpToken }));
 import authRoutes from "../routes/authRoutes";
 import settingsRoutes from "../routes/settingsRoutes";
 
@@ -90,6 +90,13 @@ describe("administrative configuration stays private", () => {
     expect(response.status).toHaveBeenCalledWith(401);
     expect(mocks.getSettings).not.toHaveBeenCalled();
     expect(mocks.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it.each(["POST", "DELETE"])("denies a regular user %s on the MCP token", async method => {
+    const response = await dispatch(settingsRoutes, method, "/mcp-token", {}, user);
+    expect(response.status).toHaveBeenCalledWith(401);
+    expect(mocks.createMcpToken).not.toHaveBeenCalled();
+    expect(mocks.deleteMcpToken).not.toHaveBeenCalled();
   });
 
   it.each(["GET", "PUT"])("preserves administrator %s access", async method => {

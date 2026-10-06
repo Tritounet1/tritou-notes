@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "./api";
 import { useAuth } from "./hooks/useAuth";
+import { McpSettings } from "./components/McpSettings";
 
 const EyeIcon = ({ open }: { open: boolean }) => (
   <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
@@ -53,11 +54,14 @@ interface Settings {
   smtpPassword: string | null;
   smtpHost: string | null;
   smtpPort: number | null;
+  mcpTokenSet: boolean;
+  mcpTokenCreatedAt: string | null;
 }
 
 export const SettingsPage = () => {
   const { isAdmin, user } = useAuth();
-  const [tab, setTab] = useState<"account" | "ai" | "mail">("account");
+  const [tab, setTab] = useState<"account" | "ai" | "mail" | "mcp">("account");
+  const [mcp, setMcp] = useState({ tokenSet: false, createdAt: null as string | null });
   const [settingsId, setSettingsId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -101,6 +105,7 @@ export const SettingsPage = () => {
             setSmtpPort(s.smtpPort?.toString() || "587");
             setSmtpUser(s.smtpUser || "");
             setSmtpPassword(s.smtpPassword || "");
+            setMcp({ tokenSet: s.mcpTokenSet, createdAt: s.mcpTokenCreatedAt });
           }
         }
       } catch (err) {
@@ -206,9 +211,10 @@ export const SettingsPage = () => {
       ? [
           ["ai", "Intelligence artificielle"],
           ["mail", "E-mail (SMTP)"],
+          ["mcp", "MCP"],
         ]
       : []),
-  ] as ["account" | "ai" | "mail", string][];
+  ] as ["account" | "ai" | "mail" | "mcp", string][];
 
   const initials = (user?.username ?? "?").slice(0, 2).toUpperCase();
 
@@ -402,6 +408,8 @@ export const SettingsPage = () => {
               </div>
             </section>
           )}
+
+          {isAdmin && tab === "mcp" && <McpSettings tokenSet={mcp.tokenSet} createdAt={mcp.createdAt} />}
         </div>
       </div>
     </div>

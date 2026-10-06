@@ -42,7 +42,6 @@ Le serveur démarre en mode **stdio** (local) ou **HTTP** (production) selon la 
 | `DATABASE_URL`              | Connexion PostgreSQL                                    |
 | `REDIS_HOST` / `REDIS_PORT` | Connexion Redis                                         |
 | `MCP_HTTP_PORT`             | Si défini → mode HTTP sur ce port. Absent → mode stdio. |
-| `MCP_AUTH_TOKEN`            | Token Bearer obligatoire en mode HTTP                   |
 
 ---
 
@@ -75,13 +74,7 @@ Redémarre Claude Desktop.
 
 ### 1. Déployer le service MCP sur le serveur
 
-Ajoute `MCP_AUTH_TOKEN` dans un fichier `.env` à la racine du projet (même que les autres services) :
-
-```env
-MCP_AUTH_TOKEN=un_secret_long_et_aleatoire
-```
-
-Puis lance le service avec Docker Compose ou le Dockerfile.
+Lance le service avec Docker Compose ou le Dockerfile.
 
 Le MCP tourne sur le port **3001** à l'intérieur du réseau Docker.
 
@@ -102,7 +95,34 @@ location /mcp {
 
 Le `/health` ne nécessite pas de token : `https://ton-domaine.com/mcp/health` doit répondre `{"ok":true}`.
 
-### 3. Configurer Claude Desktop
+### 3. Générer le token
+
+Le token n'est pas dans le `.env` : c'est l'app qui le génère. Dans **Paramètres › MCP** (administrateur), clique sur **Générer un token**. Il n'est affiché qu'une fois ; seule son empreinte SHA-256 est enregistrée (`Settings.mcpTokenHash`). Tant qu'aucun token n'a été généré, le serveur HTTP refuse toutes les requêtes. **Régénérer** invalide l'ancien token, **Révoquer** coupe l'accès.
+
+La page affiche aussi les configurations Claude Code et Claude Desktop prêtes à copier, avec le token. L’URL proposée est celle de l’app suivie de `/mcp` (modifiable dans la page, ou via `VITE_MCP_URL` au build du frontend).
+
+### 4. Configurer Claude Code
+
+```bash
+claude mcp add --transport http tritou-notes https://ton-domaine.com/mcp \
+  --header "Authorization: Bearer tritou_mcp_…"
+```
+
+Ou dans le `.mcp.json` d'un projet :
+
+```json
+{
+  "mcpServers": {
+    "tritou-notes": {
+      "type": "http",
+      "url": "https://ton-domaine.com/mcp",
+      "headers": { "Authorization": "Bearer tritou_mcp_…" }
+    }
+  }
+}
+```
+
+### 5. Configurer Claude Desktop
 
 Claude Desktop ne supporte pas encore le format `url` natif — il faut passer par `mcp-remote`, un proxy stdio qui fait le lien avec le serveur HTTP. Il sera téléchargé automatiquement via `npx`.
 
@@ -118,7 +138,7 @@ Dans `~/Library/Application Support/Claude/claude_desktop_config.json` :
         "mcp-remote",
         "https://ton-domaine.com/mcp",
         "--header",
-        "Authorization: Bearer un_secret_long_et_aleatoire"
+        "Authorization: Bearer tritou_mcp_…"
       ]
     }
   }

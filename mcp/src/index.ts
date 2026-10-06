@@ -1,4 +1,5 @@
 import "dotenv/config";
+import crypto from "node:crypto";
 import express from "express";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -15,6 +16,7 @@ import { instanceTools, handleInstanceTool } from "./tools/instances";
 import { schedulerTools, handleSchedulerTool } from "./tools/schedulers";
 import { userTools, handleUserTool } from "./tools/users";
 import { commandTools, handleCommandTool } from "./tools/commands";
+import { prisma } from "./prisma";
 
 const allTools = [
   ...documentTools,
@@ -78,7 +80,22 @@ async function startStdio() {
   process.stderr.write("Tritou Notes MCP — mode stdio\n");
 }
 
-async function startHttp(port: number, authToken: string) {
+const sha256 = (value: string) => crypto.createHash("sha256").update(value).digest();
+const sameDigest = (a: Buffer, b: Buffer) => a.length === b.length && crypto.timingSafeEqual(a, b);
+
+/**
+ * Checks the bearer token against the one generated in the app (Paramètres › MCP).
+ * Only its SHA-256 is stored, in Settings.mcpTokenHash; no token generated = no access.
+ */
+async function isAuthorized(header: string | undefined): Promise<boolean> {
+  const token = header?.startsWith("Bearer ") ? header.slice("Bearer ".length).trim() : "";
+  if (!token) return false;
+  const digest = sha256(token);
+  const settings = await prisma.settings.findFirst({ select: { mcpTokenHash: true } });
+  return Boolean(settings?.mcpTokenHash) && sameDigest(digest, Buffer.from(settings!.mcpTokenHash!, "hex"));
+}
+
+async function startHttp(port: number) {
   const app = express();
   app.use(express.json());
 
@@ -86,13 +103,18 @@ async function startHttp(port: number, authToken: string) {
     res.json({ ok: true });
   });
 
-  app.use((req, res, next) => {
-    const auth = req.headers.authorization;
-    if (!authToken || auth === `Bearer ${authToken}`) {
-      next();
-      return;
+  // Fail closed: with no token configured at all, every request is rejected.
+  app.use(async (req, res, next) => {
+    try {
+      if (await isAuthorized(req.headers.authorization)) {
+        next();
+        return;
+      }
+      res.status(401).json({ error: "Unauthorized — generate a token in Tritou Notes › Paramètres › MCP" });
+    } catch (err) {
+      process.stderr.write(`Auth check failed: ${err}\n`);
+      res.status(500).json({ error: "Auth check failed" });
     }
-    res.status(401).json({ error: "Unauthorized" });
   });
 
   app.all("/mcp", async (req: IncomingMessage, res: ServerResponse) => {
@@ -114,10 +136,9 @@ async function startHttp(port: number, authToken: string) {
 }
 
 const httpPort = process.env.MCP_HTTP_PORT ? parseInt(process.env.MCP_HTTP_PORT) : null;
-const authToken = process.env.MCP_AUTH_TOKEN ?? "";
 
 if (httpPort) {
-  startHttp(httpPort, authToken).catch((err) => {
+  startHttp(httpPort).catch((err) => {
     process.stderr.write(`Fatal: ${err}\n`);
     process.exit(1);
   });
