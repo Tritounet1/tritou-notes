@@ -95,6 +95,7 @@ export const CommandPalette = ({ onClose }: { onClose: () => void }) => {
 
   const pages: [string, string, boolean][] = [
     ["Accueil", "/dashboard", true],
+    ["Assistant IA", "/assistant", hasPermission("useAiChatBot")],
     ["Scrapers", "/scrapers", canScrape],
     ["Instances", "/instances", hasPermission("accessInstancesScrapersPage")],
     ["Planificateurs", "/scraping-schedulers", canScrape],

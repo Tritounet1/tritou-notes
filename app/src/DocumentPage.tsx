@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import remarkGfm from "remark-gfm";
+import { AiChat } from "./components/AiChat";
+import { AiImageModal } from "./components/AiImageModal";
 import { ImageBlock } from "./components/ImageBlock";
 import { ImageUploadModal } from "./components/ImageUploadModal";
 import { insertImageBlocks, serializeDocumentImage, type DocumentImageBlock } from "./utils/documentImages";
@@ -53,28 +55,6 @@ interface DiffLine {
   content: string;
 }
 
-interface AIModel {
-  type: string;
-  id: string;
-  display_name: string;
-  created_at: string;
-}
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-}
-
-interface Conversation {
-  id: number;
-  message: string;
-  response: string;
-  model_id: string;
-  documentId: number;
-  authorId: number;
-  created_at: string;
-}
-
 const docTypeIcons = {
   TEXT: <><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></>,
   EXCEL: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M3 15h18M9 4v16" /></>,
@@ -83,7 +63,7 @@ const docTypeIcons = {
 
 // Short glyphs shown in the slash command menu tiles.
 const commandGlyphs: Record<string, string> = {
-  page: "¶", image: "▣", planificateur: "↻", scrape: "↯", date: "31", time: "◷",
+  page: "¶", image: "▣", "image-ia": "✦", planificateur: "↻", scrape: "↯", date: "31", time: "◷",
   divider: "—", code: "{}", quote: "“", list: "•", checkbox: "[ ]",
 };
 
@@ -179,17 +159,13 @@ export const DocumentPage = () => {
   const [schedulerListLoading, setSchedulerListLoading] = useState(false);
   const schedulerInsertRef = useRef<{ segIndex: number; cursorPos: number } | null>(null);
 
-  // AI Chat state
   const [showAiChat, setShowAiChat] = useState(false);
-  const [aiModels, setAiModels] = useState<AIModel[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>("");
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [aiInput, setAiInput] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const [showMentions, setShowMentions] = useState(false);
-  const [mentionSearch, setMentionSearch] = useState("");
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const aiTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showAiImageModal, setShowAiImageModal] = useState(false);
+  // Bumped when the assistant edits this page to refetch it.
+  const [reloadKey, setReloadKey] = useState(0);
+  // Bumped after each fetch: the to-do / spreadsheet editors only read their data on mount,
+  // so they are remounted once the fresh content is in state.
+  const [loadedVersion, setLoadedVersion] = useState(0);
 
   // Scrape modal state
   const [showScrapeModal, setShowScrapeModal] = useState(false);
@@ -199,24 +175,6 @@ export const DocumentPage = () => {
   const scrapeInsertPosRef = useRef<number>(0);
 
   useEffect(() => {
-    const fetchConversations = async () => {
-      try {
-        const response = await apiFetch(`/api/conversations/${id}`);
-        if (response.ok) {
-          const data: Conversation[] = await response.json();
-          // Transform conversations into chat messages
-          const messages: ChatMessage[] = [];
-          data.forEach((conv) => {
-            messages.push({ role: "user", content: conv.message });
-            messages.push({ role: "assistant", content: conv.response });
-          });
-          setChatMessages(messages);
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    };
-
     const fetchDocument = async () => {
       try {
         const response = await apiFetch(`/api/documents/${id}`);
@@ -228,9 +186,8 @@ export const DocumentPage = () => {
         savedTitleRef.current = data.title;
         setTitle(data.title || "");
         setText(data.text || "");
+        setLoadedVersion((n) => n + 1);
         setIsPublic(data.public || false);
-        // Fetch conversations after document is loaded
-        fetchConversations();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erreur");
       } finally {
@@ -239,7 +196,7 @@ export const DocumentPage = () => {
     };
 
     fetchDocument();
-  }, [id]);
+  }, [id, reloadKey]);
 
   const fetchHistory = async () => {
     setHistoryLoading(true);
@@ -264,86 +221,6 @@ export const DocumentPage = () => {
     fetchHistory();
   };
 
-  // AI Chat functions
-  const fetchAiModels = async () => {
-    try {
-      const response = await apiFetch("/api/ai-client");
-      if (response.ok) {
-        const data = await response.json();
-        setAiModels(data);
-        if (data.length > 0 && !selectedModel) {
-          setSelectedModel(data[0].id);
-        }
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleOpenAiChat = () => {
-    setShowAiChat(true);
-    if (aiModels.length === 0) {
-      fetchAiModels();
-    }
-  };
-
-  const handleSendMessage = async () => {
-    if (!aiInput.trim() || !selectedModel || aiLoading) return;
-
-    const userMessage = aiInput.trim();
-
-    // Replace @file with actual document content for AI
-    const messageForAi = userMessage.replace(
-      /@file/g,
-      `[Document: ${title}]\n${text}\n[Fin du document]`,
-    );
-
-    setAiInput("");
-    // Show the original message (with @file) to the user
-    setChatMessages((prev) => [
-      ...prev,
-      { role: "user", content: userMessage },
-    ]);
-    setAiLoading(true);
-
-    try {
-      const response = await apiFetch("/api/ai-client", {
-        method: "POST",
-        body: JSON.stringify({
-          model_id: selectedModel,
-          message: messageForAi,
-          document_id: document?.id,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const aiResponse = data[0]?.text || "Pas de réponse";
-        setChatMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: aiResponse },
-        ]);
-      } else {
-        setChatMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: "Erreur lors de la requête" },
-        ]);
-      }
-    } catch {
-      setChatMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Erreur de connexion" },
-      ]);
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  // Scroll to bottom when new messages arrive
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
-
   // Auto-resize active segment textarea
   useEffect(() => {
     if (editingSegmentIndex !== null) {
@@ -355,114 +232,6 @@ export const DocumentPage = () => {
     }
   }, [text, editingSegmentIndex]);
 
-  // Mention system for @file
-  const mentions = [
-    {
-      name: "file",
-      description: "Insérer le contenu du document",
-    },
-  ];
-
-  const filteredMentions = mentions.filter((m) =>
-    m.name.toLowerCase().startsWith(mentionSearch.toLowerCase()),
-  );
-
-  const handleAiInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = e.target.value;
-    const cursorPos = e.target.selectionStart;
-
-    // Check for @ mention
-    const textBeforeCursor = newValue.slice(0, cursorPos);
-    const lastAtIndex = textBeforeCursor.lastIndexOf("@");
-
-    if (lastAtIndex !== -1) {
-      const textAfterAt = textBeforeCursor.slice(lastAtIndex + 1);
-
-      // Cancel if space right after @
-      if (textAfterAt.startsWith(" ")) {
-        setShowMentions(false);
-        setMentionSearch("");
-      } else if (
-        lastAtIndex === 0 ||
-        newValue[lastAtIndex - 1] === " " ||
-        newValue[lastAtIndex - 1] === "\n"
-      ) {
-        if (!/\s/.test(textAfterAt)) {
-          setShowMentions(true);
-          setMentionSearch(textAfterAt);
-        } else {
-          setShowMentions(false);
-          setMentionSearch("");
-        }
-      } else {
-        setShowMentions(false);
-        setMentionSearch("");
-      }
-    } else {
-      setShowMentions(false);
-      setMentionSearch("");
-    }
-
-    setAiInput(newValue);
-
-    // Auto-resize textarea
-    if (aiTextareaRef.current) {
-      aiTextareaRef.current.style.height = "auto";
-      aiTextareaRef.current.style.height =
-        Math.min(aiTextareaRef.current.scrollHeight, 150) + "px";
-    }
-  };
-
-  const insertMention = (mentionName: string) => {
-    const cursorPos = aiTextareaRef.current?.selectionStart || aiInput.length;
-    const textBeforeCursor = aiInput.slice(0, cursorPos);
-    const lastAtIndex = textBeforeCursor.lastIndexOf("@");
-
-    if (lastAtIndex === -1) return;
-
-    const beforeMention = aiInput.slice(0, lastAtIndex);
-    const afterCursor = aiInput.slice(cursorPos);
-
-    // Just insert the @mention tag, not the content
-    const insertedText = `@${mentionName} `;
-
-    const newText = beforeMention + insertedText + afterCursor;
-    setAiInput(newText);
-    setShowMentions(false);
-    setMentionSearch("");
-
-    setTimeout(() => {
-      if (aiTextareaRef.current) {
-        const newCursorPos = beforeMention.length + insertedText.length;
-        aiTextareaRef.current.selectionStart = newCursorPos;
-        aiTextareaRef.current.selectionEnd = newCursorPos;
-        aiTextareaRef.current.focus();
-      }
-    }, 0);
-  };
-
-  // Check if message contains @file
-  const hasFileMention = aiInput.includes("@file");
-
-  const handleAiKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (showMentions) {
-      if (e.key === "Enter" && filteredMentions.length > 0) {
-        e.preventDefault();
-        insertMention(filteredMentions[0].name);
-        return;
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        setShowMentions(false);
-        setMentionSearch("");
-        return;
-      }
-    }
-
-    if (e.key === "Enter" && !e.shiftKey && !showMentions) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
 
   const savedTitleRef = useRef<string | null>(null);
 
@@ -756,7 +525,8 @@ export const DocumentPage = () => {
 
   // Filter commands based on search
   const filteredCommands = slashCommands.filter((cmd) =>
-    cmd.name.toLowerCase().startsWith(commandSearch.toLowerCase()),
+    cmd.name.toLowerCase().startsWith(commandSearch.toLowerCase()) &&
+    (cmd.name !== "image-ia" || hasPermission("useAiChatBot")),
   );
 
   // Reset selected index when filtered commands change
@@ -793,6 +563,14 @@ export const DocumentPage = () => {
     debouncedSave(title, newText, isPublic);
     setShowCommands(false);
     setCommandSearch("");
+
+    if (command.name === "image-ia") {
+      const offset = segmentGlobalOffset(segs, editingSegmentIndex) + result.newCursorPosition;
+      imageInsertRef.current = { start: offset, end: offset, source: newText };
+      setEditingSegmentIndex(null);
+      setShowAiImageModal(true);
+      return;
+    }
 
     if (command.name === "image") {
       const offset = segmentGlobalOffset(segs, editingSegmentIndex) + result.newCursorPosition;
@@ -1021,6 +799,9 @@ export const DocumentPage = () => {
       {showMoveModal && (
         <MovePageModal documentId={document.id} currentParentId={document.parentId} onMoved={handleMoved} onClose={() => setShowMoveModal(false)} />
       )}
+      {showAiImageModal && (
+        <AiImageModal documentId={document.id} onInsert={handleInsertImages} onClose={() => setShowAiImageModal(false)} />
+      )}
       {showImageModal && <ImageUploadModal key={document.id} documentId={document.id} initialFiles={imageFiles}
         onInsert={handleInsertImages} onClose={() => setShowImageModal(false)} />}
 
@@ -1078,7 +859,7 @@ export const DocumentPage = () => {
               {canUseAi && (
                 <button
                   type="button"
-                  onClick={showAiChat ? () => setShowAiChat(false) : handleOpenAiChat}
+                  onClick={() => setShowAiChat(!showAiChat)}
                   aria-pressed={showAiChat}
                   className={`flex min-h-[34px] cursor-pointer items-center gap-1.5 rounded-[9px] px-3 font-semibold transition ${showAiChat ? "bg-indigo text-white hover:bg-indigo-ink" : "border border-line-strong bg-paper text-ink hover:bg-paper-soft"}`}
                 >
@@ -1123,7 +904,7 @@ export const DocumentPage = () => {
 
           {document.type === "TODO" && (
             <div className="pb-20">
-              <TodoEditor data={text} onChange={handleTextChange} readOnly={!canModify} />
+              <TodoEditor key={loadedVersion} data={text} onChange={handleTextChange} readOnly={!canModify} />
             </div>
           )}
 
@@ -1267,7 +1048,7 @@ export const DocumentPage = () => {
 
         {document.type === "EXCEL" && (
           <div className="mx-3 mb-3 mt-[18px] flex h-[70vh] flex-col overflow-hidden rounded-2xl border border-line-strong sm:mx-5">
-            <SpreadsheetEditor data={text} onChange={handleTextChange} readOnly={!canModify} />
+            <SpreadsheetEditor key={loadedVersion} data={text} onChange={handleTextChange} readOnly={!canModify} />
           </div>
         )}
 
@@ -1288,127 +1069,12 @@ export const DocumentPage = () => {
       {/* AI Chat Panel */}
       {canUseAi && showAiChat && (
         <aside aria-label="Assistant IA" className="flex min-h-[520px] min-w-0 flex-[1_1_340px] flex-col border-t border-line-soft bg-paper-warm xl:h-full xl:min-h-0 xl:border-t-0 xl:border-l">
-          <div className="flex items-center justify-between gap-2 border-b border-line-soft px-4 py-3.5">
-            <h2 className="flex items-center gap-2.5 font-display text-[17px] font-bold text-ink">
-              <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-[9px] bg-indigo text-white">
-                <svg className="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">{sparkle}</svg>
-              </span>
-              Assistant IA
-            </h2>
-            <button type="button" onClick={() => setShowAiChat(false)} aria-label="Fermer l’assistant" className="icon-btn h-8 w-8 rounded-lg">
-              {closeIcon}
-            </button>
-          </div>
-
-          {/* Messages */}
-          <div className="flex flex-1 flex-col gap-3.5 overflow-y-auto px-4 py-[18px] text-sm leading-[1.55]">
-            {chatMessages.length === 0 ? (
-              <p className="mt-8 text-center text-sm text-muted">
-                Posez une question à l’IA
-              </p>
-            ) : (
-              chatMessages.map((msg, index) =>
-                msg.role === "user" ? (
-                  <p key={index} className="max-w-[85%] self-end whitespace-pre-wrap rounded-[16px_16px_4px_16px] bg-ink px-3.5 py-2.5 text-white">
-                    {msg.content.split(/(@file)/g).map((part, i) =>
-                      part === "@file" ? (
-                        <span key={i} className="rounded-[5px] bg-[#3a3934] px-1.5 py-px font-mono text-xs text-neon">@file</span>
-                      ) : (
-                        part
-                      ),
-                    )}
-                  </p>
-                ) : (
-                  <p key={index} className="max-w-[92%] whitespace-pre-wrap text-ink-2">{msg.content}</p>
-                ),
-              )
-            )}
-            {aiLoading && (
-              <span role="status" className="flex items-center gap-2 text-[13px] text-muted">
-                <span aria-hidden="true" className="flex gap-[3px]">
-                  <span className="h-[5px] w-[5px] animate-pulse rounded-full bg-indigo" />
-                  <span className="h-[5px] w-[5px] animate-pulse rounded-full bg-indigo/60 [animation-delay:150ms]" />
-                  <span className="h-[5px] w-[5px] animate-pulse rounded-full bg-indigo/30 [animation-delay:300ms]" />
-                </span>
-                Réflexion…
-              </span>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* Input */}
-          <div className="border-t border-line-soft p-3">
-            <div className="relative">
-              {showMentions && filteredMentions.length > 0 && (
-                <div className="absolute bottom-full left-0 z-10 mb-2 w-full rounded-[14px] bg-paper p-1.5 shadow-[0_18px_50px_-12px_rgba(28,27,25,0.35),0_0_0_1px_var(--color-line-strong)]">
-                  <p className="eyebrow px-2.5 pt-1.5 pb-1">Mentions</p>
-                  {filteredMentions.map((mention) => (
-                    <button
-                      key={mention.name}
-                      type="button"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        insertMention(mention.name);
-                      }}
-                      className="flex w-full cursor-pointer items-center gap-3 rounded-[10px] bg-indigo-tint px-2.5 py-2 text-left"
-                    >
-                      <span className="font-mono text-sm font-semibold text-indigo-ink">@{mention.name}</span>
-                      <span className="text-xs text-muted">{mention.description}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="flex flex-col gap-2 rounded-[14px] border border-line-strong bg-paper py-2.5 pr-2.5 pl-3 transition focus-within:border-indigo focus-within:ring-4 focus-within:ring-indigo-tint">
-                <textarea
-                  ref={aiTextareaRef}
-                  value={aiInput}
-                  onChange={handleAiInputChange}
-                  onKeyDown={handleAiKeyDown}
-                  placeholder="Écrivez votre message… (@file pour inclure le document)"
-                  aria-label="Message à l’assistant"
-                  className="max-h-[150px] min-h-[44px] resize-none border-0 bg-transparent text-sm text-ink outline-none placeholder:text-muted/70"
-                  disabled={aiLoading}
-                  rows={2}
-                />
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <label className="flex min-w-0 items-center gap-1.5 text-xs text-muted">
-                    Modèle
-                    <select
-                      value={selectedModel}
-                      onChange={(e) => setSelectedModel(e.target.value)}
-                      className="min-w-0 max-w-44 cursor-pointer rounded-[7px] border border-line-strong bg-paper-soft px-1.5 py-[3px] text-xs text-ink outline-none focus:border-indigo"
-                    >
-                      {aiModels.map((model) => (
-                        <option key={model.id} value={model.id}>
-                          {model.display_name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    {hasFileMention && (
-                      <span className="pill bg-indigo-tint font-medium text-indigo-ink">
-                        <svg aria-hidden="true" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z" /><path d="M14 3v5h5" /></svg>
-                        Document inclus
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleSendMessage}
-                      disabled={aiLoading || !aiInput.trim()}
-                      aria-label="Envoyer"
-                      className="flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-[10px] bg-indigo text-white transition hover:bg-indigo-ink disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <p className="mt-1.5 px-1 text-[11px] text-muted">
-                <kbd className="font-mono">Maj+Entrée</kbd> pour une nouvelle ligne
-              </p>
-            </div>
-          </div>
+          <AiChat
+            documentId={document.id}
+            variant="panel"
+            onClose={() => setShowAiChat(false)}
+            onDocumentsChanged={(ids) => ids.includes(document.id) && setReloadKey((n) => n + 1)}
+          />
         </aside>
       )}
 

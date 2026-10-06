@@ -15,6 +15,7 @@ import { ScrapingSchedulersPage } from "./ScrapingSchedulersPage";
 import { UserPage } from "./UserPage";
 import { UsersPage } from "./UsersPage";
 import { SettingsPage } from "./SettingsPage";
+import { AssistantPage } from "./AssistantPage";
 import { useAuth } from "./hooks/useAuth";
 import { useEffect, useState, type ReactNode } from "react";
 import { CommandPalette } from "./components/CommandPalette";
@@ -124,6 +125,14 @@ export const App = () => {
             element={
               <ProtectedRoute>
                 <UserPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/assistant"
+            element={
+              <ProtectedRoute>
+                <AssistantPage />
               </ProtectedRoute>
             }
           />

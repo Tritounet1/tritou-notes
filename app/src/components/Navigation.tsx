@@ -12,6 +12,7 @@ const Icon = ({ d, className = "w-[17px] h-[17px]" }: { d: string; className?: s
 
 const icons = {
   search: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-3.5-3.5",
+  sparkle: "M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8zM19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2-2.2-.8 2.2-.8z",
   home: "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
   code: "m8 8-5 4 5 4M16 8l5 4-5 4M14 4l-4 16",
   database: "M4 5c0 1.7 3.6 3 8 3s8-1.3 8-3-3.6-3-8-3-8 1.3-8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
@@ -99,6 +100,7 @@ export const Navigation = ({ onSearch }: { onSearch: () => void }) => {
           </kbd>
         </button>
         {navItem("/dashboard", icons.home, "Accueil")}
+        {hasPermission("useAiChatBot") && navItem("/assistant", icons.sparkle, "Assistant IA")}
       </div>
 
       <PageTree />

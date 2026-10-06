@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "./api";
 import { useAuth } from "./hooks/useAuth";
+import { AiSettings } from "./components/AiSettings";
 import { McpSettings } from "./components/McpSettings";
 
 const EyeIcon = ({ open }: { open: boolean }) => (
@@ -49,7 +50,9 @@ const SecretInput = ({
 
 interface Settings {
   id: number;
-  anthropicApiKey: string | null;
+  openrouterApiKeySet: boolean;
+  aiTextModel: string | null;
+  aiImageModel: string | null;
   smtpUser: string | null;
   smtpPassword: string | null;
   smtpHost: string | null;
@@ -61,12 +64,11 @@ interface Settings {
 export const SettingsPage = () => {
   const { isAdmin, user } = useAuth();
   const [tab, setTab] = useState<"account" | "ai" | "mail" | "mcp">("account");
+  const [ai, setAi] = useState({ keySet: false, textModel: null as string | null, imageModel: null as string | null });
   const [mcp, setMcp] = useState({ tokenSet: false, createdAt: null as string | null });
   const [settingsId, setSettingsId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Anthropic API
-  const [anthropicKey, setAnthropicKey] = useState("");
 
   // Password
   const [currentPassword, setCurrentPassword] = useState("");
@@ -100,7 +102,7 @@ export const SettingsPage = () => {
           if (data.length > 0) {
             const s = data[0];
             setSettingsId(s.id);
-            setAnthropicKey(s.anthropicApiKey || "");
+            setAi({ keySet: s.openrouterApiKeySet, textModel: s.aiTextModel, imageModel: s.aiImageModel });
             setSmtpHost(s.smtpHost || "");
             setSmtpPort(s.smtpPort?.toString() || "587");
             setSmtpUser(s.smtpUser || "");
@@ -152,9 +154,6 @@ export const SettingsPage = () => {
     }
   };
 
-  const handleSaveAnthropicKey = () => {
-    saveSettings({ anthropicApiKey: anthropicKey });
-  };
 
   const handleChangePassword = async () => {
     if (saving) return;
@@ -319,37 +318,8 @@ export const SettingsPage = () => {
             </section>
           )}
 
-          {isAdmin && tab === "ai" && (
-            <section className="flex flex-col gap-[18px]">
-              <div className="p-5 rounded-2xl bg-indigo-tint flex gap-3.5 items-start">
-                <span className="w-10 h-10 flex-none rounded-xl bg-indigo text-white flex items-center justify-center">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </span>
-                <div className="flex flex-col gap-1">
-                  <b className="text-[15px] text-ink">API Anthropic</b>
-                  <span className="text-sm text-ink-2">
-                    Clé API utilisée par Claude dans le chat IA, partagée par tout l’espace.
-                  </span>
-                </div>
-              </div>
-              <label className="label">
-                Clé API Anthropic
-                <input
-                  type="password"
-                  value={anthropicKey}
-                  onChange={(e) => setAnthropicKey(e.target.value)}
-                  placeholder="sk-ant-..."
-                  className="input font-mono text-[13px]"
-                />
-              </label>
-              <div className="flex justify-end pt-2 border-t border-line-soft">
-                <button type="button" onClick={handleSaveAnthropicKey} disabled={saving} className="btn-ink">
-                  {saving ? "Enregistrement..." : "Enregistrer"}
-                </button>
-              </div>
-            </section>
+          {isAdmin && tab === "ai" && settingsId !== null && (
+            <AiSettings settingsId={settingsId} keySet={ai.keySet} textModel={ai.textModel} imageModel={ai.imageModel} onFeedback={showFeedback} />
           )}
 
           {isAdmin && tab === "mail" && (
