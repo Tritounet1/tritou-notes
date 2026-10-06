@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "./api";
 import { useAuth } from "./hooks/useAuth";
+import { LivePanel } from "./components/LivePanel";
 import { docTypeStyles } from "./utils/docTypes";
 
 interface Document {
@@ -408,6 +409,7 @@ export const Dashboard = () => {
             )}
           </section>
         </div>
+        <LivePanel />
       </div>
     </div>
   );
