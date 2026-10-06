@@ -59,6 +59,7 @@ Les chemins ci-dessous sont les préfixes réels, sans préfixe `/api` implicite
 | `/api/users` | Administration des utilisateurs |
 | `/api/user-permissions` | Administration des permissions |
 | `/api/settings` | Configuration réservée aux administrateurs |
+| `/api/link-preview` | Métadonnées des liens publics ; `modifyDocument` |
 
 Les administrateurs passent automatiquement les contrôles de `requirePermission`. Les autres utilisateurs doivent posséder toutes les permissions demandées.
 

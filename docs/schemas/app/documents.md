@@ -5,10 +5,12 @@
 ```mermaid
 flowchart TD
     Page["DocumentPage : chargement par identifiant"] --> Type{"Document.type"}
-    Type -->|TEXT| Segments["Segments de texte, code et planificateurs"]
+    Type -->|TEXT| Segments["Segments de texte, code, liens et planificateurs"]
     Type -->|EXCEL| Sheet["SpreadsheetEditor"]
     Type -->|TODO| Todo["TodoEditor"]
     Segments --> Markdown["Rendu Markdown / édition du texte"]
+    Segments --> Links["WebLinkBlock : URL, embed ou aperçu"]
+    Links --> Save
     Segments --> Code["CodeBlock : CodeMirror et choix du langage"]
     Code --> Save
     Segments --> Scheduler["SchedulerBlock"]
@@ -28,6 +30,10 @@ Les trois formats sont stockés dans le champ `Document.text`. Un bloc planifica
 La commande `/code` insère un bloc dédié, éditable avec CodeMirror. La barre d’outils en haut à droite propose un langage, la copie de tout le contenu et un menu de suppression. Le langage est enregistré dans la clôture Markdown, par exemple ` ```python `. La coloration est chargée à la demande ; les blocs sans langage restent en texte brut. Les lecteurs peuvent copier le code, mais ne peuvent pas le modifier.
 
 `utils/documentSegments.ts` sépare les blocs clôturés du texte et des planificateurs. Les marqueurs `::scheduler[id]::` dans le code restent littéraux. Les clôtures sont allongées si le contenu contient lui-même une ligne de triples accents graves.
+
+## Liens web
+
+Un lien seul peut être affiché comme URL, embed ou aperçu visuel. Voir [le parcours et le format de sauvegarde](liens-web.md).
 
 ## Sauvegarde et historique
 

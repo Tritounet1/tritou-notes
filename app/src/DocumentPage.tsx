@@ -12,7 +12,9 @@ import { useDebounce } from "./hooks/useDebounce";
 import { jsonToMarkdownTable, templateToMarkdown } from "./utils/jsonToMarkdown";
 
 import { CodeBlock } from "./components/CodeBlock";
-import { codeValue, normalizeSegments, parseSegments, segmentGlobalOffset, segmentsToText, updateCodeSegment, type Segment } from "./utils/documentSegments";
+import { WebLinkBlock } from "./components/WebLinkBlock";
+import { insertPastedWebLink, webUrlOnLine, serializeWebLink, type WebLink } from "./utils/webLinks";
+import { codeValue, convertStandaloneLinks, normalizeSegments, parseSegments, segmentGlobalOffset, segmentsToText, updateCodeSegment, type Segment } from "./utils/documentSegments";
 
 interface Document {
   id: number;
@@ -120,6 +122,7 @@ export const DocumentPage = () => {
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [focusCodeIndex, setFocusCodeIndex] = useState<number | null>(null);
+  const [pendingLinkId, setPendingLinkId] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -477,8 +480,43 @@ export const DocumentPage = () => {
 
   const handleStopEditing = () => {
     if (!showCommands && !showSchedulerModal) {
+      const converted = convertStandaloneLinks(text);
+      if (converted.ids.length) {
+        handleTextChange(converted.text);
+        setPendingLinkId(converted.ids[0]);
+      }
       setEditingSegmentIndex(null);
     }
+  };
+
+  const handleLinkPaste = (event: React.ClipboardEvent<HTMLTextAreaElement>, segIndex: number) => {
+    const textarea = event.currentTarget;
+    const inserted = insertPastedWebLink(textarea.value, textarea.selectionStart, textarea.selectionEnd, event.clipboardData.getData("text/plain"));
+    if (!inserted) return;
+    event.preventDefault();
+    const segs = normalizeSegments(parseSegments(text));
+    const offset = segmentGlobalOffset(segs, segIndex);
+    const segment = segs[segIndex];
+    if (!segment || segment.type !== "text") return;
+    const end = offset + segment.content.length;
+    const prefix = offset > 0 && text[offset - 1] !== "\n" ? "\n" : "";
+    const suffix = end < text.length && text[end] !== "\n" && !inserted.text.endsWith("\n") ? "\n" : "";
+    const updated = segs.map((segment, index) => index === segIndex ? { type: "text" as const, content: prefix + inserted.text + suffix } : segment);
+    handleTextChange(segmentsToText(updated));
+    setEditingSegmentIndex(null);
+    setShowCommands(false);
+    setPendingLinkId(inserted.data.id);
+  };
+
+  const handleWebLinkChange = (data: WebLink) => {
+    setText(current => {
+      const updated = parseSegments(current).map(segment => segment.type === "link" && segment.data.id === data.id
+        ? { ...segment, data, source: serializeWebLink(data) } : segment);
+      const newText = segmentsToText(updated);
+      debouncedSave(title, newText, isPublic);
+      return newText;
+    });
+    setPendingLinkId(null);
   };
 
   const fetchSchedulerList = async () => {
@@ -716,7 +754,13 @@ export const DocumentPage = () => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!showCommands) return;
+    if (!showCommands) {
+      if (e.key === "Enter" && webUrlOnLine(e.currentTarget.value, e.currentTarget.selectionStart)) {
+        e.preventDefault();
+        handleStopEditing();
+      }
+      return;
+    }
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -932,6 +976,11 @@ export const DocumentPage = () => {
                     );
                   }
 
+                  if (seg.type === "link") {
+                    return <WebLinkBlock key={seg.data.id} data={seg.data} readOnly={!canEdit} initialOpen={pendingLinkId === seg.data.id}
+                      onChange={handleWebLinkChange} onDelete={canEdit ? () => handleDeleteSegment(segIndex) : undefined} />;
+                  }
+
                   if (seg.type === "code") {
                     return (
                       <CodeBlock
@@ -961,6 +1010,7 @@ export const DocumentPage = () => {
                             ref={el => { textareaRefs.current.set(segIndex, el); }}
                             value={seg.content}
                             onChange={e => handleSegmentChange(segIndex, e.target.value)}
+                            onPaste={event => handleLinkPaste(event, segIndex)}
                             onKeyDown={handleKeyDown}
                             onBlur={handleStopEditing}
                             placeholder={isOnlySegment

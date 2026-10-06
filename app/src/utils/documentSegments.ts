@@ -1,3 +1,5 @@
+import { isWebUrl, parseWebLink, serializeWebLink, type WebLink } from "./webLinks.ts";
+
 export type TextSegment = { type: "text"; content: string };
 export type SchedulerSegment = { type: "scheduler"; id: number };
 export type CodeSegment = {
@@ -7,15 +9,19 @@ export type CodeSegment = {
   opening: string;
   closing: string;
 };
-export type Segment = TextSegment | SchedulerSegment | CodeSegment;
+export type LinkSegment = { type: "link"; data: WebLink; source: string };
+export type Segment = TextSegment | SchedulerSegment | CodeSegment | LinkSegment;
 
 function parseText(text: string): Segment[] {
   const segments: Segment[] = [];
-  const pattern = /::scheduler\[(\d+)\]::/g;
+  const pattern = /::scheduler\[(\d+)\]::|^::link\[[^\r\n]*?\]::(?=\r?$)/gm;
   let last = 0;
   for (const match of text.matchAll(pattern)) {
     if (match.index > last) segments.push({ type: "text", content: text.slice(last, match.index) });
-    segments.push({ type: "scheduler", id: Number(match[1]) });
+    const data = match[1] ? null : parseWebLink(match[0]);
+    if (match[1]) segments.push({ type: "scheduler", id: Number(match[1]) });
+    else if (data) segments.push({ type: "link", data, source: match[0] });
+    else segments.push({ type: "text", content: match[0] });
     last = match.index + match[0].length;
   }
   if (last < text.length) segments.push({ type: "text", content: text.slice(last) });
@@ -67,6 +73,7 @@ export function normalizeSegments(segments: Segment[]): Segment[] {
 function segmentToText(segment: Segment): string {
   if (segment.type === "text") return segment.content;
   if (segment.type === "scheduler") return `::scheduler[${segment.id}]::`;
+  if (segment.type === "link") return segment.source;
   return segment.opening + segment.content + segment.closing;
 }
 
@@ -97,4 +104,27 @@ export function updateCodeSegment(segment: CodeSegment, value: string, language:
     opening: opening[1] + fence + language + newline,
     closing: fence + (segment.closing.endsWith("\n") ? newline : ""),
   };
+}
+
+// Called when text editing ends, never while the user is typing a URL.
+export function convertStandaloneLinks(text: string): { text: string; ids: string[] } {
+  const ids: string[] = [];
+  const original = parseSegments(text);
+  const segments = original.map((segment, index) => {
+    if (segment.type !== "text") return segment;
+    const incompleteFence = segment.content.search(/^ {0,3}(`{3,}|~{3,})/m);
+    const head = incompleteFence === -1 ? segment.content : segment.content.slice(0, incompleteFence);
+    const tail = incompleteFence === -1 ? "" : segment.content.slice(incompleteFence);
+    const content = head.replace(/^[ \t]*(https?:\/\/[^\s<>]+)[ \t]*(?=\r?$)/gm, (line, url: string) => {
+      if (!isWebUrl(url)) return line;
+      const id = crypto.randomUUID();
+      ids.push(id);
+      return serializeWebLink({ id, url, mode: "url" });
+    });
+    let result = content + tail;
+    if (result.startsWith("::link[") && index > 0 && !segmentsToText(original.slice(0, index)).endsWith("\n")) result = "\n" + result;
+    if (result.endsWith("]::") && index < original.length - 1 && !segmentsToText(original.slice(index + 1)).startsWith("\n")) result += "\n";
+    return { ...segment, content: result };
+  });
+  return { text: segmentsToText(segments), ids };
 }
