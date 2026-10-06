@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "./api";
 import { useAuth } from "./hooks/useAuth";
+import { docTypeStyles } from "./utils/docTypes";
 
 interface Document {
   id: number;
@@ -17,13 +18,12 @@ type SortOption = "date" | "name";
 
 export const Dashboard = () => {
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("date");
   const [search, setSearch] = useState("");
-  const [showNewDocModal, setShowNewDocModal] = useState(false);
 
   useEffect(() => {
     fetchDocuments();
@@ -45,11 +45,10 @@ export const Dashboard = () => {
 
   const handleCreateDocument = async (type: "TEXT" | "EXCEL" | "TODO") => {
     setCreating(true);
-    setShowNewDocModal(false);
     const titles = {
       TEXT: "Sans titre",
       EXCEL: "Nouveau tableur",
-      TODO: "Ma liste de taches",
+      TODO: "Ma liste de tâches",
     };
     try {
       const response = await apiFetch("/api/documents", {
@@ -81,365 +80,335 @@ export const Dashboard = () => {
       return a.title.localeCompare(b.title);
     });
 
+  const recentDocuments = [...documents]
+    .sort(
+      (a, b) =>
+        new Date(b.last_update).getTime() - new Date(a.last_update).getTime(),
+    )
+    .slice(0, 4);
+
+  const now = new Date();
+  const greeting = now.getHours() >= 18 || now.getHours() < 5 ? "Bonsoir" : "Bonjour";
+  const dateLine = `${now.toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  })} · ${now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+
+  const formatDate = (iso: string) =>
+    new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+
+  const canCreate = hasPermission("createDocument");
+  const canScrape = hasPermission("accessInstancesScrapersPage");
+
+  const createCards = [
+    {
+      type: "TEXT" as const,
+      desc: "Texte, markdown, blocs",
+      icon: (
+        <>
+          <path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z" />
+          <path d="M14 3v5h5M9 13h6M9 17h6" />
+        </>
+      ),
+    },
+    {
+      type: "EXCEL" as const,
+      desc: "Cellules, colonnes, export",
+      icon: (
+        <>
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <path d="M3 10h18M3 15h18M9 4v16" />
+        </>
+      ),
+    },
+    {
+      type: "TODO" as const,
+      desc: "Cases à cocher, priorités",
+      icon: (
+        <>
+          <rect x="3" y="3" width="18" height="18" rx="3" />
+          <path d="m8 12 3 3 5-6" />
+        </>
+      ),
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-5 border-b border-gray-100 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Mes documents
-              </h2>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    // TODO: Exporter les documents
-                    console.log("TODO: Export documents");
-                  }}
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition"
-                  title="Exporter les documents"
+    <div className="max-w-[1120px] mx-auto px-6 sm:px-10 pt-10 pb-16 flex flex-col gap-11">
+      <section className="flex flex-col gap-2.5">
+        <span className="font-mono text-xs tracking-[0.12em] text-muted uppercase">
+          {dateLine}
+        </span>
+        <h1 className="font-display font-bold text-[44px] sm:text-[60px] leading-none tracking-[-0.035em] text-ink">
+          {greeting}
+          {user && (
+            <>
+              , <span className="highlight">{user.username}</span>
+            </>
+          )}
+          .
+        </h1>
+      </section>
+
+      {(canCreate || canScrape) && (
+        <section
+          aria-label="Créer"
+          className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3"
+        >
+          {canCreate &&
+            createCards.map((card) => (
+              <button
+                key={card.type}
+                type="button"
+                onClick={() => handleCreateDocument(card.type)}
+                disabled={creating}
+                className="card flex flex-col items-start gap-[18px] p-[18px] text-left cursor-pointer transition hover:border-line-strong hover:bg-paper-soft disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${docTypeStyles[card.type].chip}`}
                 >
                   <svg
-                    className="w-5 h-5"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
-                    viewBox="0 0 24 24"
+                    strokeWidth={1.75}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                    />
+                    {card.icon}
                   </svg>
-                </button>
+                </span>
+                <span className="flex flex-col gap-0.5">
+                  <span className="font-semibold text-[15px] text-ink">
+                    {docTypeStyles[card.type].label}
+                  </span>
+                  <span className="text-[13px] text-muted">
+                    {creating ? "Création…" : card.desc}
+                  </span>
+                </span>
+              </button>
+            ))}
+          {canScrape && (
+            <Link
+              to="/instances"
+              className="cover-ink flex flex-col items-start gap-[18px] p-[18px] rounded-2xl text-white transition hover:brightness-110"
+            >
+              <span className="w-10 h-10 rounded-xl bg-neon text-ink flex items-center justify-center">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.75}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+                </svg>
+              </span>
+              <span className="flex flex-col gap-0.5">
+                <span className="font-semibold text-[15px]">Scraper une URL</span>
+                <span className="text-[13px] text-white/70">
+                  Coller un lien, choisir un scraper
+                </span>
+              </span>
+            </Link>
+          )}
+        </section>
+      )}
+
+      <div className="flex flex-wrap gap-8 items-start">
+        <div className="flex-[999_1_520px] min-w-0 flex flex-col gap-10">
+          {recentDocuments.length > 0 && (
+            <section className="flex flex-col gap-3.5">
+              <h2 className="section-title">Récemment ouverts</h2>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
+                {recentDocuments.map((doc) => (
+                  <Link
+                    key={doc.id}
+                    to={`/document/${doc.id}`}
+                    className="flex flex-col rounded-[14px] border border-line overflow-hidden bg-paper text-ink transition hover:border-line-strong hover:-translate-y-0.5"
+                  >
+                    <span className={`h-[76px] ${docTypeStyles[doc.type].cover}`} />
+                    <span className="px-3.5 pt-3 pb-3.5 flex flex-col gap-1.5">
+                      <span className="font-semibold text-sm truncate">
+                        {doc.title || "Sans titre"}
+                      </span>
+                      <span className="text-xs text-muted">
+                        {docTypeStyles[doc.type].label} ·{" "}
+                        <span className="font-mono">{formatDate(doc.last_update)}</span>
+                      </span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section className="flex flex-col gap-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="section-title">Toutes les pages</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <svg
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m20 20-3.5-3.5" />
+                  </svg>
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Rechercher une page…"
+                    aria-label="Rechercher une page"
+                    className="input min-h-9 pl-9 w-56"
+                  />
+                </div>
+                <div role="group" aria-label="Trier par" className="segmented">
+                  <button
+                    type="button"
+                    aria-pressed={sortBy === "date"}
+                    onClick={() => setSortBy("date")}
+                  >
+                    Récents
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={sortBy === "name"}
+                    onClick={() => setSortBy("name")}
+                  >
+                    A → Z
+                  </button>
+                </div>
                 <button
+                  type="button"
                   onClick={() => {
                     // TODO: Importer des documents
                     console.log("TODO: Import documents");
                   }}
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition"
+                  className="icon-btn"
+                  aria-label="Importer des documents"
                   title="Importer des documents"
                 >
                   <svg
-                    className="w-5 h-5"
+                    width="17"
+                    height="17"
+                    viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
-                    viewBox="0 0 24 24"
+                    strokeWidth={1.75}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                    />
+                    <path d="M12 15V3M7 8l5-5 5 5M5 21h14" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // TODO: Exporter les documents
+                    console.log("TODO: Export documents");
+                  }}
+                  className="icon-btn"
+                  aria-label="Exporter les documents"
+                  title="Exporter les documents"
+                >
+                  <svg
+                    width="17"
+                    height="17"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
                   </svg>
                 </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-6">
-              <div className="relative flex-1">
-                <svg
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Rechercher un document..."
-                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-500">Trier par :</span>
-                <button
-                  onClick={() => setSortBy("date")}
-                  className={`px-3 py-1.5 rounded-md transition ${
-                    sortBy === "date"
-                      ? "bg-gray-800 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  Date
-                </button>
-                <button
-                  onClick={() => setSortBy("name")}
-                  className={`px-3 py-1.5 rounded-md transition ${
-                    sortBy === "name"
-                      ? "bg-gray-800 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  Nom
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="divide-y divide-gray-100">
             {loading ? (
-              <div className="p-6">
-                <p className="text-gray-500 text-sm text-center">
-                  Chargement...
-                </p>
-              </div>
+              <p className="py-24 text-center text-muted">Chargement…</p>
             ) : filteredDocuments.length === 0 ? (
-              <div className="p-6">
-                <p className="text-gray-500 text-sm text-center py-8">
-                  {documents.length === 0
-                    ? "Aucun document. Créez votre premier document !"
-                    : "Aucun document trouvé."}
-                </p>
-              </div>
-            ) : (
-              filteredDocuments.map((doc) => (
-                <Link
-                  key={doc.id}
-                  to={`/document/${doc.id}`}
-                  className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {doc.type === "EXCEL" ? (
-                      <div className="w-8 h-8 bg-green-100 rounded flex items-center justify-center shrink-0">
-                        <svg
-                          className="w-5 h-5 text-green-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                          />
-                        </svg>
-                      </div>
-                    ) : doc.type === "TODO" ? (
-                      <div className="w-8 h-8 bg-purple-100 rounded flex items-center justify-center shrink-0">
-                        <svg
-                          className="w-5 h-5 text-purple-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                          />
-                        </svg>
-                      </div>
-                    ) : (
-                      <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center shrink-0">
-                        <svg
-                          className="w-5 h-5 text-blue-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                          />
-                        </svg>
-                      </div>
-                    )}
-                    <p className="font-medium text-gray-900 truncate">
-                      {doc.title || "Sans titre"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 ml-4">
-                    <span
-                      className={`px-2 py-0.5 text-xs rounded ${
-                        doc.public
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      {doc.public ? "Public" : "Privé"}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {new Date(doc.last_update).toLocaleDateString("fr-FR")}
-                    </span>
-                    <svg
-                      className="w-4 h-4 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                  </div>
-                </Link>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Bouton Nouveau document */}
-        {hasPermission("createDocument") && (
-          <button
-            type="button"
-            onClick={() => setShowNewDocModal(true)}
-            disabled={creating}
-            className="w-full mt-4 py-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-gray-400 hover:text-gray-600 hover:bg-white transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
-          >
-            <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center transition">
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                />
-              </svg>
-            </div>
-            <span className="font-medium">
-              {creating ? "Création..." : "Nouveau document"}
-            </span>
-          </button>
-        )}
-      </div>
-
-      {/* Modal nouveau document */}
-      {showNewDocModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-xl font-semibold text-gray-900">
-                Nouveau document
-              </h3>
-              <button
-                onClick={() => setShowNewDocModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <div className="p-6">
-              <p className="text-gray-500 mb-6 text-center">
-                Choisissez le type de document à créer
+              <p className="py-16 text-center text-muted border border-dashed border-line-strong rounded-[14px]">
+                {documents.length === 0
+                  ? "Aucun document. Créez votre premier document !"
+                  : "Aucun document trouvé."}
               </p>
-
-              <div className="grid grid-cols-3 gap-4">
-                {/* Document Texte */}
-                <button
-                  onClick={() => handleCreateDocument("TEXT")}
-                  className="group p-5 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left"
-                >
-                  <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center mb-3 group-hover:bg-blue-200 transition">
-                    <svg
-                      className="w-7 h-7 text-blue-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                  </div>
-                  <h4 className="text-base font-semibold text-gray-900 mb-1">
-                    Document Texte
-                  </h4>
-                </button>
-
-                {/* Document Excel */}
-                <button
-                  onClick={() => handleCreateDocument("EXCEL")}
-                  className="group p-5 border-2 border-gray-200 rounded-xl hover:border-green-500 hover:bg-green-50/50 transition-all text-left"
-                >
-                  <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center mb-3 group-hover:bg-green-200 transition">
-                    <svg
-                      className="w-7 h-7 text-green-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </div>
-                  <h4 className="text-base font-semibold text-gray-900 mb-1">
-                    Tableur Excel
-                  </h4>
-                </button>
-
-                {/* Liste TODO */}
-                <button
-                  onClick={() => handleCreateDocument("TODO")}
-                  className="group p-5 border-2 border-gray-200 rounded-xl hover:border-purple-500 hover:bg-purple-50/50 transition-all text-left"
-                >
-                  <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center mb-3 group-hover:bg-purple-200 transition">
-                    <svg
-                      className="w-7 h-7 text-purple-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                      />
-                    </svg>
-                  </div>
-                  <h4 className="text-base font-semibold text-gray-900 mb-1">
-                    Liste TODO
-                  </h4>
-                </button>
+            ) : (
+              <div className="overflow-x-auto border border-line rounded-[14px]">
+                <table className="w-full min-w-[560px] border-collapse text-sm">
+                  <thead>
+                    <tr className="text-left">
+                      <th className="px-4 py-2.5 text-xs font-medium text-muted border-b border-line">
+                        Nom
+                      </th>
+                      <th className="px-4 py-2.5 text-xs font-medium text-muted border-b border-line">
+                        Type
+                      </th>
+                      <th className="px-4 py-2.5 text-xs font-medium text-muted border-b border-line">
+                        Visibilité
+                      </th>
+                      <th className="px-4 py-2.5 text-xs font-medium text-muted border-b border-line text-right">
+                        Modifié
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredDocuments.map((doc) => {
+                      const style = docTypeStyles[doc.type];
+                      return (
+                        <tr
+                          key={doc.id}
+                          className="border-b border-line-soft last:border-b-0 hover:bg-paper-soft transition"
+                        >
+                          <td className="px-4 py-[11px]">
+                            <Link
+                              to={`/document/${doc.id}`}
+                              className="flex items-center gap-2.5 font-medium text-ink"
+                            >
+                              <span className={`w-2 h-2 rounded-[3px] shrink-0 ${style.dot}`} />
+                              <span className="truncate">{doc.title || "Sans titre"}</span>
+                            </Link>
+                          </td>
+                          <td className="px-4 py-[11px]">
+                            <span className={`pill font-medium ${style.chip}`}>{style.label}</span>
+                          </td>
+                          <td className="px-4 py-[11px] text-ink-2">
+                            {doc.public ? "Public" : "Privé"}
+                          </td>
+                          <td className="px-4 py-[11px] text-right font-mono text-xs text-muted">
+                            {new Date(doc.last_update).toLocaleDateString("fr-FR")}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          </div>
+            )}
+          </section>
         </div>
-      )}
+      </div>
     </div>
   );
 };

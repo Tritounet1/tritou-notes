@@ -18,12 +18,28 @@ interface InstanceScrape {
 }
 
 const STATUS_CONFIG = {
-  IN_QUEUE: { label: "En attente", color: "bg-gray-100 text-gray-700" },
-  STARTING: { label: "Démarrage", color: "bg-blue-100 text-blue-700" },
-  WORKING: { label: "En cours", color: "bg-yellow-100 text-yellow-700" },
-  FINISHED: { label: "Terminé", color: "bg-green-100 text-green-700" },
-  ERROR: { label: "Erreur", color: "bg-red-100 text-red-700" },
+  IN_QUEUE: { label: "En file", pill: "bg-chip text-ink-2", dot: "bg-muted" },
+  STARTING: { label: "Démarrage", pill: "bg-indigo-tint text-indigo-ink", dot: "bg-indigo animate-pulse" },
+  WORKING: { label: "En cours", pill: "bg-indigo-tint text-indigo-ink", dot: "bg-indigo animate-pulse" },
+  FINISHED: { label: "Terminé", pill: "bg-neon-tint text-neon-ink", dot: "bg-neon-dot" },
+  ERROR: { label: "Erreur", pill: "bg-danger-tint text-danger-ink", dot: "bg-danger" },
 };
+
+const StatusPill = ({ status }: { status: InstanceScrape["status"] }) => (
+  <span className={`pill ${STATUS_CONFIG[status].pill}`}>
+    <span className={`w-1.5 h-1.5 rounded-full ${STATUS_CONFIG[status].dot}`} />
+    {STATUS_CONFIG[status].label}
+  </span>
+);
+
+const Icon = ({ d, className = "w-4 h-4" }: { d: string; className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+    <path d={d} />
+  </svg>
+);
+
+const formatDate = (iso: string) =>
+  new Date(iso).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
 
 const PAGE_SIZES = [10, 25, 50, 100];
 
@@ -102,299 +118,237 @@ export const InstancesScrapePage = () => {
     setCurrentPage(1);
   };
 
+  const expanded = instances.find((i) => i.id === expandedId) ?? null;
+  const hasTemplate = (i: InstanceScrape) =>
+    !!i.scraper?.display_template && i.scraper.display_template.length > 0;
+  const countBy = (status: InstanceScrape["status"][]) =>
+    instances.filter((i) => status.includes(i.status)).length;
+
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">Chargement...</p>
-      </div>
-    );
+    return <p className="py-24 text-center text-muted">Chargement…</p>;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {/* Formulaire de création */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Nouvelle instance
-          </h2>
-          <form onSubmit={handleCreate} className="flex gap-3">
-            <input
-              type="url"
-              value={newUrl}
-              onChange={(e) => setNewUrl(e.target.value)}
-              placeholder="https://example.com/page-to-scrape"
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-800"
-              required
-            />
-            <button
-              type="submit"
-              disabled={creating}
-              className="px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition disabled:opacity-50"
-            >
-              {creating ? "Lancement..." : "Lancer"}
-            </button>
-          </form>
-        </div>
+    <div className="max-w-[1120px] mx-auto px-6 sm:px-10 pt-10 pb-16 flex flex-col gap-7">
+      <header className="flex flex-col gap-2">
+        <h1 className="page-title">Instances</h1>
+        <p className="text-[15px] text-ink-2">
+          Chaque exécution d’un scraper sur une URL, en file ou terminée.
+        </p>
+      </header>
 
-        {/* Liste des instances */}
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Historique ({instances.length})
-            </h2>
+      <form
+        onSubmit={handleCreate}
+        className="cover-ink rounded-2xl p-2 flex flex-wrap gap-2"
+      >
+        <label className="flex-[999_1_280px] flex items-center gap-2.5 min-h-11 px-3.5 rounded-[11px] bg-[#2a2925] text-[#bdbab2]">
+          <Icon d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1 1M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1-1" />
+          <span className="sr-only">URL à scraper</span>
+          <input
+            type="url"
+            value={newUrl}
+            onChange={(e) => setNewUrl(e.target.value)}
+            placeholder="https://example.com/page-to-scrape"
+            className="flex-1 min-w-0 bg-transparent border-0 outline-none font-mono text-[13px] text-white placeholder:text-[#8a877f]"
+            required
+          />
+        </label>
+        <button type="submit" disabled={creating} className="btn-neon min-h-11 flex-none">
+          <Icon d="M5 3l14 9-14 9V3z" />
+          {creating ? "Lancement…" : "Lancer"}
+        </button>
+      </form>
 
-            <button
-              type="button"
-              onClick={() =>
-                setSortOrder(sortOrder === "desc" ? "asc" : "desc")
-              }
-              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition"
-            >
-              <span>
-                {sortOrder === "desc" ? "Plus récent" : "Plus ancien"}
-              </span>
-              <svg
-                className={`w-4 h-4 transition-transform ${sortOrder === "asc" ? "rotate-180" : ""}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
-          </div>
+      <div className="flex flex-wrap gap-1.5 text-[13px]">
+        <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-ink text-white">
+          Toutes <span className="font-mono text-[11px] text-[#bdbab2]">{instances.length}</span>
+        </span>
+        <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-indigo-tint text-indigo-ink">
+          <span className="w-1.5 h-1.5 rounded-full bg-indigo" />
+          En cours {countBy(["WORKING", "STARTING"])}
+        </span>
+        <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-chip text-ink-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-muted" />
+          En file {countBy(["IN_QUEUE"])}
+        </span>
+        <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-danger-tint text-danger-ink">
+          <span className="w-1.5 h-1.5 rounded-full bg-danger" />
+          Erreurs {countBy(["ERROR"])}
+        </span>
+      </div>
 
-          {instances.length === 0 ? (
-            <div className="px-6 py-12 text-center text-gray-500">
-              Aucune instance de scrape pour le moment
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {paginatedInstances.map((instance) => {
-                const isExpanded = expandedId === instance.id;
-                return (
-                  <div key={instance.id}>
+      {instances.length === 0 ? (
+        <p className="py-16 text-center text-muted border border-dashed border-line-strong rounded-[14px]">
+          Aucune instance de scrape pour le moment
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="overflow-x-auto border border-line rounded-[14px]">
+            <table className="w-full min-w-[640px] border-collapse text-sm">
+              <thead>
+                <tr className="text-left text-xs font-medium text-muted">
+                  <th className="px-4 py-2.5 font-medium border-b border-line">URL</th>
+                  <th className="px-4 py-2.5 font-medium border-b border-line">Scraper</th>
+                  <th className="px-4 py-2.5 font-medium border-b border-line">Statut</th>
+                  <th className="px-4 py-2.5 font-medium border-b border-line text-right">
                     <button
                       type="button"
-                      onClick={() =>
-                        setExpandedId(isExpanded ? null : instance.id)
-                      }
-                      className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition text-left"
+                      onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+                      className="inline-flex items-center gap-1 hover:text-ink transition cursor-pointer"
+                      aria-label={`Trier par date : ${sortOrder === "desc" ? "plus récent" : "plus ancien"} d’abord`}
                     >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {instance.url}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Créé le{" "}
-                          {new Date(instance.created_at).toLocaleString(
-                            "fr-FR",
-                          )}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-4 ml-4">
-                        <span
-                          className={`px-3 py-1 text-xs font-medium rounded-full ${
-                            STATUS_CONFIG[instance.status].color
-                          }`}
-                        >
-                          {STATUS_CONFIG[instance.status].label}
-                        </span>
-
-                        {(instance.status === "WORKING" ||
-                          instance.status === "STARTING") && (
-                          <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin" />
-                        )}
-
-                        <svg
-                          className={`w-5 h-5 text-gray-400 transition-transform ${
-                            isExpanded ? "rotate-180" : ""
-                          }`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </div>
+                      Lancée
+                      <Icon
+                        d="M6 9l6 6 6-6"
+                        className={`w-3.5 h-3.5 transition-transform ${sortOrder === "asc" ? "rotate-180" : ""}`}
+                      />
                     </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedInstances.map((instance) => (
+                  <tr
+                    key={instance.id}
+                    tabIndex={0}
+                    onClick={() => setExpandedId(instance.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") setExpandedId(instance.id);
+                    }}
+                    className="cursor-pointer hover:bg-paper-warm focus-visible:bg-indigo-tint/50 outline-none transition"
+                  >
+                    <td className="px-4 py-[11px] border-b border-line-soft font-mono text-[12.5px] text-ink max-w-[300px] truncate">
+                      {instance.url}
+                    </td>
+                    <td className="px-4 py-[11px] border-b border-line-soft text-ink-2">
+                      {instance.scraper?.name ?? "—"}
+                    </td>
+                    <td className="px-4 py-[11px] border-b border-line-soft">
+                      <StatusPill status={instance.status} />
+                    </td>
+                    <td className="px-4 py-[11px] border-b border-line-soft text-right font-mono text-xs text-muted whitespace-nowrap">
+                      {formatDate(instance.created_at)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-                    {isExpanded && (
-                      <div className="px-6 pb-4">
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          {/* Toggle only when template exists and status is FINISHED */}
-                          {instance.status === "FINISHED" && instance.scraper?.display_template && instance.scraper.display_template.length > 0 && (
-                            <div className="flex items-center gap-2 mb-3">
-                              <button
-                                onClick={() => setRenderedViews((prev) => ({ ...prev, [instance.id]: false }))}
-                                className={`px-3 py-1 text-xs rounded-md transition ${!renderedViews[instance.id] ? "bg-gray-800 text-white" : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"}`}
-                              >
-                                JSON brut
-                              </button>
-                              <button
-                                onClick={() => setRenderedViews((prev) => ({ ...prev, [instance.id]: true }))}
-                                className={`px-3 py-1 text-xs rounded-md transition ${renderedViews[instance.id] ? "bg-gray-800 text-white" : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"}`}
-                              >
-                                Vue structurée
-                              </button>
-                            </div>
-                          )}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 text-[13px] text-muted">
+            <label className="flex items-center gap-2">
+              Afficher
+              <select
+                value={pageSize}
+                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                className="border border-line-strong rounded-lg px-2 py-1 bg-paper text-ink outline-none focus:border-indigo"
+              >
+                {PAGE_SIZES.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+              par page
+            </label>
 
-                          {renderedViews[instance.id] && instance.scraper?.display_template && instance.scraper.display_template.length > 0 ? (
-                            <ScraperTemplateRenderer
-                              data={instance.response as Record<string, unknown> | Record<string, unknown>[]}
-                              template={instance.scraper.display_template}
-                            />
-                          ) : instance.response ? (
-                            <pre className="text-sm bg-white border border-gray-200 text-gray-800 p-4 rounded-lg overflow-x-auto font-mono">
-                              {JSON.stringify(instance.response, null, 2)}
-                            </pre>
-                          ) : (
-                            <p className="text-sm text-gray-500 italic">Aucune réponse disponible</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="flex items-center gap-1">
+              <span className="mr-2 font-mono text-xs">
+                {startIndex + 1}–{Math.min(startIndex + pageSize, instances.length)} sur {instances.length}
+              </span>
+              {[
+                { label: "Première page", d: "M11 17l-5-5 5-5M18 17l-5-5 5-5", to: 1, disabled: currentPage === 1 },
+                { label: "Page précédente", d: "M15 18l-6-6 6-6", to: Math.max(1, currentPage - 1), disabled: currentPage === 1 },
+              ].map((b) => (
+                <button key={b.label} type="button" aria-label={b.label} onClick={() => setCurrentPage(b.to)} disabled={b.disabled} className="icon-btn border border-line-strong bg-paper disabled:opacity-30 disabled:cursor-not-allowed">
+                  <Icon d={b.d} />
+                </button>
+              ))}
+              <span className="px-2.5 font-mono text-xs text-ink">
+                {currentPage} / {totalPages}
+              </span>
+              {[
+                { label: "Page suivante", d: "M9 18l6-6-6-6", to: Math.min(totalPages, currentPage + 1), disabled: currentPage === totalPages },
+                { label: "Dernière page", d: "M13 17l5-5-5-5M6 17l5-5-5-5", to: totalPages, disabled: currentPage === totalPages },
+              ].map((b) => (
+                <button key={b.label} type="button" aria-label={b.label} onClick={() => setCurrentPage(b.to)} disabled={b.disabled} className="icon-btn border border-line-strong bg-paper disabled:opacity-30 disabled:cursor-not-allowed">
+                  <Icon d={b.d} />
+                </button>
+              ))}
             </div>
-          )}
+          </div>
+        </div>
+      )}
 
-          {/* Pagination */}
-          {instances.length > 0 && (
-            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600">Afficher</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                  className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-800"
-                >
-                  {PAGE_SIZES.map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-sm text-gray-600">par page</span>
-              </div>
+      <p className="text-xs text-muted text-center">
+        La liste se rafraîchit automatiquement toutes les 5 secondes
+      </p>
 
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600">
-                  {startIndex + 1}-
-                  {Math.min(startIndex + pageSize, instances.length)} sur{" "}
-                  {instances.length}
+      {expanded && (
+        <div className="modal-backdrop" onClick={() => setExpandedId(null)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Détail de l’instance"
+            className="modal max-w-3xl max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 pt-6 pb-4 flex items-start justify-between gap-4 border-b border-line-soft">
+              <div className="flex flex-col gap-2 min-w-0">
+                <span className="self-start">
+                  <StatusPill status={expanded.status} />
                 </span>
+                <h2 className="section-title">{expanded.scraper?.name ?? "Instance"}</h2>
+                <span className="font-mono text-xs text-indigo-ink break-all">{expanded.url}</span>
+              </div>
+              <button type="button" aria-label="Fermer" onClick={() => setExpandedId(null)} className="icon-btn flex-none">
+                <Icon d="M6 6l12 12M18 6L6 18" />
+              </button>
+            </div>
 
-                <div className="flex items-center gap-1 ml-4">
+            <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
+              <dl className="grid grid-cols-[110px_1fr] gap-y-2 text-[13px]">
+                <dt className="text-muted">Lancée</dt>
+                <dd className="font-mono">{formatDate(expanded.created_at)}</dd>
+                <dt className="text-muted">Mise à jour</dt>
+                <dd className="font-mono">{formatDate(expanded.last_update)}</dd>
+              </dl>
+
+              {expanded.status === "FINISHED" && hasTemplate(expanded) && (
+                <div className="segmented self-start">
                   <button
                     type="button"
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                    aria-pressed={!renderedViews[expanded.id]}
+                    onClick={() => setRenderedViews((prev) => ({ ...prev, [expanded.id]: false }))}
                   >
-                    <svg
-                      className="w-5 h-5 text-gray-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
-                      />
-                    </svg>
+                    JSON brut
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                    aria-pressed={!!renderedViews[expanded.id]}
+                    onClick={() => setRenderedViews((prev) => ({ ...prev, [expanded.id]: true }))}
                   >
-                    <svg
-                      className="w-5 h-5 text-gray-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 19l-7-7 7-7"
-                      />
-                    </svg>
-                  </button>
-                  <span className="px-3 text-sm text-gray-700">
-                    {currentPage} / {totalPages}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
-                    disabled={currentPage === totalPages}
-                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <svg
-                      className="w-5 h-5 text-gray-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <svg
-                      className="w-5 h-5 text-gray-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 5l7 7-7 7M5 5l7 7-7 7"
-                      />
-                    </svg>
+                    Vue structurée
                   </button>
                 </div>
-              </div>
-            </div>
-          )}
-        </div>
+              )}
 
-        <p className="mt-4 text-xs text-gray-400 text-center">
-          La liste se rafraîchit automatiquement toutes les 5 secondes
-        </p>
-      </div>
+              {renderedViews[expanded.id] && hasTemplate(expanded) ? (
+                <ScraperTemplateRenderer
+                  data={expanded.response as Record<string, unknown> | Record<string, unknown>[]}
+                  template={expanded.scraper!.display_template!}
+                />
+              ) : expanded.response ? (
+                <pre className="m-0 px-3.5 py-3 rounded-xl bg-code text-[#e6e4de] font-mono text-[11.5px] leading-relaxed overflow-x-auto">
+                  {JSON.stringify(expanded.response, null, 2)}
+                </pre>
+              ) : (
+                <p className="text-sm text-muted italic">Aucune réponse disponible</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

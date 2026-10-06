@@ -57,7 +57,7 @@ export const UsersPage = () => {
       });
 
       if (response.ok) {
-        setSuccess("Invitation envoyee !");
+        setSuccess("Invitation envoyée !");
         setInviteEmail("");
         setTimeout(() => {
           setShowInviteModal(false);
@@ -65,10 +65,10 @@ export const UsersPage = () => {
         }, 2000);
       } else {
         const data = await response.json();
-        setError(data.error || "Erreur lors de l'envoi");
+        setError(data.error || "Erreur lors de l’envoi");
       }
     } catch {
-      setError("Erreur lors de l'envoi");
+      setError("Erreur lors de l’envoi");
     } finally {
       setSending(false);
     }
@@ -79,204 +79,146 @@ export const UsersPage = () => {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">Chargement...</p>
-      </div>
-    );
+    return <p className="py-24 text-center text-muted">Chargement...</p>;
   }
 
+  const closeInvite = () => {
+    setShowInviteModal(false);
+    setError("");
+    setSuccess("");
+    setInviteEmail("");
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {/* Liste des utilisateurs */}
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Tous les utilisateurs ({users.length})
-            </h2>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  // TODO: Exporter les utilisateurs
-                  console.log("TODO: Export users");
-                }}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition"
-                title="Exporter les utilisateurs"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-              </button>
-              <button
-                onClick={() => {
-                  // TODO: Importer des utilisateurs
-                  console.log("TODO: Import users");
-                }}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition"
-                title="Importer des utilisateurs"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {users.length === 0 ? (
-            <div className="px-6 py-12 text-center text-gray-500">
-              Aucun utilisateur
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {users.map((user) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() => navigate(`/user/${user.id}`)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition text-left"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                      <span className="text-gray-600 font-medium">
-                        {user.username.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {user.username}
-                      </p>
-                      <p className="text-xs text-gray-500">{user.email}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`px-3 py-1 text-xs font-medium rounded-full ${
-                        user.role === "ADMIN"
-                          ? "bg-purple-100 text-purple-700"
-                          : "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      {user.role === "ADMIN" ? "Admin" : "Utilisateur"}
-                    </span>
-                    <svg
-                      className="w-5 h-5 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
+    <div className="max-w-[1120px] mx-auto px-6 sm:px-10 pt-10 pb-16 flex flex-col gap-7">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <h1 className="page-title">Utilisateurs</h1>
+          <p className="text-[15px] text-ink-2">
+            {users.length} membre{users.length > 1 ? "s" : ""} dans l’espace
+          </p>
         </div>
-
-        {/* Bouton Inviter */}
-        <button
-          type="button"
-          onClick={() => setShowInviteModal(true)}
-          className="w-full mt-4 py-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-gray-400 hover:text-gray-600 hover:bg-white transition-all flex items-center justify-center gap-2 group"
-        >
-          <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center transition">
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-              />
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              // TODO: Exporter les utilisateurs
+              console.log("TODO: Export users");
+            }}
+            className="icon-btn"
+            title="Exporter les utilisateurs"
+            aria-label="Exporter les utilisateurs"
+          >
+            <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-          </div>
-          <span className="font-medium">Inviter un utilisateur</span>
-        </button>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              // TODO: Importer des utilisateurs
+              console.log("TODO: Import users");
+            }}
+            className="icon-btn"
+            title="Importer des utilisateurs"
+            aria-label="Importer des utilisateurs"
+          >
+            <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+          </button>
+          <button type="button" onClick={() => setShowInviteModal(true)} className="btn-primary ml-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Inviter
+          </button>
+        </div>
       </div>
 
-      {/* Modal d'invitation */}
+      <div className="card overflow-hidden">
+        {users.length === 0 ? (
+          <p className="px-6 py-12 text-center text-muted">Aucun utilisateur</p>
+        ) : (
+          <ul className="divide-y divide-line-soft">
+            {users.map((user) => (
+              <li key={user.id}>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/user/${user.id}`)}
+                  className="w-full px-4 py-3 flex items-center gap-3 hover:bg-paper-soft transition text-left cursor-pointer"
+                >
+                  <span
+                    className={`w-[34px] h-[34px] flex-none rounded-full flex items-center justify-center text-xs font-bold text-ink ${
+                      user.role === "ADMIN" ? "bg-neon" : "bg-indigo-soft"
+                    }`}
+                  >
+                    {user.username.slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="flex-1 min-w-0 flex flex-col">
+                    <span className="text-sm font-semibold text-ink truncate">{user.username}</span>
+                    <span className="font-mono text-xs text-muted truncate">{user.email}</span>
+                  </span>
+                  <span
+                    className={`pill ${
+                      user.role === "ADMIN" ? "bg-ink text-neon" : "bg-chip text-ink-2"
+                    }`}
+                  >
+                    {user.role === "ADMIN" ? "Admin" : "Utilisateur"}
+                  </span>
+                  <svg className="w-4 h-4 flex-none text-muted" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {showInviteModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="px-6 py-4 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900">
+        <div className="modal-backdrop">
+          <div className="modal max-w-md" role="dialog" aria-modal="true" aria-labelledby="invite-title">
+            <form onSubmit={handleInvite} className="p-6 flex flex-col gap-4">
+              <h3 id="invite-title" className="section-title">
                 Inviter un utilisateur
               </h3>
-            </div>
 
-            <form onSubmit={handleInvite} className="p-6 space-y-4">
               {error && (
-                <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg">
-                  {error}
-                </div>
+                <div className="px-4 py-3 rounded-[10px] bg-danger-tint text-danger-ink text-sm">{error}</div>
               )}
 
               {success && (
-                <div className="p-3 bg-green-50 text-green-600 text-sm rounded-lg flex items-center gap-2">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
+                <div className="px-4 py-3 rounded-[10px] bg-neon-tint text-neon-ink text-sm flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 13l4 4L19 7" />
                   </svg>
                   {success}
                 </div>
               )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
-                </label>
+              <label className="label">
+                E-mail
                 <input
                   type="email"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-800"
+                  className="input"
                   placeholder="utilisateur@exemple.com"
                   required
+                  autoFocus
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Un email d'invitation sera envoye a cette adresse
-                </p>
-              </div>
+                <span className="text-xs font-normal text-muted">
+                  Un e-mail d’invitation sera envoyé à cette adresse.
+                </span>
+              </label>
 
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowInviteModal(false);
-                    setError("");
-                    setSuccess("");
-                    setInviteEmail("");
-                  }}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition"
-                >
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={closeInvite} className="btn-secondary">
                   Annuler
                 </button>
-                <button
-                  type="submit"
-                  disabled={sending || !!success}
-                  className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition disabled:opacity-50"
-                >
-                  {sending ? "Envoi..." : "Envoyer l'invitation"}
+                <button type="submit" disabled={sending || !!success} className="btn-primary">
+                  {sending ? "Envoi..." : "Inviter"}
                 </button>
               </div>
             </form>

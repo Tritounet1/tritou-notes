@@ -13,6 +13,7 @@ import { TodoEditor } from "./components/TodoEditor";
 import { useAuth } from "./hooks/useAuth";
 import { useDebounce } from "./hooks/useDebounce";
 import { jsonToMarkdownTable, templateToMarkdown } from "./utils/jsonToMarkdown";
+import { docTypeStyles } from "./utils/docTypes";
 
 import { CodeBlock } from "./components/CodeBlock";
 import { WebLinkBlock } from "./components/WebLinkBlock";
@@ -65,6 +66,18 @@ interface Conversation {
   authorId: number;
   created_at: string;
 }
+
+const docTypeIcons = {
+  TEXT: <><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></>,
+  EXCEL: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M3 15h18M9 4v16" /></>,
+  TODO: <><rect x="3" y="3" width="18" height="18" rx="3" /><path d="m8 12 3 3 5-6" /></>,
+};
+
+// Short glyphs shown in the slash command menu tiles.
+const commandGlyphs: Record<string, string> = {
+  image: "▣", planificateur: "↻", scrape: "↯", date: "31", time: "◷",
+  divider: "—", code: "{}", quote: "“", list: "•", checkbox: "[ ]",
+};
 
 function computeDiff(oldText: string, newText: string): DiffLine[] {
   const oldLines = oldText.split("\n");
@@ -863,156 +876,173 @@ export const DocumentPage = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">Chargement...</p>
-      </div>
-    );
+    return <p className="py-24 text-center text-muted">Chargement…</p>;
   }
 
   if (error || !document) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-red-500">{error || "Document non trouvé"}</p>
-      </div>
-    );
+    return <p className="py-24 text-center text-danger-ink">{error || "Document non trouvé"}</p>;
   }
+
+  const typeStyle = docTypeStyles[document.type];
+  const canModify = isAuthenticated && hasPermission("modifyDocument");
+  const canUseAi = isAuthenticated && hasPermission("useAiChatBot");
 
   // Shared markdown component map (avoids duplication between view modes)
   const mdComponents = {
     input: ({ checked }: { checked?: boolean }) => (
-      <input type="checkbox" checked={checked} readOnly className="mr-2 h-4 w-4 rounded border-gray-300 text-gray-800 focus:ring-gray-800" />
+      <span
+        role="checkbox"
+        aria-checked={!!checked}
+        aria-readonly="true"
+        data-checked={checked ? "true" : undefined}
+        className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[6px] ${checked ? "bg-ink text-neon" : "border-[1.5px] border-[#bdb9b0]"}`}
+      >
+        {checked && <svg aria-hidden="true" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10" /></svg>}
+      </span>
     ),
-    h1: ({ children }: { children?: React.ReactNode }) => <h1 className="text-3xl font-bold text-gray-900 mt-6 mb-4 first:mt-0">{children}</h1>,
-    h2: ({ children }: { children?: React.ReactNode }) => <h2 className="text-2xl font-semibold text-gray-900 mt-5 mb-3">{children}</h2>,
-    h3: ({ children }: { children?: React.ReactNode }) => <h3 className="text-xl font-semibold text-gray-900 mt-4 mb-2">{children}</h3>,
-    p: ({ children }: { children?: React.ReactNode }) => <p className="text-gray-700 mb-4 leading-relaxed">{children}</p>,
-    ul: ({ children }: { children?: React.ReactNode }) => <ul className="list-disc list-inside mb-4 text-gray-700 space-y-1">{children}</ul>,
-    ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal list-inside mb-4 text-gray-700 space-y-1">{children}</ol>,
+    h1: ({ children }: { children?: React.ReactNode }) => <h1 className="font-display text-[32px] leading-tight font-bold tracking-[-0.03em] text-ink mt-8 mb-3 first:mt-0">{children}</h1>,
+    h2: ({ children }: { children?: React.ReactNode }) => <h2 className="font-display text-[26px] leading-tight font-bold tracking-[-0.02em] text-ink mt-7 mb-3 first:mt-0">{children}</h2>,
+    h3: ({ children }: { children?: React.ReactNode }) => <h3 className="font-display text-xl font-semibold tracking-[-0.01em] text-ink mt-6 mb-2 first:mt-0">{children}</h3>,
+    p: ({ children }: { children?: React.ReactNode }) => <p className="text-ink-2 mb-4">{children}</p>,
+    ul: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
+      <ul className={`mb-4 text-ink-2 flex flex-col gap-1.5 ${className?.includes("contains-task-list") ? "list-none" : "list-disc pl-6 marker:text-muted"}`}>{children}</ul>
+    ),
+    ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal pl-6 mb-4 text-ink-2 flex flex-col gap-1.5 marker:text-muted marker:font-mono marker:text-sm">{children}</ol>,
     li: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
-      <li className={`ml-2 ${className?.includes("task-list-item") ? "list-none flex items-center" : ""}`}>{children}</li>
+      <li className={className?.includes("task-list-item") ? "flex items-center gap-2.5 has-[[data-checked]]:text-muted has-[[data-checked]]:line-through" : "pl-1"}>{children}</li>
     ),
     blockquote: ({ children }: { children?: React.ReactNode }) => (
-      <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-600 my-4">{children}</blockquote>
+      <blockquote className="my-4 rounded-xl bg-paper-soft px-[18px] py-3.5 font-display text-xl leading-[1.4] font-medium text-ink [&_p]:mb-0 [&_p]:text-ink">{children}</blockquote>
     ),
     code: ({ className, children }: { className?: string; children?: React.ReactNode }) => {
       const isBlock = className?.includes("language-");
       return isBlock ? (
-        <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto my-4">
-          <code className="text-sm font-mono">{children}</code>
+        <pre className="my-4 overflow-x-auto rounded-[14px] bg-code px-5 py-4 text-[#e6e4de]">
+          <code className="font-mono text-[13px] leading-[1.7]">{children}</code>
         </pre>
       ) : (
-        <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>
+        <code className="rounded-md bg-chip px-1.5 py-0.5 font-mono text-[0.85em] text-ink">{children}</code>
       );
     },
     pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
     a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
-      <a href={href} className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">{children}</a>
+      <a href={href} className="text-indigo-ink underline decoration-indigo-soft underline-offset-4 hover:decoration-indigo" target="_blank" rel="noopener noreferrer">{children}</a>
     ),
-    hr: () => <hr className="my-6 border-gray-200" />,
-    strong: ({ children }: { children?: React.ReactNode }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+    hr: () => <hr className="my-6 border-line-soft" />,
+    strong: ({ children }: { children?: React.ReactNode }) => <strong className="font-semibold text-ink">{children}</strong>,
     em: ({ children }: { children?: React.ReactNode }) => <em className="italic">{children}</em>,
+    table: ({ children }: { children?: React.ReactNode }) => (
+      <div className="my-4 overflow-x-auto rounded-2xl border border-line-strong"><table className="w-full border-collapse text-[13px] leading-snug">{children}</table></div>
+    ),
+    th: ({ children }: { children?: React.ReactNode }) => <th className="px-3.5 py-2 text-left text-xs font-medium text-muted">{children}</th>,
+    td: ({ children }: { children?: React.ReactNode }) => <td className="border-t border-line-soft px-3.5 py-2 text-ink-2">{children}</td>,
   };
 
+  const closeIcon = <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6 6 18" /></svg>;
+  const sparkle = <path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z" />;
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`flex flex-wrap items-stretch xl:h-[calc(100vh-20px)] ${isAuthenticated ? "" : "paper m-2.5 min-h-[calc(100vh-20px)] overflow-hidden"}`}>
       {showImageModal && <ImageUploadModal key={document.id} documentId={document.id} initialFiles={imageFiles}
         onInsert={handleInsertImages} onClose={() => setShowImageModal(false)} />}
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {isAuthenticated && (
-          <div className="flex items-center justify-between mb-6">
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-              Retour
-            </button>
 
-            <div className="flex items-center gap-3">
-              {saving && (
-                <span className="text-xs text-gray-400">Sauvegarde...</span>
-              )}
-              {hasPermission("modifyDocument") ? (
-                <button
-                  onClick={handleTogglePublic}
-                  className={`px-3 py-1.5 text-sm rounded-md transition ${
-                    isPublic
-                      ? "bg-green-100 text-green-700 hover:bg-green-200"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {isPublic ? "Public" : "Privé"}
-                </button>
-              ) : (
-                <span
-                  className={`px-3 py-1.5 text-sm rounded-md ${
-                    isPublic
-                      ? "bg-green-100 text-green-700"
-                      : "bg-gray-100 text-gray-600"
-                  }`}
-                >
-                  {isPublic ? "Public" : "Privé"}
-                </span>
-              )}
+      <div className="min-w-0 flex-[999_1_540px] xl:h-full xl:overflow-y-auto">
+        {isAuthenticated ? (
+          <header className="flex flex-wrap items-center justify-between gap-2.5 py-2.5 pl-5 pr-4">
+            <nav aria-label="Fil d’Ariane" className="flex min-w-0 items-center gap-1.5 text-sm text-muted">
+              <button type="button" onClick={() => navigate("/dashboard")} className="cursor-pointer hover:text-ink">Pages</button>
+              <span aria-hidden="true">/</span>
+              <span className="truncate font-medium text-ink">{title || "Sans titre"}</span>
+            </nav>
+            <div className="flex flex-wrap items-center gap-1.5 text-[13px]">
+              <span role="status" className="flex items-center gap-1.5 px-2 text-muted">
+                {saving ? (
+                  <><span aria-hidden="true" className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo" />Enregistrement…</>
+                ) : (
+                  <><svg aria-hidden="true" className="h-3.5 w-3.5 text-neon-dot" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10" /></svg>Enregistré</>
+                )}
+              </span>
+              {(() => {
+                const content = (
+                  <>
+                    <svg aria-hidden="true" className="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                      {isPublic
+                        ? <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></>
+                        : <><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>}
+                    </svg>
+                    {isPublic ? "Public" : "Privé"}
+                  </>
+                );
+                const cls = `flex min-h-[34px] items-center gap-1.5 rounded-[9px] px-2.5 ${isPublic ? "bg-neon-tint text-neon-ink" : "text-ink-2"}`;
+                return hasPermission("modifyDocument")
+                  ? <button type="button" onClick={handleTogglePublic} title={isPublic ? "Rendre privé" : "Rendre public"} className={`${cls} cursor-pointer transition hover:bg-chip`}>{content}</button>
+                  : <span className={cls}>{content}</span>;
+              })()}
+              <button type="button" onClick={handleOpenHistory} aria-label="Historique des versions" title="Historique des versions" className="icon-btn h-[34px] w-[34px] rounded-[9px] text-ink-2">
+                <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5M12 7v5l3 2" /></svg>
+              </button>
               {hasPermission("deleteDocument") && (
+                <button type="button" onClick={handleDelete} aria-label="Supprimer le document" title="Supprimer le document" className="icon-btn h-[34px] w-[34px] rounded-[9px] text-ink-2 hover:bg-danger-tint hover:text-danger-ink">
+                  <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
+                </button>
+              )}
+              {canUseAi && (
                 <button
-                  onClick={handleDelete}
-                  className="px-3 py-1.5 text-sm bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition"
+                  type="button"
+                  onClick={showAiChat ? () => setShowAiChat(false) : handleOpenAiChat}
+                  aria-pressed={showAiChat}
+                  className={`flex min-h-[34px] cursor-pointer items-center gap-1.5 rounded-[9px] px-3 font-semibold transition ${showAiChat ? "bg-indigo text-white hover:bg-indigo-ink" : "border border-line-strong bg-paper text-ink hover:bg-paper-soft"}`}
                 >
-                  Supprimer
+                  <svg aria-hidden="true" className="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">{sparkle}<path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2-2.2-.8 2.2-.8z" /></svg>
+                  Assistant
                 </button>
               )}
             </div>
-          </div>
-        )}
+          </header>
+        ) : <div className="h-3" />}
 
-        <div onClick={handleDocumentBackgroundClick} className={`bg-white rounded-lg shadow-sm ${document.type === "EXCEL" || document.type === "TODO" ? "flex flex-col h-[calc(100vh-200px)]" : "p-8"}`}>
-          <div className={document.type === "EXCEL" || document.type === "TODO" ? "px-6 py-4 border-b border-gray-100" : ""}>
-            {isAuthenticated && hasPermission("modifyDocument") ? (
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => handleTitleChange(e.target.value)}
-                placeholder="Titre du document"
-                className={`w-full text-3xl font-bold text-gray-900 border-none outline-none placeholder-gray-300 ${document.type === "EXCEL" || document.type === "TODO" ? "" : "mb-6"}`}
-              />
-            ) : (
-              <h1 className={`text-3xl font-bold text-gray-900 ${document.type === "EXCEL" || document.type === "TODO" ? "" : "mb-6"}`}>
-                {title || "Sans titre"}
-              </h1>
-            )}
-          </div>
+        <div aria-hidden="true" className={`mx-3 h-[140px] rounded-[14px] sm:h-[180px] ${typeStyle.cover}`} />
 
-          {document.type === "EXCEL" ? (
-            <SpreadsheetEditor
-              data={text}
-              onChange={handleTextChange}
-              readOnly={!isAuthenticated || !hasPermission("modifyDocument")}
-            />
-          ) : document.type === "TODO" ? (
-            <TodoEditor
-              data={text}
-              onChange={handleTextChange}
-              readOnly={!isAuthenticated || !hasPermission("modifyDocument")}
+        <div onClick={handleDocumentBackgroundClick} className="mx-auto flex max-w-[760px] flex-col gap-[18px] px-5 sm:px-10">
+          <span aria-hidden="true" className="relative -mt-9 flex h-[72px] w-[72px] -rotate-6 items-center justify-center rounded-[20px] bg-ink text-neon shadow-[0_0_0_5px_var(--color-paper)]">
+            <svg className="h-[34px] w-[34px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">{docTypeIcons[document.type]}</svg>
+          </span>
+
+          {canModify ? (
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => handleTitleChange(e.target.value)}
+              placeholder="Sans titre"
+              aria-label="Titre du document"
+              className="w-full bg-transparent font-display text-[36px] leading-[1.05] font-bold tracking-[-0.03em] text-ink outline-none placeholder:text-line-strong sm:text-[46px]"
             />
           ) : (
+            <h1 className="font-display text-[36px] leading-[1.05] font-bold tracking-[-0.03em] text-ink sm:text-[46px]">
+              {title || "Sans titre"}
+            </h1>
+          )}
+
+          <dl className="grid grid-cols-[120px_1fr] gap-y-1.5 text-sm leading-relaxed">
+            <dt className="text-muted">Type</dt>
+            <dd><span className={`pill font-medium ${typeStyle.chip}`}>{typeStyle.label}</span></dd>
+            <dt className="text-muted">Modifié</dt>
+            <dd className="font-mono text-[13px] text-ink-2">{new Date(document.last_update).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}</dd>
+          </dl>
+
+          <hr className="my-1 border-line-soft" />
+
+          {document.type === "TODO" && (
+            <div className="pb-20">
+              <TodoEditor data={text} onChange={handleTextChange} readOnly={!canModify} />
+            </div>
+          )}
+
+          {document.type === "TEXT" && (
             // TEXT document — segmented renderer (text + scheduler blocks)
-            <div onClick={handleDocumentBackgroundClick} className={`min-h-[60vh] flex flex-col ${isAuthenticated && hasPermission("modifyDocument") ? "cursor-text" : ""}`}>
+            <div onClick={handleDocumentBackgroundClick} className={`flex min-h-[50vh] flex-col pb-20 text-base leading-[1.7] text-ink-2 ${canModify ? "cursor-text" : ""}`}>
               {(() => {
-                const canEdit = isAuthenticated && hasPermission("modifyDocument");
+                const canEdit = canModify;
                 const segs = normalizeSegments(parseSegments(text));
 
                 return segs.map((seg, segIndex) => {
@@ -1073,28 +1103,38 @@ export const DocumentPage = () => {
                               ? "Commencez à écrire en Markdown… (tapez / pour les commandes)"
                               : "Tapez ici… (/ pour les commandes)"}
                             aria-label="Contenu du document"
-                            className={`w-full min-h-[50px] text-gray-700 border-none outline-none resize-none overflow-hidden placeholder-gray-300 leading-relaxed font-mono text-sm ${isLastSegment ? "flex-1" : ""}`}
+                            className={`w-full min-h-[50px] resize-none overflow-hidden border-none bg-transparent font-mono text-sm leading-[1.7] text-ink outline-none placeholder:text-muted/60 caret-indigo ${isLastSegment ? "flex-1" : ""}`}
                           />
                           {showCommands && filteredCommands.length > 0 && (
                             <div
                               ref={commandMenuRef}
-                              className="absolute left-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg py-2 min-w-64 z-50"
+                              role="listbox"
+                              aria-label="Commandes"
+                              className="absolute left-0 top-8 z-50 w-80 max-w-full rounded-[14px] bg-paper p-1.5 leading-[1.3] shadow-[0_18px_50px_-12px_rgba(28,27,25,0.35),0_0_0_1px_var(--color-line-strong)]"
                             >
-                              <div className="px-3 py-1 text-xs text-gray-400 border-b border-gray-100 mb-1">
-                                Commandes
+                              <p className="eyebrow px-2.5 pt-1.5 pb-1">Blocs</p>
+                              <div className="max-h-80 overflow-y-auto">
+                                {filteredCommands.map((cmd, index) => (
+                                  <button
+                                    key={cmd.name}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={index === selectedCommandIndex}
+                                    onMouseDown={e => { e.preventDefault(); executeCommand(index); }}
+                                    className={`flex w-full cursor-pointer items-center gap-3 rounded-[10px] px-2 py-1.5 text-left transition ${
+                                      index === selectedCommandIndex ? "bg-indigo-tint" : "hover:bg-paper-soft"
+                                    }`}
+                                  >
+                                    <span aria-hidden="true" className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px] border border-line bg-chip font-mono text-[13px] font-semibold text-ink-2">
+                                      {commandGlyphs[cmd.name] ?? "/"}
+                                    </span>
+                                    <span className="flex min-w-0 flex-col gap-px">
+                                      <span className="text-sm font-medium text-ink">/{cmd.name}</span>
+                                      <span className="truncate text-xs text-muted">{cmd.description}</span>
+                                    </span>
+                                  </button>
+                                ))}
                               </div>
-                              {filteredCommands.map((cmd, index) => (
-                                <button
-                                  key={cmd.name}
-                                  onMouseDown={e => { e.preventDefault(); executeCommand(index); }}
-                                  className={`w-full px-3 py-2 text-left flex items-center gap-3 transition ${
-                                    index === selectedCommandIndex ? "bg-gray-100" : "hover:bg-gray-50"
-                                  }`}
-                                >
-                                  <span className="text-gray-400 font-mono text-sm">/{cmd.name}</span>
-                                  <span className="text-gray-600 text-sm">{cmd.description}</span>
-                                </button>
-                              ))}
                             </div>
                           )}
                         </div>
@@ -1109,7 +1149,7 @@ export const DocumentPage = () => {
                             }
                           } : undefined}
                           aria-label={canEdit ? "Modifier le texte du document" : undefined}
-                          className={`${canEdit ? "cursor-text" : ""} ${isLastSegment ? "flex-1" : ""} ${seg.content ? "prose prose-gray max-w-none" : "min-h-[40px]"}`}
+                          className={`rounded-md outline-none focus-visible:ring-2 focus-visible:ring-indigo-soft ${canEdit ? "cursor-text" : ""} ${isLastSegment ? "flex-1" : ""} ${seg.content ? "" : "min-h-[40px]"}`}
                         >
                           {seg.content ? (
                             <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
@@ -1126,287 +1166,174 @@ export const DocumentPage = () => {
           )}
         </div>
 
-        <div className="mt-4 flex items-center justify-end gap-4">
-          <p className="text-xs text-gray-400">
-            Dernière modification :{" "}
-            {new Date(document.last_update).toLocaleString("fr-FR")}
-          </p>
-          {isAuthenticated && (
-            <button
-              onClick={handleOpenHistory}
-              className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 transition"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              Historique
-            </button>
-          )}
-        </div>
+        {document.type === "EXCEL" && (
+          <div className="mx-3 mb-3 mt-[18px] flex h-[70vh] flex-col overflow-hidden rounded-2xl border border-line-strong sm:mx-5">
+            <SpreadsheetEditor data={text} onChange={handleTextChange} readOnly={!canModify} />
+          </div>
+        )}
       </div>
 
-      {/* AI Chat Toggle Button */}
-      {isAuthenticated && hasPermission("useAiChatBot") && (
-        <button
-          onClick={handleOpenAiChat}
-          className="fixed right-0 top-1/2 -translate-y-1/2 bg-gray-800 text-white p-3 rounded-l-lg shadow-lg hover:bg-gray-700 transition z-40"
-          title="Ouvrir le chat IA"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-        </button>
-      )}
-
       {/* AI Chat Panel */}
-      <div
-        className={`fixed right-0 top-0 h-full w-96 bg-white shadow-xl transform transition-transform duration-300 z-50 ${
-          showAiChat ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        <div className="h-full flex flex-col">
-          {/* Header */}
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="font-semibold text-gray-900">Assistant IA</h3>
-            <button
-              onClick={() => setShowAiChat(false)}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+      {canUseAi && showAiChat && (
+        <aside aria-label="Assistant IA" className="flex min-h-[520px] min-w-0 flex-[1_1_340px] flex-col border-t border-line-soft bg-paper-warm xl:h-full xl:min-h-0 xl:border-t-0 xl:border-l">
+          <div className="flex items-center justify-between gap-2 border-b border-line-soft px-4 py-3.5">
+            <h2 className="flex items-center gap-2.5 font-display text-[17px] font-bold text-ink">
+              <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-[9px] bg-indigo text-white">
+                <svg className="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">{sparkle}</svg>
+              </span>
+              Assistant IA
+            </h2>
+            <button type="button" onClick={() => setShowAiChat(false)} aria-label="Fermer l’assistant" className="icon-btn h-8 w-8 rounded-lg">
+              {closeIcon}
             </button>
-          </div>
-
-          {/* Model Selector */}
-          <div className="px-4 py-3 border-b border-gray-100">
-            <label className="block text-xs text-gray-500 mb-1">Modèle</label>
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-800"
-            >
-              {aiModels.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.display_name}
-                </option>
-              ))}
-            </select>
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex flex-1 flex-col gap-3.5 overflow-y-auto px-4 py-[18px] text-sm leading-[1.55]">
             {chatMessages.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center mt-8">
-                Posez une question à l'IA
+              <p className="mt-8 text-center text-sm text-muted">
+                Posez une question à l’IA
               </p>
             ) : (
-              chatMessages.map((msg, index) => (
-                <div
-                  key={index}
-                  className={`flex ${
-                    msg.role === "user" ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`max-w-[80%] px-4 py-2 rounded-lg text-sm ${
-                      msg.role === "user"
-                        ? "bg-gray-800 text-white"
-                        : "bg-gray-100 text-gray-800"
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap">
-                      {msg.role === "user"
-                        ? msg.content.split(/(@file)/g).map((part, i) =>
-                            part === "@file" ? (
-                              <span
-                                key={i}
-                                className="bg-blue-500/30 text-blue-200 px-1 rounded font-mono"
-                              >
-                                @file
-                              </span>
-                            ) : (
-                              part
-                            ),
-                          )
-                        : msg.content}
-                    </p>
-                  </div>
-                </div>
-              ))
+              chatMessages.map((msg, index) =>
+                msg.role === "user" ? (
+                  <p key={index} className="max-w-[85%] self-end whitespace-pre-wrap rounded-[16px_16px_4px_16px] bg-ink px-3.5 py-2.5 text-white">
+                    {msg.content.split(/(@file)/g).map((part, i) =>
+                      part === "@file" ? (
+                        <span key={i} className="rounded-[5px] bg-[#3a3934] px-1.5 py-px font-mono text-xs text-neon">@file</span>
+                      ) : (
+                        part
+                      ),
+                    )}
+                  </p>
+                ) : (
+                  <p key={index} className="max-w-[92%] whitespace-pre-wrap text-ink-2">{msg.content}</p>
+                ),
+              )
             )}
             {aiLoading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg text-sm">
-                  <span className="animate-pulse">Réflexion...</span>
-                </div>
-              </div>
+              <span role="status" className="flex items-center gap-2 text-[13px] text-muted">
+                <span aria-hidden="true" className="flex gap-[3px]">
+                  <span className="h-[5px] w-[5px] animate-pulse rounded-full bg-indigo" />
+                  <span className="h-[5px] w-[5px] animate-pulse rounded-full bg-indigo/60 [animation-delay:150ms]" />
+                  <span className="h-[5px] w-[5px] animate-pulse rounded-full bg-indigo/30 [animation-delay:300ms]" />
+                </span>
+                Réflexion…
+              </span>
             )}
             <div ref={chatEndRef} />
           </div>
 
           {/* Input */}
-          <div className="p-4 border-t border-gray-100">
+          <div className="border-t border-line-soft p-3">
             <div className="relative">
               {showMentions && filteredMentions.length > 0 && (
-                <div className="absolute bottom-full left-0 mb-2 bg-white border border-gray-200 rounded-lg shadow-lg py-2 w-full z-10">
-                  <div className="px-3 py-1 text-xs text-gray-400 border-b border-gray-100 mb-1">
-                    Mentions
-                  </div>
+                <div className="absolute bottom-full left-0 z-10 mb-2 w-full rounded-[14px] bg-paper p-1.5 shadow-[0_18px_50px_-12px_rgba(28,27,25,0.35),0_0_0_1px_var(--color-line-strong)]">
+                  <p className="eyebrow px-2.5 pt-1.5 pb-1">Mentions</p>
                   {filteredMentions.map((mention) => (
                     <button
                       key={mention.name}
+                      type="button"
                       onMouseDown={(e) => {
                         e.preventDefault();
                         insertMention(mention.name);
                       }}
-                      className="w-full px-3 py-2 text-left flex items-center gap-3 hover:bg-gray-50 transition"
+                      className="flex w-full cursor-pointer items-center gap-3 rounded-[10px] bg-indigo-tint px-2.5 py-2 text-left"
                     >
-                      <span className="text-gray-400 font-mono text-sm">
-                        @{mention.name}
-                      </span>
-                      <span className="text-gray-600 text-sm">
-                        {mention.description}
-                      </span>
+                      <span className="font-mono text-sm font-semibold text-indigo-ink">@{mention.name}</span>
+                      <span className="text-xs text-muted">{mention.description}</span>
                     </button>
                   ))}
                 </div>
               )}
-              <div className="flex gap-2 items-end">
+              <div className="flex flex-col gap-2 rounded-[14px] border border-line-strong bg-paper py-2.5 pr-2.5 pl-3 transition focus-within:border-indigo focus-within:ring-4 focus-within:ring-indigo-tint">
                 <textarea
                   ref={aiTextareaRef}
                   value={aiInput}
                   onChange={handleAiInputChange}
                   onKeyDown={handleAiKeyDown}
-                  placeholder="Écrivez votre message... (@file pour inclure le document)"
-                  className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-800 resize-none min-h-[60px] max-h-[150px]"
+                  placeholder="Écrivez votre message… (@file pour inclure le document)"
+                  aria-label="Message à l’assistant"
+                  className="max-h-[150px] min-h-[44px] resize-none border-0 bg-transparent text-sm text-ink outline-none placeholder:text-muted/70"
                   disabled={aiLoading}
-                  rows={1}
+                  rows={2}
                 />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={aiLoading || !aiInput.trim()}
-                  className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed h-10"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                    />
-                  </svg>
-                </button>
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                <p className="text-xs text-gray-400">
-                  Shift+Enter pour nouvelle ligne
-                </p>
-                {hasFileMention && (
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <svg
-                      className="w-3 h-3"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="flex min-w-0 items-center gap-1.5 text-xs text-muted">
+                    Modèle
+                    <select
+                      value={selectedModel}
+                      onChange={(e) => setSelectedModel(e.target.value)}
+                      className="min-w-0 max-w-44 cursor-pointer rounded-[7px] border border-line-strong bg-paper-soft px-1.5 py-[3px] text-xs text-ink outline-none focus:border-indigo"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                    Document inclus
-                  </span>
-                )}
+                      {aiModels.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.display_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {hasFileMention && (
+                      <span className="pill bg-indigo-tint font-medium text-indigo-ink">
+                        <svg aria-hidden="true" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z" /><path d="M14 3v5h5" /></svg>
+                        Document inclus
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleSendMessage}
+                      disabled={aiLoading || !aiInput.trim()}
+                      aria-label="Envoyer"
+                      className="flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-[10px] bg-indigo text-white transition hover:bg-indigo-ink disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+                    </button>
+                  </div>
+                </div>
               </div>
+              <p className="mt-1.5 px-1 text-[11px] text-muted">
+                <kbd className="font-mono">Maj+Entrée</kbd> pour une nouvelle ligne
+              </p>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Overlay when chat is open */}
-      {showAiChat && (
-        <div
-          className="fixed inset-0 bg-black/20 z-40"
-          onClick={() => setShowAiChat(false)}
-        />
+        </aside>
       )}
 
       {/* Scheduler picker modal */}
       {showSchedulerModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Lier un planificateur</h2>
-              <button
-                onClick={() => setShowSchedulerModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+        <div className="modal-backdrop">
+          <div role="dialog" aria-modal="true" aria-labelledby="scheduler-modal-title" className="modal max-w-md p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 id="scheduler-modal-title" className="section-title">Lier un planificateur</h2>
+              <button type="button" onClick={() => setShowSchedulerModal(false)} aria-label="Fermer" className="icon-btn">
+                {closeIcon}
               </button>
             </div>
 
             {schedulerListLoading ? (
-              <p className="text-sm text-gray-400 text-center py-6">Chargement…</p>
+              <p className="py-6 text-center text-sm text-muted">Chargement…</p>
             ) : schedulerList.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-6">Aucun planificateur disponible.</p>
+              <p className="py-6 text-center text-sm text-muted">Aucun planificateur disponible.</p>
             ) : (
-              <div className="space-y-2 max-h-72 overflow-y-auto">
+              <div className="flex max-h-72 flex-col gap-2 overflow-y-auto">
                 {schedulerList.map(s => (
                   <button
                     key={s.id}
+                    type="button"
                     onClick={() => handleSelectScheduler(s.id)}
-                    className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition text-left"
+                    className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border border-line px-4 py-3 text-left transition hover:border-indigo-soft hover:bg-indigo-tint"
                   >
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{s.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">ID #{s.id}</p>
-                    </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-ink">{s.title}</span>
+                      <span className="mt-0.5 block font-mono text-xs text-muted">#{s.id}</span>
+                    </span>
+                    <span className={`pill shrink-0 ${
                       s.status === "ACTIVATE"
-                        ? "bg-green-100 text-green-700"
+                        ? "bg-neon-tint text-neon-ink"
                         : s.status === "RUNNING"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-gray-100 text-gray-500"
+                          ? "bg-indigo-tint text-indigo-ink"
+                          : "bg-chip text-ink-2"
                     }`}>
                       {s.status === "ACTIVATE" ? "Actif" : s.status === "RUNNING" ? "En cours" : "Inactif"}
                     </span>
@@ -1415,11 +1342,8 @@ export const DocumentPage = () => {
               </div>
             )}
 
-            <div className="flex justify-end mt-4">
-              <button
-                onClick={() => setShowSchedulerModal(false)}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
-              >
+            <div className="mt-5 flex justify-end">
+              <button type="button" onClick={() => setShowSchedulerModal(false)} className="btn-secondary">
                 Annuler
               </button>
             </div>
@@ -1429,63 +1353,42 @@ export const DocumentPage = () => {
 
       {/* Scrape Modal */}
       {showScrapeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Scrape une URL
-              </h2>
-              <button
-                onClick={() => setShowScrapeModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+        <div className="modal-backdrop">
+          <div role="dialog" aria-modal="true" aria-labelledby="scrape-modal-title" className="modal max-w-md p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 id="scrape-modal-title" className="section-title">Scraper une URL</h2>
+              <button type="button" onClick={() => setShowScrapeModal(false)} aria-label="Fermer" className="icon-btn">
+                {closeIcon}
               </button>
             </div>
 
-            <input
-              type="url"
-              value={scrapeUrl}
-              onChange={(e) => setScrapeUrl(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleScrape();
-                }
-              }}
-              placeholder="https://example.com/page"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-800 mb-4"
-              autoFocus
-            />
+            <label className="label mb-4">
+              URL
+              <input
+                type="url"
+                value={scrapeUrl}
+                onChange={(e) => setScrapeUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleScrape();
+                  }
+                }}
+                placeholder="https://example.com/page"
+                className="input font-mono"
+                autoFocus
+              />
+            </label>
 
             {scrapeError && (
-              <p className="text-sm text-red-500 mb-4">{scrapeError}</p>
+              <p className="mb-4 text-sm text-danger-ink">{scrapeError}</p>
             )}
 
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowScrapeModal(false)}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
-              >
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setShowScrapeModal(false)} className="btn-secondary">
                 Annuler
               </button>
-              <button
-                onClick={handleScrape}
-                disabled={!scrapeUrl.trim() || scrapeLoading}
-                className="px-4 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              <button type="button" onClick={handleScrape} disabled={!scrapeUrl.trim() || scrapeLoading} className="btn-primary">
                 Scraper
               </button>
             </div>
@@ -1494,61 +1397,38 @@ export const DocumentPage = () => {
       )}
 
       {showHistory && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Historique des modifications
-              </h2>
-              <button
-                onClick={() => setShowHistory(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+        <div className="modal-backdrop">
+          <div role="dialog" aria-modal="true" aria-labelledby="history-modal-title" className="modal flex max-h-[85vh] max-w-4xl flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-line-soft px-6 py-4">
+              <h2 id="history-modal-title" className="section-title">Historique des modifications</h2>
+              <button type="button" onClick={() => setShowHistory(false)} aria-label="Fermer" className="icon-btn">
+                {closeIcon}
               </button>
             </div>
 
             {historyLoading ? (
-              <div className="p-8 text-center text-gray-500">Chargement...</div>
+              <p className="p-8 text-center text-muted">Chargement…</p>
             ) : history.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                Aucun historique disponible
-              </div>
+              <p className="p-8 text-center text-muted">Aucun historique disponible</p>
             ) : (
-              <div className="flex flex-1 overflow-hidden">
-                <div className="w-64 border-r border-gray-100 overflow-y-auto">
+              <div className="flex flex-1 flex-col overflow-hidden sm:flex-row">
+                <div className="max-h-48 shrink-0 overflow-y-auto border-b border-line-soft bg-paper-warm p-2 sm:max-h-none sm:w-64 sm:border-r sm:border-b-0">
                   {history.map((entry, index) => (
                     <button
                       key={entry.id}
+                      type="button"
                       onClick={() => setSelectedVersion(index)}
-                      className={`w-full px-4 py-3 text-left border-b border-gray-50 transition ${
-                        selectedVersion === index
-                          ? "bg-gray-100"
-                          : "hover:bg-gray-50"
+                      aria-pressed={selectedVersion === index}
+                      className={`w-full cursor-pointer rounded-[10px] px-3 py-2.5 text-left transition ${
+                        selectedVersion === index ? "bg-indigo-tint" : "hover:bg-chip"
                       }`}
                     >
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {entry.title}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <span className="block truncate text-sm font-medium text-ink">{entry.title}</span>
+                      <span className="mt-0.5 block font-mono text-xs text-muted">
                         {new Date(entry.created_at).toLocaleString("fr-FR")}
-                      </p>
+                      </span>
                       {index === 0 && (
-                        <span className="text-xs text-gray-400">
-                          Version initiale
-                        </span>
+                        <span className="text-xs text-muted">Version initiale</span>
                       )}
                     </button>
                   ))}
@@ -1557,10 +1437,10 @@ export const DocumentPage = () => {
                 <div className="flex-1 overflow-y-auto p-4">
                   {selectedVersion !== null && history[selectedVersion] && (
                     <div>
-                      <div className="mb-4 flex items-center gap-4 text-sm">
-                        <span className="text-gray-500">
+                      <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+                        <span className="text-muted">
                           {selectedVersion > 0
-                            ? `Changements depuis la version précédente`
+                            ? "Changements depuis la version précédente"
                             : "Version initiale"}
                         </span>
                         {history[selectedVersion].public !==
@@ -1568,10 +1448,10 @@ export const DocumentPage = () => {
                             ? history[selectedVersion - 1]?.public
                             : false) && (
                           <span
-                            className={`px-2 py-0.5 rounded text-xs ${
+                            className={`pill ${
                               history[selectedVersion].public
-                                ? "bg-green-100 text-green-700"
-                                : "bg-gray-100 text-gray-600"
+                                ? "bg-neon-tint text-neon-ink"
+                                : "bg-chip text-ink-2"
                             }`}
                           >
                             {history[selectedVersion].public
@@ -1585,23 +1465,23 @@ export const DocumentPage = () => {
                         (selectedVersion > 0
                           ? history[selectedVersion - 1]?.title
                           : "") && (
-                        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                          <p className="text-xs text-gray-500 mb-1">Titre</p>
+                        <div className="mb-4 rounded-xl bg-paper-soft p-3">
+                          <p className="eyebrow mb-1">Titre</p>
                           {selectedVersion > 0 &&
                             history[selectedVersion - 1]?.title && (
-                              <p className="text-sm text-red-600 line-through">
+                              <p className="text-sm text-danger-ink line-through">
                                 {history[selectedVersion - 1].title}
                               </p>
                             )}
-                          <p className="text-sm text-green-600">
+                          <p className="text-sm text-neon-ink">
                             {history[selectedVersion].title}
                           </p>
                         </div>
                       )}
 
-                      <div className="bg-gray-900 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+                      <div className="overflow-x-auto rounded-[14px] bg-code px-4 py-3 font-mono text-[13px] leading-[1.7]">
                         {getDiff().length === 0 ? (
-                          <p className="text-gray-500">
+                          <p className="text-[#9c9a94]">
                             Aucune modification du contenu
                           </p>
                         ) : (
@@ -1610,13 +1490,13 @@ export const DocumentPage = () => {
                               key={index}
                               className={`${
                                 line.type === "added"
-                                  ? "bg-green-900/30 text-green-400"
+                                  ? "bg-neon/10 text-neon"
                                   : line.type === "removed"
-                                    ? "bg-red-900/30 text-red-400"
-                                    : "text-gray-400"
-                              } px-2 py-0.5 -mx-2`}
+                                    ? "bg-danger/15 text-[#ff9c87]"
+                                    : "text-[#9c9a94]"
+                              } -mx-2 whitespace-pre-wrap px-2`}
                             >
-                              <span className="select-none mr-2">
+                              <span className="mr-2 select-none">
                                 {line.type === "added"
                                   ? "+"
                                   : line.type === "removed"

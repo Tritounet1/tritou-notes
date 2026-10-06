@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { API_URL } from "./api";
 import { useAuth } from "./hooks/useAuth";
+import { AuthError, AuthShell, AuthSubmit } from "./LoginPage";
 
 export const RegisterPage = () => {
   const [searchParams] = useSearchParams();
@@ -9,7 +10,7 @@ export const RegisterPage = () => {
   const navigate = useNavigate();
   const { login, isAuthenticated } = useAuth();
 
-  // Rediriger si deja authentifie
+  // Rediriger si déjà authentifié
   useEffect(() => {
     if (isAuthenticated) {
       navigate("/dashboard");
@@ -25,7 +26,7 @@ export const RegisterPage = () => {
   const [verifying, setVerifying] = useState(!!token);
   const [tokenValid, setTokenValid] = useState(false);
 
-  // Verification du token d'invitation
+  // Vérification du token d'invitation
   useEffect(() => {
     if (!token) {
       setVerifying(false);
@@ -66,7 +67,7 @@ export const RegisterPage = () => {
     }
 
     if (password.length < 6) {
-      setError("Le mot de passe doit contenir au moins 6 caracteres");
+      setError("Le mot de passe doit contenir au moins 6 caractères");
       return;
     }
 
@@ -84,7 +85,7 @@ export const RegisterPage = () => {
           body: JSON.stringify({ username, password }),
         });
       } else {
-        // Inscription classique (si autorisee)
+        // Inscription classique (si autorisée)
         response = await fetch(`${API_URL}/auth/register`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -112,187 +113,140 @@ export const RegisterPage = () => {
 
   if (verifying) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Verification de l'invitation...</p>
-      </div>
+      <AuthShell>
+        <p className="py-24 text-center text-muted">Vérification de l’invitation…</p>
+      </AuthShell>
     );
   }
 
-  // Token invalide ou expire
+  // Token invalide ou expiré
   if (token && !tokenValid) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <AuthShell>
+        <div className="flex flex-col items-start gap-4">
+          <span className="w-12 h-12 rounded-xl bg-danger-tint text-danger-ink flex items-center justify-center">
             <svg
-              className="w-8 h-8 text-red-600"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              viewBox="0 0 24 24"
+              strokeWidth={1.75}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
+              <path d="M18 6 6 18M6 6l12 12" />
             </svg>
-          </div>
-          <h1 className="text-2xl font-semibold text-gray-800 mb-2">
+          </span>
+          <h2 className="font-display text-[34px] font-bold tracking-[-0.03em] text-ink">
             Invitation invalide
-          </h1>
-          <p className="text-gray-600 mb-6">
-            {error || "Ce lien d'invitation n'est pas valide ou a expire."}
+          </h2>
+          <p className="text-[15px] text-muted">
+            {error || "Ce lien d’invitation n’est pas valide ou a expiré."}
           </p>
-          <button
-            onClick={() => navigate("/login")}
-            className="text-gray-600 hover:text-gray-800 transition"
-          >
-            Retour a la connexion
+          <button type="button" onClick={() => navigate("/login")} className="btn-secondary">
+            Retour à la connexion
           </button>
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
+  const invited = !!(token && tokenValid);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
-        {token && tokenValid ? (
-          <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg
-                className="w-8 h-8 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-semibold text-gray-800">
-              Creer votre compte
-            </h1>
-            <p className="text-gray-500 mt-2">
-              Vous avez ete invite a rejoindre la plateforme
+    <AuthShell>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-[18px]">
+        <div className="flex flex-col gap-1.5">
+          {invited && (
+            <span className="pill bg-neon-tint text-neon-ink self-start mb-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-neon-dot" />
+              Invitation
+            </span>
+          )}
+          <h2 className="font-display text-[34px] font-bold tracking-[-0.03em] text-ink">
+            {invited ? "Créer votre compte" : "Inscription"}
+          </h2>
+          {invited && (
+            <p className="text-[15px] text-muted">
+              Vous avez été invité à rejoindre la plateforme.
             </p>
-          </div>
-        ) : (
-          <h1 className="text-2xl font-semibold text-gray-800 text-center mb-6">
-            Inscription
-          </h1>
-        )}
+          )}
+        </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
-            {error}
-          </div>
-        )}
+        {error && <AuthError>{error}</AuthError>}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={!!(token && tokenValid)}
-              required
-              className={`w-full px-3 py-2 border border-gray-300 rounded-md transition ${
-                token && tokenValid
-                  ? "bg-gray-50 text-gray-500"
-                  : "focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent"
-              }`}
-              placeholder="votre@email.com"
-            />
-          </div>
+        <label className="label">
+          Email
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={invited}
+            required
+            className="input min-h-[46px] text-[15px] disabled:bg-chip disabled:text-muted"
+            placeholder="votre@email.com"
+          />
+        </label>
 
-          <div>
-            <label
-              htmlFor="username"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Nom d'utilisateur
-            </label>
-            <input
-              id="username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition"
-              placeholder="Votre pseudo"
-            />
-          </div>
+        <label className="label">
+          Nom d’utilisateur
+          <input
+            id="username"
+            type="text"
+            autoComplete="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            className="input min-h-[46px] text-[15px]"
+            placeholder="Votre pseudo"
+          />
+        </label>
 
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Mot de passe
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition"
-              placeholder="Minimum 6 caracteres"
-            />
-          </div>
+        <label className="label">
+          Mot de passe
+          <input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="input min-h-[46px] text-[15px]"
+            placeholder="Minimum 6 caractères"
+          />
+        </label>
 
-          <div>
-            <label
-              htmlFor="confirmPassword"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Confirmer le mot de passe
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition"
-              placeholder="Confirmez votre mot de passe"
-            />
-          </div>
+        <label className="label">
+          Confirmer le mot de passe
+          <input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            className="input min-h-[46px] text-[15px]"
+            placeholder="Confirmez votre mot de passe"
+          />
+        </label>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 bg-gray-800 text-white font-medium rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-800 focus:ring-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "Creation..." : "Creer mon compte"}
-          </button>
-        </form>
+        <AuthSubmit loading={loading}>
+          {loading ? "Création…" : "Créer mon compte"}
+        </AuthSubmit>
 
         {!token && (
-          <p className="mt-6 text-center text-sm text-gray-600">
-            Deja un compte ?{" "}
-            <Link
-              to="/login"
-              className="font-medium text-gray-800 hover:underline"
-            >
+          <p className="text-[13px] text-muted text-center">
+            Déjà un compte ?{" "}
+            <Link to="/login" className="font-semibold text-indigo-ink hover:text-ink">
               Connectez-vous
             </Link>
           </p>
         )}
-      </div>
-    </div>
+      </form>
+    </AuthShell>
   );
 };

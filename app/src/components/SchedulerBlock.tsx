@@ -50,60 +50,62 @@ export const SchedulerBlock = ({ schedulerId, onDelete }: SchedulerBlockProps) =
     : null;
 
   return (
-    <div className="my-4 border border-purple-200 rounded-xl overflow-hidden bg-purple-50/30">
+    <section aria-label="Bloc planificateur" className="my-4 overflow-hidden rounded-2xl border border-line-strong leading-[1.4]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-purple-100">
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span className="text-sm font-medium text-gray-800">
-            {loading ? "Chargement…" : error ? "Planificateur introuvable" : preview?.title}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-ink px-3.5 py-3 text-white">
+        <span className="flex min-w-0 items-center gap-2.5 text-sm font-semibold">
+          <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${error ? "bg-danger" : "bg-neon shadow-[0_0_0_4px_rgba(212,244,90,0.25)]"}`} />
+          <span className="truncate">
+            Planificateur · {loading ? "Chargement…" : error ? "introuvable" : preview?.title}
           </span>
+        </span>
+        <span className="flex items-center gap-2">
           {preview?.last_run_at && (
-            <span className="text-xs text-gray-400">
-              · {new Date(preview.last_run_at).toLocaleString("fr-FR")}
+            <span className="font-mono text-[11px] text-[#bdbab2]">
+              live · {new Date(preview.last_run_at).toLocaleString("fr-FR")}
             </span>
           )}
-        </div>
-        {onDelete && (
-          <button
-            onClick={onDelete}
-            className="p-1 text-gray-400 hover:text-red-500 transition rounded"
-            title="Supprimer ce bloc planificateur"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              aria-label="Supprimer ce bloc planificateur"
+              title="Supprimer ce bloc planificateur"
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-[#bdbab2] transition hover:bg-white/10 hover:text-white"
+            >
+              <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+            </button>
+          )}
+        </span>
       </div>
 
       {/* Body */}
-      <div className="p-4">
+      <div className="text-[13px]">
         {loading && (
-          <p className="text-sm text-gray-400 animate-pulse">Chargement des données…</p>
+          <p className="animate-pulse px-3.5 py-4 text-muted">Chargement des données…</p>
         )}
         {!loading && error && (
-          <p className="text-sm text-red-500">{error}</p>
+          <p className="px-3.5 py-4 text-danger-ink">{error}</p>
         )}
         {!loading && !error && !preview?.latestData && (
-          <p className="text-sm text-gray-400 italic">
-            Aucune donnée disponible — le planificateur n'a pas encore été exécuté.
+          <p className="px-3.5 py-4 text-muted">
+            Aucune donnée disponible — le planificateur n’a pas encore été exécuté.
           </p>
         )}
         {!loading && !error && preview?.latestData && hasTemplate && (
-          <ScraperTemplateRenderer
-            data={preview.latestData.response as Record<string, unknown> | Record<string, unknown>[]}
-            template={template!}
-          />
+          <div className="p-3.5">
+            <ScraperTemplateRenderer
+              data={preview.latestData.response as Record<string, unknown> | Record<string, unknown>[]}
+              template={template!}
+            />
+          </div>
         )}
         {!loading && !error && preview?.latestData && !hasTemplate && markdownFallback && (
-          <div className="prose prose-sm prose-gray max-w-none overflow-x-auto">
+          <div className="overflow-x-auto text-ink [&_table]:w-full [&_table]:min-w-[460px] [&_table]:border-collapse [&_th]:px-3.5 [&_th]:py-2 [&_th]:text-left [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted [&_td]:border-t [&_td]:border-line-soft [&_td]:px-3.5 [&_td]:py-2 [&_td]:text-ink-2 [&_p]:px-3.5 [&_p]:py-2 [&_a]:text-indigo-ink [&_a]:underline">
             <Markdown remarkPlugins={[remarkGfm]}>{markdownFallback}</Markdown>
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 };

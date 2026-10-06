@@ -79,51 +79,56 @@ export function WebLinkBlock({ data, readOnly, initialOpen, onChange, onDelete }
     <div ref={root} className="group relative my-3" onClick={event => event.stopPropagation()}>
       {!readOnly && (
         <div className="mb-1 flex justify-end">
-          <button ref={toggle} type="button" aria-label="Choisir l’affichage du lien" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(!open)} className="rounded-md px-2 py-1 text-xs text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-gray-400">
+          <button ref={toggle} type="button" aria-label="Choisir l’affichage du lien" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(!open)} className="cursor-pointer rounded-lg px-2 py-1 text-xs text-muted transition hover:bg-chip hover:text-ink focus-visible:outline-2 focus-visible:outline-indigo">
             {choices.find(choice => choice.mode === data.mode)?.label} <span aria-hidden="true">⌄</span>
           </button>
         </div>
       )}
       {open && !readOnly && (
-        <div ref={menu} role="dialog" aria-label="Afficher ce lien sous quelle forme ?" onKeyDown={event => { if (event.key === "Escape") { setOpen(false); toggle.current?.focus(); } }} className="absolute right-0 top-8 z-30 w-80 max-w-full rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl">
-          <p className="px-3 py-2 text-xs font-medium text-gray-400">Afficher ce lien sous quelle forme ?</p>
+        <div ref={menu} role="dialog" aria-label="Afficher ce lien sous quelle forme ?" onKeyDown={event => { if (event.key === "Escape") { setOpen(false); toggle.current?.focus(); } }} className="absolute right-0 top-8 z-30 w-80 max-w-full rounded-[14px] bg-paper p-1.5 leading-[1.3] shadow-[0_18px_50px_-12px_rgba(28,27,25,0.35),0_0_0_1px_var(--color-line-strong)]">
+          <p className="eyebrow px-2.5 pt-1.5 pb-1">Afficher ce lien sous quelle forme ?</p>
           {choices.map(choice => (
-            <button key={choice.mode} type="button" onClick={() => void choose(choice.mode)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none">
-              <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gray-200 text-lg text-gray-500">{choice.icon}</span>
-              <span><span className="block text-sm text-gray-800">{choice.label}</span><span className="block text-xs text-gray-400">{choice.description}</span></span>
+            <button key={choice.mode} type="button" onClick={() => void choose(choice.mode)} className={`flex w-full cursor-pointer items-center gap-3 rounded-[10px] px-2 py-1.5 text-left transition hover:bg-paper-soft focus-visible:bg-indigo-tint focus-visible:outline-none ${choice.mode === data.mode ? "bg-indigo-tint" : ""}`}>
+              <span aria-hidden="true" className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px] border border-line bg-chip text-base text-ink-2">{choice.icon}</span>
+              <span><span className="block text-sm font-medium text-ink">{choice.label}</span><span className="block text-xs text-muted">{choice.description}</span></span>
             </button>
           ))}
-          {onDelete && <button type="button" onClick={onDelete} className="mt-1 w-full rounded-lg border-t border-gray-100 px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50">Supprimer le lien</button>}
+          {onDelete && <button type="button" onClick={onDelete} className="mt-1 w-full cursor-pointer rounded-[10px] px-3 py-2 text-left text-xs text-danger-ink hover:bg-danger-tint">Supprimer le lien</button>}
         </div>
       )}
       {data.mode === "url" ? (
-        <a href={data.url} target="_blank" rel="noopener noreferrer" className="break-all text-blue-600 underline decoration-blue-200 underline-offset-4 hover:decoration-blue-600">{data.url}</a>
+        <a href={data.url} target="_blank" rel="noopener noreferrer" className="break-all text-indigo-ink underline decoration-indigo-soft underline-offset-4 hover:decoration-indigo">{data.url}</a>
       ) : data.mode === "preview" ? (
-        <a href={data.url} target="_blank" rel="noopener noreferrer" className="flex min-h-32 overflow-hidden rounded-lg border border-gray-200 bg-white transition hover:bg-gray-50">
-          <div className="flex min-w-0 flex-1 flex-col justify-center gap-2 px-5 py-4">
-            <p className="truncate text-sm font-medium text-gray-800">{loading ? "Chargement de l’aperçu…" : data.title || (video ? "Vidéo YouTube" : host)}</p>
-            {data.description && <p className="line-clamp-2 text-xs leading-relaxed text-gray-500">{data.description}</p>}
-            <p className="truncate text-xs text-gray-400">{data.siteName || host} · {data.url}</p>
-          </div>
-          {image && failedImage !== image && <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedImage(image)} className="w-28 shrink-0 object-cover sm:w-48" />}
+        <a href={data.url} target="_blank" rel="noopener noreferrer" className="flex gap-3.5 rounded-2xl border border-line-strong bg-paper p-3.5 leading-[1.4] text-ink no-underline transition hover:border-indigo-soft hover:bg-paper-warm">
+          {image && failedImage !== image
+            ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedImage(image)} className="h-[72px] w-24 shrink-0 rounded-[10px] object-cover sm:h-24 sm:w-36" />
+            : <span aria-hidden="true" className="cover-stripes h-[72px] w-24 shrink-0 rounded-[10px]" />}
+          <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+            <span className="truncate text-[15px] font-semibold">{loading ? "Chargement de l’aperçu…" : data.title || (video ? "Vidéo YouTube" : host)}</span>
+            {data.description && <span className="line-clamp-2 text-[13px] text-muted">{data.description}</span>}
+            <span className="flex min-w-0 items-center gap-1.5 font-mono text-[11px] text-muted">
+              <svg aria-hidden="true" className="h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" /></svg>
+              <span className="truncate">{data.siteName || host}</span>
+            </span>
+          </span>
         </a>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+        <div className="overflow-hidden rounded-2xl border border-line-strong bg-paper-soft">
           {video && !playing ? (
-            <button type="button" onClick={() => setPlaying(true)} aria-label="Lire la vidéo YouTube" className="relative block aspect-video w-full overflow-hidden bg-gray-900">
+            <button type="button" onClick={() => setPlaying(true)} aria-label="Lire la vidéo YouTube" className="relative block aspect-video w-full cursor-pointer overflow-hidden bg-ink">
               {image && failedImage !== image && <img src={image} alt={data.title || "Aperçu de la vidéo YouTube"} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedImage(image)} className="h-full w-full object-cover" />}
-              <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-black/10"><span className="flex h-14 w-20 items-center justify-center rounded-2xl bg-red-600 text-3xl text-white shadow-lg">▶</span></span>
+              <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-ink/10"><span className="flex h-14 w-20 items-center justify-center rounded-2xl bg-ink text-neon shadow-lg"><svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg></span></span>
             </button>
           ) : (
             <iframe src={video?.embed || data.url} title={data.title || `Page intégrée : ${host}`} className={video ? "aspect-video min-h-[200px] w-full" : "h-[420px] w-full"} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" sandbox={video ? "allow-scripts allow-same-origin allow-presentation" : "allow-scripts allow-forms allow-popups allow-presentation"} allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowFullScreen />
           )}
-          <div className="flex items-center justify-between gap-3 border-t border-gray-200 px-4 py-2 text-xs text-gray-500">
+          <div className="flex items-center justify-between gap-3 border-t border-line-strong px-4 py-2 text-xs text-muted">
             <span className="truncate">{video ? data.title || "YouTube" : "Si la page ne s’affiche pas, ouvrez le lien."}</span>
-            <a href={data.url} target="_blank" rel="noopener noreferrer" className="shrink-0 hover:text-gray-900">Ouvrir ↗</a>
+            <a href={data.url} target="_blank" rel="noopener noreferrer" className="shrink-0 font-medium text-indigo-ink hover:text-ink">Ouvrir ↗</a>
           </div>
         </div>
       )}
-      {previewError && <p role="status" className="mt-2 text-xs text-gray-500">{previewError} {!readOnly && <button type="button" onClick={() => void choose("preview")} className="underline">Réessayer</button>}</p>}
+      {previewError && <p role="status" className="mt-2 text-xs text-muted">{previewError} {!readOnly && <button type="button" onClick={() => void choose("preview")} className="cursor-pointer text-indigo-ink underline">Réessayer</button>}</p>}
     </div>
   );
 }

@@ -36,11 +36,11 @@ export const ScraperTemplateRenderer = ({
   const items = normalizeToItems(data);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
       {items.map((item, itemIndex) => (
         <div
           key={itemIndex}
-          className="bg-white border border-gray-200 rounded-lg overflow-hidden"
+          className="card overflow-hidden flex flex-col gap-1.5"
         >
           {template.map((block) => {
             const value = item[block.field];
@@ -56,7 +56,7 @@ export const ScraperTemplateRenderer = ({
                   key={block.id}
                   src={value}
                   alt=""
-                  className="w-full h-44 object-cover"
+                  className="w-[calc(100%-16px)] h-44 m-2 mb-1 object-cover rounded-[10px] bg-chip"
                 />
               );
             }
@@ -64,7 +64,7 @@ export const ScraperTemplateRenderer = ({
             if (block.type === "title") {
               return (
                 <div key={block.id} className="px-4 pt-3">
-                  <h3 className="font-semibold text-gray-900 text-sm leading-snug">
+                  <h3 className="font-semibold text-ink text-[15px] leading-snug">
                     {String(value)}
                   </h3>
                 </div>
@@ -74,7 +74,7 @@ export const ScraperTemplateRenderer = ({
             if (block.type === "text") {
               return (
                 <div key={block.id} className="px-4">
-                  <p className="text-sm text-gray-600">{String(value)}</p>
+                  <p className="text-sm text-ink-2 leading-relaxed">{String(value)}</p>
                 </div>
               );
             }
@@ -86,7 +86,7 @@ export const ScraperTemplateRenderer = ({
                     href={String(value)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:underline inline-flex items-center gap-1"
+                    className="text-sm font-semibold text-indigo-ink hover:text-ink hover:underline inline-flex items-center gap-1"
                   >
                     {block.label || "Ouvrir"} →
                   </a>
@@ -97,7 +97,7 @@ export const ScraperTemplateRenderer = ({
             if (block.type === "badge") {
               return (
                 <div key={block.id} className="px-4">
-                  <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+                  <span className="pill bg-neon-tint text-neon-ink">
                     {String(value)}
                   </span>
                 </div>
@@ -115,15 +115,15 @@ export const ScraperTemplateRenderer = ({
                 displayValue = String(value);
               }
               return (
-                <div key={block.id} className="px-4 pb-3">
-                  <span className="text-xs text-gray-400">{displayValue}</span>
+                <div key={block.id} className="px-4">
+                  <span className="font-mono text-xs text-muted">{displayValue}</span>
                 </div>
               );
             }
 
             return null;
           })}
-          <div className="pb-3" />
+          <div className="pb-2.5" />
         </div>
       ))}
     </div>

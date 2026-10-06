@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { API_URL } from "./api";
 import { useAuth } from "./hooks/useAuth";
+import { AuthError, AuthShell, AuthSubmit } from "./LoginPage";
 
 export const AdminAuthPage = () => {
   const [searchParams] = useSearchParams();
@@ -53,7 +54,7 @@ export const AdminAuthPage = () => {
         throw new Error(data.error || "Erreur lors de l'inscription");
       }
 
-      // Le cookie est deja defini par le backend
+      // Le cookie est déjà défini par le backend
       login(data.user);
       navigate("/dashboard");
     } catch (err) {
@@ -67,119 +68,91 @@ export const AdminAuthPage = () => {
 
   if (!code) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md text-center">
-          <h1 className="text-2xl font-semibold text-gray-800 mb-4">
+      <AuthShell>
+        <div className="flex flex-col gap-3">
+          <h2 className="font-display text-[34px] font-bold tracking-[-0.03em] text-ink">
             Accès refusé
-          </h1>
-          <p className="text-gray-600">
-            Code d'invitation requis pour accéder à cette page.
+          </h2>
+          <p className="text-[15px] text-muted">
+            Code d’invitation requis pour accéder à cette page.
           </p>
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
-        <div className="text-center mb-6">
-          <span className="inline-block px-3 py-1 text-xs font-medium bg-gray-800 text-white rounded-full mb-4">
-            Admin
-          </span>
-          <h1 className="text-2xl font-semibold text-gray-800">
+    <AuthShell>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-[18px]">
+        <div className="flex flex-col gap-1.5">
+          <span className="pill bg-ink text-neon self-start mb-1">Admin</span>
+          <h2 className="font-display text-[34px] leading-tight font-bold tracking-[-0.03em] text-ink">
             Créer un compte administrateur
-          </h1>
+          </h2>
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
-            {error}
-          </div>
-        )}
+        {error && <AuthError>{error}</AuthError>}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label
-              htmlFor="username"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Nom d'utilisateur
-            </label>
-            <input
-              id="username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition"
-              placeholder="Votre pseudo"
-            />
-          </div>
+        <label className="label">
+          Nom d’utilisateur
+          <input
+            id="username"
+            type="text"
+            autoComplete="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            className="input min-h-[46px] text-[15px]"
+            placeholder="Votre pseudo"
+          />
+        </label>
 
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition"
-              placeholder="votre@email.com"
-            />
-          </div>
+        <label className="label">
+          Email
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="input min-h-[46px] text-[15px]"
+            placeholder="votre@email.com"
+          />
+        </label>
 
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Mot de passe
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition"
-              placeholder="Minimum 6 caractères"
-            />
-          </div>
+        <label className="label">
+          Mot de passe
+          <input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="input min-h-[46px] text-[15px]"
+            placeholder="Minimum 6 caractères"
+          />
+        </label>
 
-          <div>
-            <label
-              htmlFor="confirmPassword"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Confirmer le mot de passe
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition"
-              placeholder="Confirmez votre mot de passe"
-            />
-          </div>
+        <label className="label">
+          Confirmer le mot de passe
+          <input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            className="input min-h-[46px] text-[15px]"
+            placeholder="Confirmez votre mot de passe"
+          />
+        </label>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 bg-gray-800 text-white font-medium rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-800 focus:ring-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "Création..." : "Créer le compte admin"}
-          </button>
-        </form>
-      </div>
-    </div>
+        <AuthSubmit loading={loading}>
+          {loading ? "Création…" : "Créer le compte admin"}
+        </AuthSubmit>
+      </form>
+    </AuthShell>
   );
 };

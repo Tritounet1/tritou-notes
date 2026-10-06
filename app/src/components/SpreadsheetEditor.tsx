@@ -333,16 +333,16 @@ export const SpreadsheetEditor = ({
 
   return (
     <div
-      className="flex flex-col h-full"
+      className="flex flex-col h-full outline-none"
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
       {/* Formula bar */}
-      <div className="flex items-center gap-2 px-2 py-1 bg-gray-50 border-b border-gray-200">
-        <span className="text-sm font-mono text-gray-600 w-12 text-center">
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-paper-warm border-b border-line">
+        <span className="flex h-7 min-w-12 items-center justify-center rounded-md bg-chip px-1.5 text-xs font-mono font-semibold text-ink-2">
           {selectedCell || ""}
         </span>
-        <div className="w-px h-5 bg-gray-300" />
+        <span aria-hidden="true" className="font-mono text-sm italic text-muted">fx</span>
         <input
           type="text"
           value={
@@ -366,11 +366,12 @@ export const SpreadsheetEditor = ({
               commitEdit();
             }
           }}
-          className="flex-1 px-2 py-1 text-sm font-mono border-none outline-none bg-transparent"
+          aria-label="Barre de formule"
+          className="flex-1 min-w-0 px-1 py-1 text-[13px] font-mono text-ink border-none outline-none bg-transparent placeholder:text-muted/70"
           placeholder={
             readOnly
               ? ""
-              : "Entrez une valeur ou une formule (=SUM, =AVERAGE...)"
+              : "Entrez une valeur ou une formule (=SUM, =AVERAGE…)"
           }
           readOnly={readOnly}
         />
@@ -378,14 +379,14 @@ export const SpreadsheetEditor = ({
 
       {/* Grid */}
       <div ref={gridRef} className="flex-1 overflow-auto">
-        <table className="border-collapse min-w-full">
+        <table className="border-collapse min-w-full text-ink">
           <thead className="sticky top-0 z-10">
             <tr>
-              <th className="sticky left-0 z-20 w-10 min-w-10 h-7 bg-gray-100 border border-gray-300 text-xs text-gray-500" />
+              <th className="sticky left-0 z-20 w-10 min-w-10 h-7 bg-paper-soft border border-line text-xs text-muted" />
               {Array.from({ length: INITIAL_COLS }, (_, i) => (
                 <th
                   key={i}
-                  className="w-24 min-w-24 h-7 bg-gray-100 border border-gray-300 text-xs font-medium text-gray-600"
+                  className="w-24 min-w-24 h-7 bg-paper-soft border border-line font-mono text-[11px] font-medium text-muted"
                 >
                   {getColumnLabel(i)}
                 </th>
@@ -395,7 +396,7 @@ export const SpreadsheetEditor = ({
           <tbody>
             {Array.from({ length: INITIAL_ROWS }, (_, rowIndex) => (
               <tr key={rowIndex}>
-                <td className="sticky left-0 z-10 w-10 min-w-10 h-7 bg-gray-100 border border-gray-300 text-xs text-gray-500 text-center font-medium">
+                <td className="sticky left-0 z-10 w-10 min-w-10 h-7 bg-paper-soft border border-line font-mono text-[11px] text-muted text-center font-medium">
                   {rowIndex + 1}
                 </td>
                 {Array.from({ length: INITIAL_COLS }, (_, colIndex) => {
@@ -410,10 +411,10 @@ export const SpreadsheetEditor = ({
                     <td
                       key={colIndex}
                       className={`
-                        w-24 min-w-24 h-7 border border-gray-200 p-0 relative
-                        ${isSelected ? "outline-2 outline-blue-500 z-10" : ""}
-                        ${inSelection && !isSelected ? "bg-blue-50" : ""}
-                        ${!isSelected && !inSelection ? "hover:bg-gray-50" : ""}
+                        w-24 min-w-24 h-7 border border-line-soft p-0 relative
+                        ${isSelected ? "outline-2 -outline-offset-1 outline-indigo z-10" : ""}
+                        ${inSelection && !isSelected ? "bg-indigo-tint" : ""}
+                        ${!isSelected && !inSelection ? "hover:bg-paper-warm" : ""}
                       `}
                       onClick={(e) => handleCellClick(cellKey, e)}
                       onDoubleClick={() => handleCellDoubleClick(cellKey)}
@@ -424,11 +425,11 @@ export const SpreadsheetEditor = ({
                           type="text"
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
-                          className="absolute inset-0 w-full h-full px-1 text-sm font-mono border-none outline-none bg-white"
+                          className="absolute inset-0 w-full h-full px-1.5 text-[13px] font-mono border-none outline-none bg-paper"
                           onBlur={commitEdit}
                         />
                       ) : (
-                        <span className="block px-1 text-sm truncate">
+                        <span className="block px-1.5 text-[13px] truncate">
                           {displayValue}
                         </span>
                       )}

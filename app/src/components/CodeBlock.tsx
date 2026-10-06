@@ -79,43 +79,45 @@ export function CodeBlock({ value, language, readOnly = false, autoFocus, onFocu
   };
 
   return (
-    <section className="document-code-block relative my-4 rounded-[14px] bg-[#202020]" aria-label="Bloc de code">
-      <div className="flex justify-end px-2 pt-2">
-        <div className="flex h-9 items-center rounded-lg border border-[#383838] bg-[#232323] p-0.5 text-[#a0a0a0]">
-          <div className="relative flex items-center">
+    <section className="document-code-block relative my-4 rounded-[14px] bg-code" aria-label="Bloc de code">
+      <div className="flex items-center justify-between gap-2 border-b border-[#2e2e2e] py-2 pr-3 pl-4">
+        <label className="flex items-center gap-2 font-mono text-xs text-[#9c9a94]">
+          Langage
+          <span className="relative flex items-center">
             <select
               aria-label="Langage du bloc de code"
               value={selected}
               disabled={readOnly}
               onChange={event => onChange?.(value, event.target.value)}
-              className="h-7 max-w-44 appearance-none rounded-md bg-transparent py-1 pl-2 pr-7 text-sm outline-none transition hover:bg-white/5 focus-visible:ring-1 focus-visible:ring-gray-500 disabled:cursor-default"
+              className="max-w-44 appearance-none rounded-md border border-[#3a3a3a] bg-[#2a2a2a] py-[3px] pr-6 pl-1.5 text-[#e6e4de] outline-none transition hover:border-[#4a4a4a] focus-visible:border-indigo disabled:cursor-default disabled:opacity-100"
             >
               {!options.some(([id]) => id === selected) && <option value={selected}>{language}</option>}
               {options.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
             </select>
-            <svg aria-hidden="true" className="pointer-events-none absolute right-2 h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m6 9 6 6 6-6" /></svg>
-          </div>
-          <span aria-hidden="true" className="mx-1 h-4 w-px bg-[#383838]" />
+            <svg aria-hidden="true" className="pointer-events-none absolute right-1.5 h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+          </span>
+        </label>
+        <div className="flex items-center gap-0.5 text-[#9c9a94]">
           <button
             type="button"
             onClick={() => void copy()}
             title={copyStatus === "copied" ? "Copié !" : "Copier"}
-            className="flex h-7 w-8 items-center justify-center rounded-md transition hover:bg-white/10 hover:text-gray-200 focus-visible:outline-1 focus-visible:outline-gray-500"
+            className="flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-[7px] transition hover:bg-white/10 hover:text-[#e6e4de] focus-visible:outline-1 focus-visible:outline-[#9c9a94]"
             aria-label={copyStatus === "copied" ? "Code copié" : "Copier tout le code"}
           >
             {copyStatus === "copied" ? (
-              <svg aria-hidden="true" className="h-4 w-4 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m5 12 4 4L19 6" /></svg>
+              <svg aria-hidden="true" className="h-[15px] w-[15px] text-neon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10" /></svg>
             ) : (
-              <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="8" y="8" width="12" height="13" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></svg>
+              <svg aria-hidden="true" className="h-[15px] w-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></svg>
             )}
           </button>
           {onDelete && (
             <details className="relative">
-              <summary aria-label="Options du bloc de code" title="Options" className="flex h-7 w-8 cursor-pointer list-none items-center justify-center rounded-md transition hover:bg-white/10 hover:text-gray-200 focus-visible:outline-1 focus-visible:outline-gray-500 [&::-webkit-details-marker]:hidden">
+              <summary aria-label="Options du bloc de code" title="Options" className="flex h-[30px] w-[30px] cursor-pointer list-none items-center justify-center rounded-[7px] transition hover:bg-white/10 hover:text-[#e6e4de] focus-visible:outline-1 focus-visible:outline-[#9c9a94] [&::-webkit-details-marker]:hidden">
                 <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
               </summary>
-              <div className="absolute right-0 top-9 z-20 w-48 rounded-lg border border-[#383838] bg-[#252525] p-1 shadow-xl">
-                <button type="button" onClick={onDelete} className="w-full rounded-md px-3 py-2 text-left text-xs text-red-300 hover:bg-white/5">Supprimer le bloc</button>
+              <div className="absolute right-0 top-9 z-20 w-48 rounded-[10px] border border-[#3a3a3a] bg-[#2a2a2a] p-1 shadow-xl">
+                <button type="button" onClick={onDelete} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-xs text-[#ff9c87] hover:bg-white/5">Supprimer le bloc</button>
               </div>
             </details>
           )}
@@ -135,7 +137,7 @@ export function CodeBlock({ value, language, readOnly = false, autoFocus, onFocu
         aria-label="Contenu du bloc de code"
         basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: false, highlightActiveLineGutter: false }}
       />
-      <p role="status" aria-live="polite" className={copyStatus === "error" || loaded?.failed ? "px-3 py-2 text-xs text-amber-300" : "sr-only"}>
+      <p role="status" aria-live="polite" className={copyStatus === "error" || loaded?.failed ? "px-4 py-2 font-mono text-xs text-neon" : "sr-only"}>
         {copyStatus === "error" ? "La copie a échoué. Sélectionnez le code pour le copier manuellement." : copyStatus === "copied" ? "Code copié dans le presse-papiers." : loaded?.failed ? "Coloration indisponible pour ce langage." : ""}
       </p>
     </section>

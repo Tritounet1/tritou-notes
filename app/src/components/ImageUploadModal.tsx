@@ -66,8 +66,8 @@ export function ImageUploadModal({ documentId, initialFiles, onInsert, onClose }
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-4" onClick={() => { if (!busy) onClose(); }}>
-      <div ref={root} role="dialog" aria-modal="true" aria-labelledby="image-upload-title" className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl" onClick={event => event.stopPropagation()}
+    <div className="modal-backdrop z-[70]" onClick={() => { if (!busy) onClose(); }}>
+      <div ref={root} role="dialog" aria-modal="true" aria-labelledby="image-upload-title" className="modal max-w-lg p-6" onClick={event => event.stopPropagation()}
         onKeyDown={event => {
           if (event.key === "Escape" && !busy) onClose();
           if (event.key === "Tab") {
@@ -79,21 +79,21 @@ export function ImageUploadModal({ documentId, initialFiles, onInsert, onClose }
           }
         }}>
         <div className="mb-4 flex items-center justify-between">
-          <h2 id="image-upload-title" className="text-lg font-semibold text-gray-900">Ajouter des images</h2>
-          <button ref={close} type="button" disabled={busy} aria-label="Fermer" onClick={onClose} className="rounded p-2 text-gray-400 hover:bg-gray-100 disabled:opacity-40">✕</button>
+          <h2 id="image-upload-title" className="font-display text-xl font-bold tracking-tight text-ink">Ajouter des images</h2>
+          <button ref={close} type="button" disabled={busy} aria-label="Fermer" onClick={onClose} className="icon-btn disabled:opacity-40"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg></button>
         </div>
-        <button type="button" disabled={busy} onClick={() => input.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); if (!busy) select(Array.from(event.dataTransfer.files)); }} className="flex min-h-36 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-200 px-4 py-6 text-gray-600 hover:border-gray-400 disabled:opacity-50">
-          <span className="text-2xl" aria-hidden="true">▧</span>
-          <span className="text-sm">Choisir des images ou les déposer ici</span>
-          <span className="text-xs text-gray-400">JPEG, PNG, WebP, GIF · 10 Mo par image</span>
+        <button type="button" disabled={busy} onClick={() => input.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); if (!busy) select(Array.from(event.dataTransfer.files)); }} className="flex min-h-36 w-full flex-col items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-[#cfcbc2] bg-paper-warm px-4 py-6 text-ink-2 hover:border-muted transition disabled:opacity-50">
+          <span className="w-10 h-10 rounded-full bg-paper border border-line-strong flex items-center justify-center" aria-hidden="true"><svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="m3 16 5-5 4 4 3-3 6 6M15 9h.01" /></svg></span>
+          <span className="text-sm font-medium">Choisir des images ou les déposer ici</span>
+          <span className="text-xs text-muted">JPEG, PNG, WebP, GIF · 10 Mo par image</span>
         </button>
         <input ref={input} type="file" accept={IMAGE_ACCEPT} multiple disabled={busy} className="sr-only" tabIndex={-1} aria-label="Fichiers images" onChange={event => { select(Array.from(event.target.files || [])); event.target.value = ""; }} />
-        {files.length > 0 && <ul className="my-4 max-h-36 overflow-auto text-sm text-gray-600">{files.map((file, index) => <li key={`${file.name}-${index}`} className="truncate py-1">{file.name} <span className="text-xs text-gray-400">({(file.size / 1024 / 1024).toFixed(1)} Mo)</span></li>)}</ul>}
-        {progress && <p role="status" className="mt-3 text-sm text-gray-500">{progress}</p>}
-        {error && <p role="alert" className="mt-3 whitespace-pre-line text-sm text-red-600">{error}</p>}
+        {files.length > 0 && <ul className="my-4 max-h-36 overflow-auto text-sm text-ink-2">{files.map((file, index) => <li key={`${file.name}-${index}`} className="truncate py-1">{file.name} <span className="font-mono text-xs text-muted">({(file.size / 1024 / 1024).toFixed(1)} Mo)</span></li>)}</ul>}
+        {progress && <p role="status" className="mt-3 text-sm text-muted">{progress}</p>}
+        {error && <p role="alert" className="mt-3 whitespace-pre-line text-sm text-danger-ink">{error}</p>}
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" disabled={busy} onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 disabled:opacity-40">Annuler</button>
-          <button type="button" disabled={!files.length || busy} onClick={() => void upload()} className="rounded-lg bg-gray-800 px-4 py-2 text-sm text-white hover:bg-gray-700 disabled:opacity-40">{busy ? "Envoi…" : "Insérer"}</button>
+          <button type="button" disabled={busy} onClick={onClose} className="btn-secondary">Annuler</button>
+          <button type="button" disabled={!files.length || busy} onClick={() => void upload()} className="btn-primary">{busy ? "Envoi…" : "Insérer"}</button>
         </div>
       </div>
     </div>

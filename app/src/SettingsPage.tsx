@@ -2,6 +2,50 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "./api";
 import { useAuth } from "./hooks/useAuth";
 
+const EyeIcon = ({ open }: { open: boolean }) => (
+  <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+    {open ? (
+      <path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+    ) : (
+      <>
+        <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+      </>
+    )}
+  </svg>
+);
+
+const SecretInput = ({
+  value,
+  onChange,
+  shown,
+  onToggle,
+  ...rest
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  shown: boolean;
+  onToggle: () => void;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type">) => (
+  <span className="relative block">
+    <input
+      {...rest}
+      type={shown ? "text" : "password"}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`input pr-11 ${rest.className ?? ""}`}
+    />
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={shown ? "Masquer" : "Afficher"}
+      className="absolute right-1 top-1/2 -translate-y-1/2 icon-btn w-8 h-8"
+    >
+      <EyeIcon open={shown} />
+    </button>
+  </span>
+);
+
 interface Settings {
   id: number;
   anthropicApiKey: string | null;
@@ -12,7 +56,8 @@ interface Settings {
 }
 
 export const SettingsPage = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
+  const [tab, setTab] = useState<"account" | "ai" | "mail">("account");
   const [settingsId, setSettingsId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -91,7 +136,7 @@ export const SettingsPage = () => {
         body: JSON.stringify(data),
       });
       if (response.ok) {
-        showFeedback("success", "Parametres enregistres");
+        showFeedback("success", "Paramètres enregistrés");
       } else {
         showFeedback("error", "Erreur lors de la sauvegarde");
       }
@@ -127,7 +172,7 @@ export const SettingsPage = () => {
         body: JSON.stringify({ currentPassword, newPassword }),
       });
       if (response.ok) {
-        showFeedback("success", "Mot de passe mis a jour");
+        showFeedback("success", "Mot de passe mis à jour");
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
@@ -152,379 +197,211 @@ export const SettingsPage = () => {
   };
 
   if (isAdmin && loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">Chargement...</p>
-      </div>
-    );
+    return <p className="py-24 text-center text-muted">Chargement...</p>;
   }
 
+  const tabs = [
+    ["account", "Mon compte"],
+    ...(isAdmin
+      ? [
+          ["ai", "Intelligence artificielle"],
+          ["mail", "E-mail (SMTP)"],
+        ]
+      : []),
+  ] as ["account" | "ai" | "mail", string][];
+
+  const initials = (user?.username ?? "?").slice(0, 2).toUpperCase();
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-8">Parametres</h1>
+    <div className="max-w-[1000px] mx-auto px-6 sm:px-10 pt-10 pb-16 flex flex-col gap-7">
+      <h1 className="page-title">Paramètres</h1>
 
-        {/* Feedback */}
-        {(success || error) && (
-          <div
-            className={`mb-6 p-3 rounded-lg text-sm ${
-              success
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : "bg-red-50 text-red-700 border border-red-200"
-            }`}
-          >
-            {success || error}
-          </div>
-        )}
+      {(success || error) && (
+        <div
+          role="status"
+          className={`px-4 py-3 rounded-[10px] text-sm ${
+            success ? "bg-neon-tint text-neon-ink" : "bg-danger-tint text-danger-ink"
+          }`}
+        >
+          {success || error}
+        </div>
+      )}
 
-        <div className="space-y-6">
-          {/* Anthropic API Key */}
-          {isAdmin && <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 text-purple-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
+      <div className="flex flex-wrap gap-8 items-start">
+        <div role="tablist" aria-label="Sections" className="flex-[1_1_180px] flex flex-col gap-0.5">
+          {tabs.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={tab === key}
+              onClick={() => setTab(key)}
+              className={`text-left rounded-[9px] px-3 min-h-[38px] text-sm transition cursor-pointer ${
+                tab === key ? "bg-chip text-ink font-semibold" : "text-ink-2 hover:bg-paper-soft"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div role="tabpanel" className="flex-[999_1_420px] min-w-0 flex flex-col gap-5">
+          {tab === "account" && (
+            <section className="flex flex-col gap-5">
+              <div className="flex items-center gap-4">
+                <span className="w-16 h-16 rounded-full bg-neon flex items-center justify-center font-display font-extrabold text-[22px] text-ink">
+                  {initials}
+                </span>
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <span className="font-semibold text-[17px] text-ink truncate">{user?.username}</span>
+                  <span className="text-[13px] text-muted">
+                    {isAdmin ? "Administrateur" : "Utilisateur"}
+                    {user?.email && <> · <span className="font-mono">{user.email}</span></>}
+                  </span>
+                </div>
+              </div>
+
+              <div className="card p-[18px] flex flex-col gap-3.5">
+                <div>
+                  <h2 className="text-[15px] font-semibold text-ink">Mot de passe</h2>
+                  <p className="text-[13px] text-muted">Au moins 8 caractères.</p>
+                </div>
+                <label className="label">
+                  Mot de passe actuel
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="input"
                   />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  API Anthropic
-                </h2>
-                <p className="text-sm text-gray-500">
-                  Cle API pour utiliser Claude dans le chat IA
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cle API
                 </label>
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3.5">
+                  <label className="label">
+                    Nouveau mot de passe
+                    <SecretInput
+                      autoComplete="new-password"
+                      minLength={8}
+                      value={newPassword}
+                      onChange={setNewPassword}
+                      shown={showNewPassword}
+                      onToggle={() => setShowNewPassword(!showNewPassword)}
+                    />
+                  </label>
+                  <label className="label">
+                    Confirmer le mot de passe
+                    <SecretInput
+                      autoComplete="new-password"
+                      value={confirmPassword}
+                      onChange={setConfirmPassword}
+                      shown={showConfirmPassword}
+                      onToggle={() => setShowConfirmPassword(!showConfirmPassword)}
+                    />
+                  </label>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleChangePassword}
+                    disabled={saving || !currentPassword || !newPassword || !confirmPassword}
+                    className="btn-ink"
+                  >
+                    Modifier le mot de passe
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {isAdmin && tab === "ai" && (
+            <section className="flex flex-col gap-[18px]">
+              <div className="p-5 rounded-2xl bg-indigo-tint flex gap-3.5 items-start">
+                <span className="w-10 h-10 flex-none rounded-xl bg-indigo text-white flex items-center justify-center">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </span>
+                <div className="flex flex-col gap-1">
+                  <b className="text-[15px] text-ink">API Anthropic</b>
+                  <span className="text-sm text-ink-2">
+                    Clé API utilisée par Claude dans le chat IA, partagée par tout l’espace.
+                  </span>
+                </div>
+              </div>
+              <label className="label">
+                Clé API Anthropic
                 <input
                   type="password"
                   value={anthropicKey}
                   onChange={(e) => setAnthropicKey(e.target.value)}
                   placeholder="sk-ant-..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent"
+                  className="input font-mono text-[13px]"
                 />
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  onClick={handleSaveAnthropicKey}
-                  disabled={saving}
-                  className="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-md hover:bg-gray-700 transition disabled:opacity-50"
-                >
+              </label>
+              <div className="flex justify-end pt-2 border-t border-line-soft">
+                <button type="button" onClick={handleSaveAnthropicKey} disabled={saving} className="btn-ink">
                   {saving ? "Enregistrement..." : "Enregistrer"}
                 </button>
               </div>
-            </div>
-          </div>}
+            </section>
+          )}
 
-          {/* Change Password */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+          {isAdmin && tab === "mail" && (
+            <section className="flex flex-col gap-4">
+              <p className="text-sm text-ink-2">
+                Paramètres pour l’envoi d’e-mails (invitations, notifications).
+              </p>
+              <div className="grid grid-cols-[3fr_1fr] gap-3.5">
+                <label className="label min-w-0">
+                  Serveur SMTP
+                  <SecretInput
+                    value={smtpHost}
+                    onChange={setSmtpHost}
+                    shown={showSmtpHost}
+                    onToggle={() => setShowSmtpHost(!showSmtpHost)}
+                    placeholder="smtp.exemple.com"
                   />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Mot de passe
-                </h2>
-                <p className="text-sm text-gray-500">
-                  Modifier votre mot de passe personnel (au moins 8 caractères)
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Mot de passe actuel
                 </label>
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nouveau mot de passe
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showNewPassword ? "text" : "password"}
-                      autoComplete="new-password"
-                      minLength={8}
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showNewPassword ? (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Confirmer le mot de passe
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showConfirmPassword ? "text" : "password"}
-                      autoComplete="new-password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showConfirmPassword ? (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  onClick={handleChangePassword}
-                  disabled={saving || !currentPassword || !newPassword || !confirmPassword}
-                  className="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-md hover:bg-gray-700 transition disabled:opacity-50"
-                >
-                  Modifier le mot de passe
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* SMTP Settings */}
-          {isAdmin && <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 text-green-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                  />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Configuration SMTP
-                </h2>
-                <p className="text-sm text-gray-500">
-                  Parametres pour l'envoi d'emails (invitations, notifications)
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Serveur SMTP
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showSmtpHost ? "text" : "password"}
-                      value={smtpHost}
-                      onChange={(e) => setSmtpHost(e.target.value)}
-                      placeholder="smtp.exemple.com"
-                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowSmtpHost(!showSmtpHost)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showSmtpHost ? (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Port
-                  </label>
+                <label className="label min-w-0">
+                  Port
                   <input
                     type="text"
                     value={smtpPort}
                     onChange={(e) => setSmtpPort(e.target.value)}
                     placeholder="587"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent"
+                    className="input font-mono"
                   />
-                </div>
+                </label>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Utilisateur
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showSmtpUser ? "text" : "password"}
-                      value={smtpUser}
-                      onChange={(e) => setSmtpUser(e.target.value)}
-                      placeholder="user@exemple.com"
-                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowSmtpUser(!showSmtpUser)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showSmtpUser ? (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Mot de passe
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showSmtpPassword ? "text" : "password"}
-                      value={smtpPassword}
-                      onChange={(e) => setSmtpPassword(e.target.value)}
-                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowSmtpPassword(!showSmtpPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showSmtpPassword ? (
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                          />
-                        </svg>
-                      ) : (
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                          />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3">
-                <button className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 transition">
+              <label className="label">
+                Utilisateur
+                <SecretInput
+                  value={smtpUser}
+                  onChange={setSmtpUser}
+                  shown={showSmtpUser}
+                  onToggle={() => setShowSmtpUser(!showSmtpUser)}
+                  placeholder="user@exemple.com"
+                />
+              </label>
+              <label className="label">
+                Mot de passe
+                <SecretInput
+                  value={smtpPassword}
+                  onChange={setSmtpPassword}
+                  shown={showSmtpPassword}
+                  onToggle={() => setShowSmtpPassword(!showSmtpPassword)}
+                />
+              </label>
+              <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-line-soft">
+                <button type="button" className="btn-secondary">
                   Tester la connexion
                 </button>
-                <button
-                  onClick={handleSaveSmtp}
-                  disabled={saving}
-                  className="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-md hover:bg-gray-700 transition disabled:opacity-50"
-                >
+                <button type="button" onClick={handleSaveSmtp} disabled={saving} className="btn-ink">
                   {saving ? "Enregistrement..." : "Enregistrer"}
                 </button>
               </div>
-            </div>
-          </div>}
+            </section>
+          )}
         </div>
       </div>
     </div>

@@ -15,12 +15,28 @@ import { ScrapingSchedulersPage } from "./ScrapingSchedulersPage";
 import { UserPage } from "./UserPage";
 import { UsersPage } from "./UsersPage";
 import { SettingsPage } from "./SettingsPage";
+import { useAuth } from "./hooks/useAuth";
+import type { ReactNode } from "react";
+
+// Signed-in pages sit on a white "paper" sheet next to the sidebar; auth pages get the bare frame.
+const Shell = ({ children }: { children: ReactNode }) => {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) return <>{children}</>;
+  return (
+    <div className="min-h-screen flex flex-wrap items-start">
+      <div className="flex-[1_1_248px] max-w-full min-[840px]:sticky min-[840px]:top-0 min-[840px]:max-h-screen min-[840px]:overflow-y-auto">
+        <Navigation />
+      </div>
+      <main className="paper flex-[999_1_560px] min-w-0 m-2.5 min-h-[calc(100vh-20px)] overflow-hidden">{children}</main>
+    </div>
+  );
+};
 
 export const App = () => {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Navigation />
+        <Shell>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/login" element={<Loginpage />} />
@@ -100,6 +116,7 @@ export const App = () => {
             }
           />
         </Routes>
+        </Shell>
       </BrowserRouter>
     </AuthProvider>
   );

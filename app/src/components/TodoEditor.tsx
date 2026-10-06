@@ -163,14 +163,14 @@ export const TodoEditor = ({ data, onChange, readOnly = false }: TodoEditorProps
     <div className="flex flex-col h-full">
       {/* Header avec stats */}
       {totalCount > 0 && (
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500">
-              {completedCount} / {totalCount} terminees
+        <div className="pb-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[13px] text-muted">
+              {completedCount} / {totalCount} terminées
             </span>
-            <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="w-32 h-1.5 bg-chip rounded-full overflow-hidden">
               <div
-                className="h-full bg-purple-500 transition-all duration-300"
+                className="h-full bg-neon-dot rounded-full transition-all duration-300"
                 style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
               />
             </div>
@@ -179,17 +179,17 @@ export const TodoEditor = ({ data, onChange, readOnly = false }: TodoEditorProps
       )}
 
       {/* Liste des todos */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto">
         {todos.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400">
-            <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          <div className="flex flex-col items-center justify-center h-full py-12 text-muted">
+            <svg aria-hidden="true" className="w-12 h-12 mb-3 text-line-strong" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            <p className="text-lg">Aucune tache</p>
-            <p className="text-sm">Cliquez sur + pour ajouter une tache</p>
+            <p className="font-display text-lg font-semibold text-ink">Aucune tâche</p>
+            <p className="text-sm">Ajoutez votre première tâche ci-dessous.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="flex flex-col gap-2">
             {todos.map((todo) => {
               const isDragging = draggingId === todo.id;
               const isDragOver = dragOverId === todo.id;
@@ -203,46 +203,48 @@ export const TodoEditor = ({ data, onChange, readOnly = false }: TodoEditorProps
                   onDragOver={(e) => handleDragOver(e, todo.id)}
                   onDrop={(e) => handleDrop(e, todo.id)}
                   onDragEnd={handleDragEnd}
-                  className={`group bg-white border rounded-xl p-4 transition-all ${
+                  className={`group bg-paper border rounded-2xl px-3.5 py-3 transition-all ${
                     isDragging ? "opacity-40 scale-[0.98]" : ""
                   } ${
                     isDragOver && !isDragging
-                      ? "border-purple-400 shadow-md ring-1 ring-purple-300"
+                      ? "border-indigo ring-4 ring-indigo-tint"
                       : todo.completed
-                        ? "border-gray-200 bg-gray-50"
-                        : "border-gray-200 hover:border-purple-300 hover:shadow-sm"
+                        ? "border-line-soft bg-paper-warm"
+                        : "border-line hover:border-line-strong hover:bg-paper-warm"
                   }`}
                 >
                   {editingId === todo.id ? (
                     // Mode edition
-                    <div className="space-y-3">
+                    <div className="flex flex-col gap-2">
                       <input
                         type="text"
                         value={editTitle}
                         onChange={(e) => setEditTitle(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Titre de la tache..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="Titre de la tâche…"
+                        aria-label="Titre de la tâche"
+                        className="input"
                         autoFocus
                       />
                       <textarea
                         value={editDescription}
                         onChange={(e) => setEditDescription(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Description (optionnel)..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                        placeholder="Description (optionnelle)…"
+                        aria-label="Description de la tâche"
+                        className="input py-2 resize-none"
                         rows={2}
                       />
                       <div className="flex justify-end gap-2">
                         <button
                           onClick={handleCancelEdit}
-                          className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                          className="btn-secondary min-h-9"
                         >
                           Annuler
                         </button>
                         <button
                           onClick={handleSaveEdit}
-                          className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+                          className="btn-primary min-h-9"
                         >
                           Enregistrer
                         </button>
@@ -254,10 +256,10 @@ export const TodoEditor = ({ data, onChange, readOnly = false }: TodoEditorProps
                       {/* Poignée de déplacement */}
                       {!readOnly && (
                         <div
-                          className="flex-shrink-0 mt-0.5 text-gray-300 group-hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                          className="flex-shrink-0 mt-1 text-muted opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
                           title="Déplacer"
                         >
-                          <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+                          <svg aria-hidden="true" className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
                             <circle cx="5.5" cy="3.5" r="1.2" />
                             <circle cx="10.5" cy="3.5" r="1.2" />
                             <circle cx="5.5" cy="8" r="1.2" />
@@ -272,15 +274,18 @@ export const TodoEditor = ({ data, onChange, readOnly = false }: TodoEditorProps
                       <button
                         onClick={() => handleToggleComplete(todo.id)}
                         disabled={readOnly}
-                        className={`flex-shrink-0 w-6 h-6 mt-0.5 rounded-full border-2 flex items-center justify-center transition ${
+                        role="checkbox"
+                        aria-checked={todo.completed}
+                        aria-label={todo.title || "Sans titre"}
+                        className={`flex-shrink-0 w-[18px] h-[18px] mt-[3px] rounded-[6px] flex items-center justify-center transition ${
                           todo.completed
-                            ? "bg-purple-500 border-purple-500"
-                            : "border-gray-300 hover:border-purple-400"
+                            ? "bg-ink text-neon"
+                            : "border-[1.5px] border-[#bdb9b0] hover:border-ink"
                         } ${readOnly ? "cursor-default" : "cursor-pointer"}`}
                       >
                         {todo.completed && (
-                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          <svg aria-hidden="true" className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="m5 12 5 5 9-10" />
                           </svg>
                         )}
                       </button>
@@ -290,16 +295,16 @@ export const TodoEditor = ({ data, onChange, readOnly = false }: TodoEditorProps
                         className={`flex-1 min-w-0 ${!readOnly ? "cursor-pointer" : ""}`}
                         onClick={() => !readOnly && handleStartEdit(todo)}
                       >
-                        <p className={`font-medium ${todo.completed ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                        <p className={`font-medium leading-snug ${todo.completed ? "text-muted line-through" : "text-ink"}`}>
                           {todo.title || "Sans titre"}
                         </p>
                         {todo.description && (
-                          <p className={`text-sm mt-1 ${todo.completed ? "text-gray-400" : "text-gray-500"}`}>
+                          <p className={`text-sm mt-1 ${todo.completed ? "text-muted" : "text-ink-2"}`}>
                             {todo.description}
                           </p>
                         )}
-                        <p className="text-xs text-gray-400 mt-2">
-                          Cree le {formatDate(todo.createdAt)}
+                        <p className="font-mono text-[11px] text-muted mt-1.5">
+                          Créé le {formatDate(todo.createdAt)}
                         </p>
                       </div>
 
@@ -307,11 +312,12 @@ export const TodoEditor = ({ data, onChange, readOnly = false }: TodoEditorProps
                       {!readOnly && (
                         <button
                           onClick={() => handleDeleteTodo(todo.id)}
-                          className="flex-shrink-0 p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="flex-shrink-0 w-8 h-8 -my-1 flex items-center justify-center rounded-lg text-muted hover:bg-danger-tint hover:text-danger-ink opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition"
                           title="Supprimer"
+                          aria-label="Supprimer la tâche"
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
                         </button>
                       )}
@@ -326,17 +332,17 @@ export const TodoEditor = ({ data, onChange, readOnly = false }: TodoEditorProps
 
       {/* Bouton ajouter */}
       {!readOnly && (
-        <div className="p-4 border-t border-gray-100">
+        <div className="pt-3">
           <button
             onClick={handleAddTodo}
-            className="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-purple-400 hover:text-purple-600 hover:bg-purple-50/50 transition-all flex items-center justify-center gap-2 group"
+            className="w-full py-3 border-[1.5px] border-dashed border-line-strong rounded-2xl text-muted hover:border-indigo hover:text-indigo-ink hover:bg-indigo-tint/50 transition-all flex items-center justify-center gap-2 group cursor-pointer"
           >
-            <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-purple-100 flex items-center justify-center transition">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            <div className="w-7 h-7 rounded-[9px] bg-chip group-hover:bg-indigo group-hover:text-white flex items-center justify-center transition">
+              <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 4v16m8-8H4" />
               </svg>
             </div>
-            <span className="font-medium">Ajouter une tache</span>
+            <span className="font-medium">Ajouter une tâche</span>
           </button>
         </div>
       )}

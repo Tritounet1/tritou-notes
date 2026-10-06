@@ -60,8 +60,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Chargement...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted">Chargement…</p>
       </div>
     );
   }

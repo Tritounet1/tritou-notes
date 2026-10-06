@@ -1,9 +1,149 @@
 @import "tailwindcss";
 
+/* Tritou design tokens — see the redesign canvas "Système visuel". */
+@theme {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", "Geist", ui-sans-serif, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-frame: #eeece7;
+  --color-paper: #ffffff;
+  --color-paper-soft: #f7f6f2;
+  --color-paper-warm: #fbfaf8;
+  --color-line: #e8e5de;
+  --color-line-strong: #e2dfd8;
+  --color-line-soft: #f0eee9;
+  --color-chip: #f3f1ec;
+
+  --color-ink: #1c1b19;
+  --color-ink-2: #3b3934;
+  --color-muted: #6b6862;
+
+  --color-indigo: #4b3bf5;
+  --color-indigo-ink: #3a2bd9;
+  --color-indigo-tint: #eceaff;
+  --color-indigo-soft: #dcd8ff;
+
+  --color-neon: #d4f45a;
+  --color-neon-ink: #3f5700;
+  --color-neon-tint: #f0fbd0;
+  --color-neon-dot: #84b300;
+
+  --color-coral: #e0702f;
+  --color-coral-ink: #a3410f;
+  --color-coral-tint: #ffe6d8;
+
+  --color-danger: #e2563b;
+  --color-danger-ink: #b42f17;
+  --color-danger-tint: #fde7e2;
+
+  --color-code: #202020;
+}
+
+/* A utility so the btn-* variants below can @apply it. */
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 min-h-10 px-4 rounded-[11px] text-sm font-semibold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+@layer base {
+  body {
+    @apply bg-frame text-ink font-sans antialiased;
+  }
+}
+
+@layer components {
+  .paper {
+    @apply bg-paper rounded-[18px] shadow-[0_0_0_1px_var(--color-line-strong),0_12px_32px_-18px_rgba(28,27,25,0.25)];
+  }
+  .page-title {
+    @apply font-display text-[44px] leading-none font-bold tracking-[-0.03em] text-ink;
+  }
+  .section-title {
+    @apply font-display text-[22px] font-bold tracking-[-0.02em] text-ink;
+  }
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-muted;
+  }
+  .btn-primary {
+    @apply btn bg-indigo text-white hover:bg-indigo-ink;
+  }
+  .btn-ink {
+    @apply btn bg-ink text-white hover:bg-ink-2;
+  }
+  .btn-neon {
+    @apply btn bg-neon text-ink font-bold hover:brightness-95;
+  }
+  .btn-secondary {
+    @apply btn border border-line-strong bg-paper text-ink hover:bg-paper-soft;
+  }
+  .btn-danger {
+    @apply btn bg-danger-tint text-danger-ink hover:bg-danger hover:text-white;
+  }
+  .icon-btn {
+    @apply inline-flex items-center justify-center w-9 h-9 rounded-[10px] text-muted hover:text-ink hover:bg-chip transition cursor-pointer;
+  }
+  .input {
+    @apply w-full min-h-[42px] px-3 rounded-[10px] border border-line-strong bg-paper-warm text-sm text-ink placeholder:text-muted/70 outline-none transition focus:border-indigo focus:ring-4 focus:ring-indigo-tint;
+  }
+  .label {
+    @apply flex flex-col gap-1.5 text-[13px] font-medium text-ink;
+  }
+  .card {
+    @apply rounded-2xl border border-line bg-paper;
+  }
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+  .segmented {
+    @apply flex p-[3px] rounded-[11px] bg-chip text-[13px];
+  }
+  .segmented > button {
+    @apply rounded-lg px-3 py-1.5 text-muted transition cursor-pointer;
+  }
+  .segmented > button[aria-pressed="true"] {
+    @apply bg-paper text-ink font-semibold shadow-[0_1px_2px_rgba(28,27,25,0.08)];
+  }
+  .highlight {
+    background: linear-gradient(transparent 58%, var(--color-neon) 58%, var(--color-neon) 92%, transparent 92%);
+    @apply px-1;
+  }
+  .modal-backdrop {
+    @apply fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4;
+  }
+  .modal {
+    @apply w-full rounded-[18px] bg-paper shadow-[0_30px_80px_-20px_rgba(28,27,25,0.45),0_0_0_1px_var(--color-line-strong)];
+  }
+
+  /* Pattern covers */
+  .cover-dots {
+    background-color: var(--color-indigo-tint);
+    background-image: radial-gradient(var(--color-indigo) 1.2px, transparent 1.3px);
+    background-size: 14px 14px;
+  }
+  .cover-stripes {
+    background: repeating-linear-gradient(135deg, var(--color-neon) 0 10px, #e8fa9c 10px 20px);
+  }
+  .cover-grid {
+    background-color: var(--color-coral-tint);
+    background-image: linear-gradient(#f6c2a6 1px, transparent 1px), linear-gradient(90deg, #f6c2a6 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+  .cover-ink {
+    background-color: var(--color-ink);
+    background-image: radial-gradient(#34332e 1.2px, transparent 1.3px);
+    background-size: 14px 14px;
+  }
+  .cover-ink-neon {
+    background-color: var(--color-ink);
+    background-image: radial-gradient(var(--color-neon) 1.2px, transparent 1.3px);
+    background-size: 16px 16px;
+  }
+}
+
 /* The document code block shares one background with its compact toolbar. */
 .document-code-block .cm-editor,
 .document-code-block .cm-gutters {
-  background-color: #202020;
+  background-color: var(--color-code);
 }
 
 .document-code-block .cm-editor {
@@ -16,7 +156,7 @@
 }
 
 .document-code-block .cm-scroller {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.7;
 }
