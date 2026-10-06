@@ -71,4 +71,4 @@ Sources : [connexion](../../../api/src/controllers/authController.ts), [cookies]
 
 Le mot de passe actuel est vérifié avant toute écriture. Le nouveau doit être une chaîne d’au moins 8 caractères et de 72 octets UTF-8 maximum, pour éviter la troncature de bcrypt. Seul le hash est enregistré. Les requêtes sans authentification, avec mot de passe actuel incorrect ou avec saisie invalide sont refusées.
 
-Les routes `GET /api/settings` et `PUT /api/settings/:id` conservent leur middleware administrateur : un compte standard ne peut ni lire la configuration globale ni modifier les secrets Anthropic ou SMTP, même par appel HTTP direct.
+Les routes `GET /api/settings` et `PUT /api/settings/:id` conservent leur middleware administrateur : un compte standard ne peut ni lire la configuration globale ni modifier les secrets OpenRouter ou SMTP, même par appel HTTP direct.

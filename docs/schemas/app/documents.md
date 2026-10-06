@@ -64,10 +64,14 @@ sequenceDiagram
 
 Un enregistrement encore en attente quand la page est quittée est envoyé immédiatement au lieu d’être perdu. La route `/document/:id` remonte la page à chaque changement de document.
 
-La page consulte aussi `/api/document-histories/:id` pour les anciennes versions et `/api/conversations/:id` pour les échanges IA. Les appels IA passent par `/api/ai-client`.
+La page consulte aussi `/api/document-histories/:id` pour les anciennes versions.
+
+## Assistant IA
+
+Le panneau « Assistant » (et la page `/assistant` pour les conversations globales) utilise `components/AiChat.tsx` et `/api/ai`. Le serveur appelle OpenRouter avec le modèle texte choisi dans Paramètres et exécute une boucle d’outils (`api/src/ai/`) : lister, chercher, lire, créer, modifier (`edit_page`, `append_to_page`, `rewrite_page`) et déplacer des pages, modifier les to-do (`update_todos`) et les tableurs (`set_cells`, grille A1–Z50 avec formules), lister les planificateurs. La réponse est diffusée en server-sent events (texte au fil de l’eau, outil en cours, actions terminées, puis `done`) ; le bouton « Arrêter » annule aussi l’appel OpenRouter. Derrière nginx, l’en-tête `X-Accel-Buffering: no` évite la mise en mémoire tampon du flux. Chaque modification passe par `reviseDocument` et crée donc une entrée d’historique ; la page ouverte est rechargée quand l’assistant la modifie. Les pièces jointes (images, PDF, fichiers texte ; 5 × 10 Mo) sont envoyées en data URL. `/image-ia` génère une image avec le modèle d’image et l’insère comme bloc image.
 
 ## Commandes de l’éditeur
 
-`app/src/commands.ts` définit `/page`, `/image`, `/planificateur`, `/scrape`, `/date`, `/time`, `/divider`, `/code`, `/quote`, `/list` et `/checkbox`. `/page` crée une sous-page ; `/image`, `/planificateur` et `/scrape` ouvrent une fenêtre de sélection ou de saisie ; les autres insèrent du texte. `/scrape` crée une instance, interroge son statut périodiquement et exploite le résultat.
+`app/src/commands.ts` définit `/page`, `/image`, `/image-ia`, `/planificateur`, `/scrape`, `/date`, `/time`, `/divider`, `/code`, `/quote`, `/list` et `/checkbox`. `/page` crée une sous-page ; `/image`, `/image-ia`, `/planificateur` et `/scrape` ouvrent une fenêtre de sélection ou de saisie ; les autres insèrent du texte. `/scrape` crée une instance, interroge son statut périodiquement et exploite le résultat.
 
 Sources : [page document](../../../app/src/DocumentPage.tsx), [bloc de code](../../../app/src/components/CodeBlock.tsx), [segments](../../../app/src/utils/documentSegments.ts), [commandes](../../../app/src/commands.ts), [temporisation](../../../app/src/hooks/useDebounce.ts), [bloc planificateur](../../../app/src/components/SchedulerBlock.tsx), [contrôleur document](../../../api/src/controllers/documentController.ts).

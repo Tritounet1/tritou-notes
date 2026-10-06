@@ -36,4 +36,4 @@ Docker doit fonctionner; les ports locaux `55432` et `56379` doivent être libre
 
 ## Limites
 
-Une couverture élevée ne prouve pas l’absence de bugs. SMTP, Anthropic et S3 sont testés avec des doubles, sans contacter ces services. Le worker utilise un navigateur simulé dans les tests rapides; l’intégration BullMQ vérifie un consommateur réel, sans lancer Chromium. Les migrations d’une ancienne base, la charge et les inscriptions concurrentes nécessitent des vérifications distinctes. Ces suites ne couvrent pas le frontend ni le serveur MCP.
+Une couverture élevée ne prouve pas l’absence de bugs. SMTP, OpenRouter (`fetch` simulé) et S3 sont testés avec des doubles, sans contacter ces services. Le worker utilise un navigateur simulé dans les tests rapides; l’intégration BullMQ vérifie un consommateur réel, sans lancer Chromium. Les migrations d’une ancienne base, la charge et les inscriptions concurrentes nécessitent des vérifications distinctes. Ces suites ne couvrent pas le frontend ni le serveur MCP.

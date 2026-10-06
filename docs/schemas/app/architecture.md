@@ -44,6 +44,6 @@ Sources : [entrée](../../../app/src/main.tsx), [routes](../../../app/src/App.ts
 
 ## Paramètres personnels et administration
 
-L’icône des paramètres est visible pour tous les utilisateurs connectés. Un compte `USER` voit uniquement le formulaire de changement de mot de passe : aucune requête `/api/settings` n’est envoyée. Les sections Anthropic et SMTP, ainsi que leur chargement, sont réservées à `ADMIN`.
+L’icône des paramètres est visible pour tous les utilisateurs connectés. Un compte `USER` voit uniquement le formulaire de changement de mot de passe : aucune requête `/api/settings` n’est envoyée. Les sections IA (OpenRouter), SMTP et MCP, ainsi que leur chargement, sont réservées à `ADMIN`.
 
 Le formulaire demande le mot de passe actuel et la confirmation du nouveau. Les contrôles de saisie sont également appliqués côté API ; masquer des sections dans le frontend ne remplace pas l’autorisation serveur.

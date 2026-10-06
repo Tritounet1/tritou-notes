@@ -17,7 +17,7 @@ flowchart LR
     Browser --> Web["Sites à scraper"]
     App -->|multipart images| Express
     Controllers --> Files["Disque API : document-images"]
-    Controllers --> AI["Anthropic"]
+    Controllers --> AI["OpenRouter : chat, outils, images"]
     Controllers --> Mail["SMTP : invitations"]
     MCP["Serveur MCP distinct"] --> DB
     MCP --> Queue
@@ -52,8 +52,7 @@ Les chemins ci-dessous sont les préfixes réels, sans préfixe `/api` implicite
 | `/api/admin-auth` | Premier administrateur et invitations |
 | `/api/documents` | Lecture ; mutations avec droits dédiés ; upload et lecture des images locales |
 | `/api/document-histories` | Lecture des versions de documents |
-| `/api/conversations` | Lecture et suppression ; `useAiChatBot` |
-| `/api/ai-client` | Modèles et messages IA ; `useAiChatBot` |
+| `/api/ai` | Conversations, messages (outils + pièces jointes), statut ; `useAiChatBot`. `/models` réservé admin, `/images` exige aussi `modifyDocument` |
 | `/api/scrapers` | Lecture `accessScrapersPage`, mutations avec droits dédiés |
 | `/api/instance-scrape` | Lecture `accessInstancesScrapersPage`, création/suppression `useScraper` |
 | `/api/instance-scrape-histories` | Lecture des résultats historiques |

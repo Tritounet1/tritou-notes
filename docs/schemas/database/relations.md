@@ -86,11 +86,18 @@ erDiagram
     }
     Conversation {
         Int id PK
-        String message
-        String response
-        String model_id
+        String title
         Int documentId FK "nullable"
         Int authorId FK "nullable"
+        DateTime created_at
+        DateTime updated_at
+    }
+    AiMessage {
+        Int id PK
+        Int conversationId FK
+        String role
+        Json data
+        String summary "nullable"
         DateTime created_at
     }
     UserPermissions {
@@ -117,7 +124,9 @@ erDiagram
     }
     Settings {
         Int id PK
-        String anthropicApiKey "nullable"
+        String openrouterApiKey "nullable, chiffrée"
+        String aiTextModel "nullable"
+        String aiImageModel "nullable"
         String smtpUser "nullable"
         String smtpPassword "nullable"
         String smtpHost "nullable"
@@ -137,7 +146,8 @@ erDiagram
     Scraper |o--o{ InstanceScrape : scraperId
     InstanceScrape ||--o{ InstanceScrapeHistory : instanceScrapeId
     ScrapingScheduler |o--o{ InstanceScrapeHistory : scrapingSchedulerId
-    Document |o--o{ Conversation : documentId
+    Document |o--o{ Conversation : "documentId (cascade)"
+    Conversation ||--o{ AiMessage : "conversationId (cascade)"
     User |o--o{ Conversation : authorId
     User ||--o| UserPermissions : userId
 ```

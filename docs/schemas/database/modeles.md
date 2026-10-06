@@ -11,10 +11,11 @@
 | `Scraper` | Code de scraping, origines autorisées et template de rendu JSON. |
 | `InstanceScrape` | URL, résultat JSON courant et statut du scraping. |
 | `InstanceScrapeHistory` | Ancien résultat ou erreur enregistré par le worker. |
-| `Conversation` | Message et réponse IA ; auteur et document optionnels. |
+| `Conversation` | Fil de discussion IA d’un utilisateur, lié à une page ou global ; supprimé avec sa page. |
+| `AiMessage` | Message d’une conversation au format chat OpenRouter (utilisateur, assistant, résultat d’outil) et résumé affiché. |
 | `UserPermissions` | Droits booléens ; tous désactivés par défaut. |
 | `Invitation` | Adresse email, token unique, expiration et utilisation. |
-| `Settings` | Configuration Anthropic et SMTP ; l’API utilise la ligne id=1. |
+| `Settings` | Clé OpenRouter (chiffrée), modèles texte et image, SMTP, empreinte du token MCP ; l’API utilise la première ligne. |
 | `DocumentImage` | Métadonnées d’une image locale, dimensions, taille et document propriétaire ; suppression en cascade. |
 | `Images` | Métadonnées : nom et date de création. |
 
