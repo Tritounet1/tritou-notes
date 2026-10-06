@@ -13,6 +13,7 @@ interface Document {
   last_update: string;
   authorId: number;
   type: "TEXT" | "EXCEL" | "TODO";
+  parentId: number | null;
 }
 
 type SortOption = "date" | "name";
@@ -70,6 +71,7 @@ export const Dashboard = () => {
     }
   };
 
+  const titleById = new Map(documents.map((doc) => [doc.id, doc.title]));
   const filteredDocuments = documents
     .filter((doc) => doc.title.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
@@ -389,6 +391,9 @@ export const Dashboard = () => {
                             >
                               <span className={`w-2 h-2 rounded-[3px] shrink-0 ${style.dot}`} />
                               <span className="truncate">{doc.title || "Sans titre"}</span>
+                              {doc.parentId !== null && titleById.has(doc.parentId) && (
+                                <span className="truncate text-xs font-normal text-muted">dans {titleById.get(doc.parentId) || "Sans titre"}</span>
+                              )}
                             </Link>
                           </td>
                           <td className="px-4 py-[11px]">

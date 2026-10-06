@@ -20,6 +20,7 @@ erDiagram
         DateTime last_update
         Int authorId FK
         DocumentType type
+        Int parentId FK "nullable"
     }
     DocumentImage {
         UUID id PK
@@ -129,6 +130,7 @@ erDiagram
     }
     User ||--o{ Document : authorId
     Document ||--o{ DocumentImage : "documentId (cascade)"
+    Document |o--o{ Document : "parentId (cascade)"
     Document ||--o{ DocumentHistory : documentId
     User ||--o{ DocumentHistory : authorId
     ScrapingScheduler |o--o{ InstanceScrape : scrapingSchedulerId
@@ -147,6 +149,8 @@ erDiagram
 - `nullable` : champ optionnel. `String[]` représente un tableau PostgreSQL.
 - `UserPermissions.userId` est unique : un utilisateur possède au maximum une ligne de permissions.
 - Les liens de `Conversation` vers un utilisateur et un document sont optionnels, comme les liens des instances vers un scraper ou un planificateur.
+
+`Document.parentId` forme l’arborescence des sous-pages (`null` pour une page racine). Supprimer une page supprime toute sa descendance : la base cascade sur `parentId`, et le contrôleur supprime d’abord les historiques et les images de chaque page du sous-arbre.
 
 Les fichiers de `DocumentImage` sont stockés localement par Express, hors PostgreSQL. La relation `documentId` supprime les métadonnées en cascade ; le contrôleur supprime aussi le dossier du document.
 

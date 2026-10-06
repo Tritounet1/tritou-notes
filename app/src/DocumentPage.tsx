@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import remarkGfm from "remark-gfm";
 import { ImageBlock } from "./components/ImageBlock";
 import { ImageUploadModal } from "./components/ImageUploadModal";
@@ -8,12 +8,15 @@ import { insertImageBlocks, serializeDocumentImage, type DocumentImageBlock } fr
 import { apiFetch } from "./api";
 import { slashCommands } from "./commands";
 import { SchedulerBlock } from "./components/SchedulerBlock";
+import { SubPageBlock, type SubPage } from "./components/SubPageBlock";
+import { MovePageModal } from "./components/MovePageModal";
 import { SpreadsheetEditor } from "./components/SpreadsheetEditor";
 import { TodoEditor } from "./components/TodoEditor";
 import { useAuth } from "./hooks/useAuth";
 import { useDebounce } from "./hooks/useDebounce";
 import { jsonToMarkdownTable, templateToMarkdown } from "./utils/jsonToMarkdown";
 import { docTypeStyles } from "./utils/docTypes";
+import { notifyDocumentsChanged } from "./utils/documentEvents";
 
 import { CodeBlock } from "./components/CodeBlock";
 import { WebLinkBlock } from "./components/WebLinkBlock";
@@ -28,6 +31,10 @@ interface Document {
   last_update: string;
   authorId: number;
   type: "TEXT" | "EXCEL" | "TODO";
+  parentId: number | null;
+  /** Parent chain, root first (only on GET /api/documents/:id). */
+  ancestors?: { id: number; title: string }[];
+  children?: SubPage[];
 }
 
 interface HistoryEntry {
@@ -75,7 +82,7 @@ const docTypeIcons = {
 
 // Short glyphs shown in the slash command menu tiles.
 const commandGlyphs: Record<string, string> = {
-  image: "▣", planificateur: "↻", scrape: "↯", date: "31", time: "◷",
+  page: "¶", image: "▣", planificateur: "↻", scrape: "↯", date: "31", time: "◷",
   divider: "—", code: "{}", quote: "“", list: "•", checkbox: "[ ]",
 };
 
@@ -147,6 +154,8 @@ export const DocumentPage = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const [showMoveModal, setShowMoveModal] = useState(false);
+
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -214,6 +223,7 @@ export const DocumentPage = () => {
         }
         const data = await response.json();
         setDocument(data);
+        savedTitleRef.current = data.title;
         setTitle(data.title || "");
         setText(data.text || "");
         setIsPublic(data.public || false);
@@ -452,6 +462,8 @@ export const DocumentPage = () => {
     }
   };
 
+  const savedTitleRef = useRef<string | null>(null);
+
   const saveDocument = useCallback(
     async (newTitle: string, newText: string, newIsPublic: boolean) => {
       setSaving(true);
@@ -468,7 +480,12 @@ export const DocumentPage = () => {
           throw new Error("Erreur lors de la sauvegarde");
         }
         const data = await response.json();
-        setDocument(data);
+        // PUT returns the bare row: keep the breadcrumb and sub-pages loaded by GET.
+        setDocument((previous) => (previous ? { ...previous, ...data } : data));
+        if (newTitle !== savedTitleRef.current) {
+          savedTitleRef.current = newTitle;
+          notifyDocumentsChanged();
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erreur");
       } finally {
@@ -488,6 +505,40 @@ export const DocumentPage = () => {
   const handleTextChange = (newText: string) => {
     setText(newText);
     debouncedSave(title, newText, isPublic);
+  };
+
+  /**
+   * Creates a sub-page and opens it. For text pages a `::page[id]::` block is
+   * inserted on its own line at `offset` of `baseText`; the save goes through the
+   * debounce so it replaces any pending one and is flushed when this page unmounts.
+   */
+  const createSubPage = async (offset: number | null, baseText: string) => {
+    if (!document) return;
+    try {
+      const response = await apiFetch("/api/documents", {
+        method: "POST",
+        body: JSON.stringify({ title: "Sans titre", type: "TEXT", parentId: document.id }),
+      });
+      if (!response.ok) throw new Error("Impossible de créer la sous-page");
+      const child = await response.json();
+      if (offset !== null && document.type === "TEXT") {
+        const before = baseText.slice(0, offset);
+        const after = baseText.slice(offset);
+        const nextText = `${before}${before && !before.endsWith("\n") ? "\n" : ""}::page[${child.id}]::${after.startsWith("\n") ? "" : "\n"}${after}`;
+        setText(nextText);
+        debouncedSave(title, nextText, isPublic);
+      }
+      notifyDocumentsChanged();
+      navigate(`/document/${child.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur");
+    }
+  };
+
+  const handleMoved = (parentId: number | null, ancestors: { id: number; title: string }[]) => {
+    setDocument((previous) => (previous ? { ...previous, parentId, ancestors } : previous));
+    setShowMoveModal(false);
+    notifyDocumentsChanged();
   };
 
   const handleStartEditing = (segIndex: number, atEnd = false) => {
@@ -727,6 +778,15 @@ export const DocumentPage = () => {
       i === editingSegmentIndex ? { type: "text" as const, content: result.newText } : s
     );
     const newText = segmentsToText(newSegs);
+
+    if (command.name === "page") {
+      setShowCommands(false);
+      setCommandSearch("");
+      setEditingSegmentIndex(null);
+      void createSubPage(segmentGlobalOffset(segs, editingSegmentIndex) + result.newCursorPosition, newText);
+      return;
+    }
+
     setText(newText);
     debouncedSave(title, newText, isPublic);
     setShowCommands(false);
@@ -848,7 +908,8 @@ export const DocumentPage = () => {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Supprimer ce document ?")) return;
+    const subPages = document?.children?.length ?? 0;
+    if (!confirm(subPages ? `Supprimer ce document et ses sous-pages (${subPages} directe${subPages > 1 ? "s" : ""}) ?` : "Supprimer ce document ?")) return;
 
     try {
       const response = await apiFetch(`/api/documents/${id}`, {
@@ -857,7 +918,8 @@ export const DocumentPage = () => {
       if (!response.ok) {
         throw new Error("Erreur lors de la suppression");
       }
-      navigate("/dashboard");
+      notifyDocumentsChanged();
+      navigate(document?.parentId ? `/document/${document.parentId}` : "/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur");
     }
@@ -943,6 +1005,9 @@ export const DocumentPage = () => {
 
   return (
     <div className={`flex flex-wrap items-stretch xl:h-[calc(100vh-20px)] ${isAuthenticated ? "" : "paper m-2.5 min-h-[calc(100vh-20px)] overflow-hidden"}`}>
+      {showMoveModal && (
+        <MovePageModal documentId={document.id} currentParentId={document.parentId} onMoved={handleMoved} onClose={() => setShowMoveModal(false)} />
+      )}
       {showImageModal && <ImageUploadModal key={document.id} documentId={document.id} initialFiles={imageFiles}
         onInsert={handleInsertImages} onClose={() => setShowImageModal(false)} />}
 
@@ -950,8 +1015,14 @@ export const DocumentPage = () => {
         {isAuthenticated ? (
           <header className="flex flex-wrap items-center justify-between gap-2.5 py-2.5 pl-5 pr-4">
             <nav aria-label="Fil d’Ariane" className="flex min-w-0 items-center gap-1.5 text-sm text-muted">
-              <button type="button" onClick={() => navigate("/dashboard")} className="cursor-pointer hover:text-ink">Pages</button>
+              <Link to="/dashboard" className="shrink-0 hover:text-ink">Pages</Link>
               <span aria-hidden="true">/</span>
+              {document.ancestors?.map((ancestor) => (
+                <span key={ancestor.id} className="flex min-w-0 items-center gap-1.5">
+                  <Link to={`/document/${ancestor.id}`} className="max-w-[160px] truncate hover:text-ink">{ancestor.title || "Sans titre"}</Link>
+                  <span aria-hidden="true">/</span>
+                </span>
+              ))}
               <span className="truncate font-medium text-ink">{title || "Sans titre"}</span>
             </nav>
             <div className="flex flex-wrap items-center gap-1.5 text-[13px]">
@@ -978,6 +1049,11 @@ export const DocumentPage = () => {
                   ? <button type="button" onClick={handleTogglePublic} title={isPublic ? "Rendre privé" : "Rendre public"} className={`${cls} cursor-pointer transition hover:bg-chip`}>{content}</button>
                   : <span className={cls}>{content}</span>;
               })()}
+              {canModify && (
+                <button type="button" onClick={() => setShowMoveModal(true)} aria-label="Déplacer la page" title="Déplacer la page" className="icon-btn h-[34px] w-[34px] rounded-[9px] text-ink-2">
+                  <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM10 13h6M13 10l3 3-3 3" /></svg>
+                </button>
+              )}
               <button type="button" onClick={handleOpenHistory} aria-label="Historique des versions" title="Historique des versions" className="icon-btn h-[34px] w-[34px] rounded-[9px] text-ink-2">
                 <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5M12 7v5l3 2" /></svg>
               </button>
@@ -1051,6 +1127,16 @@ export const DocumentPage = () => {
                       <SchedulerBlock
                         key={`sched-${seg.id}-${segIndex}`}
                         schedulerId={seg.id}
+                        onDelete={canEdit ? () => handleDeleteSegment(segIndex) : undefined}
+                      />
+                    );
+                  }
+
+                  if (seg.type === "page") {
+                    return (
+                      <SubPageBlock
+                        key={`page-${seg.id}-${segIndex}`}
+                        page={document.children?.find((child) => child.id === seg.id)}
                         onDelete={canEdit ? () => handleDeleteSegment(segIndex) : undefined}
                       />
                     );
@@ -1171,6 +1257,19 @@ export const DocumentPage = () => {
             <SpreadsheetEditor data={text} onChange={handleTextChange} readOnly={!canModify} />
           </div>
         )}
+
+        {(() => {
+          // Text pages show embedded sub-pages as blocks; list the others here.
+          const embedded = new Set(document.type === "TEXT" ? parseSegments(text).flatMap((seg) => (seg.type === "page" ? [seg.id] : [])) : []);
+          const loose = (document.children ?? []).filter((child) => !embedded.has(child.id));
+          if (!loose.length) return null;
+          return (
+            <section aria-label="Sous-pages" className="mx-auto flex max-w-[760px] flex-col gap-1 px-5 pb-16 sm:px-10">
+              <h2 className="eyebrow px-2 pb-1">Sous-pages</h2>
+              {loose.map((child) => <SubPageBlock key={child.id} page={child} />)}
+            </section>
+          );
+        })()}
       </div>
 
       {/* AI Chat Panel */}

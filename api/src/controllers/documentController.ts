@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
 import { removeDocumentImages } from "../utils/documentImageStorage";
+import { ancestorsOf, descendantIds, resolveParent } from "../utils/documentTree";
 
 export const createDocument = async (
   req: Request,
@@ -8,16 +9,18 @@ export const createDocument = async (
   next: NextFunction,
 ) => {
   try {
-    const { title, type } = req.body;
+    const { title, type, parentId } = req.body;
     const author = await prisma.user.findFirst({ where: { id: req.user.id } });
 
     if (!author) {
       throw new Error("Utilisateur introuvable");
     }
+    const parent = parentId === undefined ? null : await resolveParent(parentId);
     const document = await prisma.document.create({
       data: {
         title: title,
         type: type,
+        ...(parent !== null && { parent: { connect: { id: parent } } }),
         author: {
           connect: { id: author.id },
         },
@@ -58,7 +61,21 @@ export const getDocumentById = async (
       res.status(404).json({ message: "Document not found" });
       return;
     }
-    res.json(document);
+    // Signed-out readers of a public page only see the public parts of its tree.
+    const visible = (page: { public: boolean }) => Boolean(req.user) || page.public;
+    const [ancestors, children] = await Promise.all([
+      ancestorsOf(document.parentId),
+      prisma.document.findMany({
+        where: { parentId: id },
+        select: { id: true, title: true, type: true, public: true },
+        orderBy: { created_at: "asc" },
+      }),
+    ]);
+    res.json({
+      ...document,
+      ancestors: ancestors.filter(visible).map(({ id, title }) => ({ id, title })),
+      children: children.filter(visible).map(({ id, title, type }) => ({ id, title, type })),
+    });
   } catch (error) {
     next(error);
   }
@@ -71,7 +88,7 @@ export const updateDocument = async (
 ) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const { title, text, is_public } = req.body;
+    const { title, text, is_public, parentId } = req.body;
 
     const previous_document = await prisma.document.findFirst({
       where: { id: id },
@@ -86,6 +103,9 @@ export const updateDocument = async (
     if (!author) {
       throw new Error("Utilisateur introuvable");
     }
+
+    // `parentId` is only sent when moving the page (null = back to the root).
+    const parent = parentId === undefined ? undefined : await resolveParent(parentId, id);
 
     await prisma.documentHistory.create({
       data: {
@@ -116,6 +136,9 @@ export const updateDocument = async (
           connect: { id: author.id },
         },
         public: is_public,
+        ...(parent !== undefined && {
+          parent: parent === null ? { disconnect: true } : { connect: { id: parent } },
+        }),
         last_update: new Date(),
       },
     });
@@ -133,9 +156,11 @@ export const deleteDocument = async (
 ) => {
   try {
     const id = parseInt(req.params.id, 10);
+    // Sub-pages go with their parent (DB cascade); their histories must go first.
+    const subtree = [id, ...(await descendantIds(id))];
     await prisma.documentHistory.deleteMany({
       where: {
-        documentId: id,
+        documentId: { in: subtree },
       },
     });
     const deletedDocument = await prisma.document.delete({
@@ -144,7 +169,9 @@ export const deleteDocument = async (
       },
     });
     // Metadata is removed by the cascading DocumentImage relation.
-    await removeDocumentImages(id).catch(error => console.error("Image cleanup failed for document", id, error));
+    await Promise.all(subtree.map(pageId =>
+      removeDocumentImages(pageId).catch(error => console.error("Image cleanup failed for document", pageId, error)),
+    ));
     res.json(deletedDocument);
   } catch (error) {
     next(error);

@@ -1,16 +1,8 @@
-import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api";
 import { useAuth } from "../hooks/useAuth";
-import { docTypeStyles } from "../utils/docTypes";
-
-interface RecentDocument {
-  id: number;
-  title: string;
-  last_update: string;
-  type: "TEXT" | "EXCEL" | "TODO";
-}
+import { PageTree } from "./PageTree";
 
 const Icon = ({ d, className = "w-[17px] h-[17px]" }: { d: string; className?: string }) => (
   <svg className={`${className} shrink-0`} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
@@ -41,23 +33,6 @@ export const Navigation = ({ onSearch }: { onSearch: () => void }) => {
   const { isAuthenticated, logout, user, isAdmin, hasPermission } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [recents, setRecents] = useState<RecentDocument[]>([]);
-
-  // Refetch on navigation so renamed / new documents show up.
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    apiFetch("/api/documents")
-      .then((res) => (res.ok ? res.json() : []))
-      .then((docs: RecentDocument[]) =>
-        setRecents(
-          [...docs]
-            .sort((a, b) => new Date(b.last_update).getTime() - new Date(a.last_update).getTime())
-            .slice(0, 5),
-        ),
-      )
-      .catch(console.error);
-  }, [isAuthenticated, location.pathname]);
-
   if (!isAuthenticated) {
     return null;
   }
@@ -126,20 +101,7 @@ export const Navigation = ({ onSearch }: { onSearch: () => void }) => {
         {navItem("/dashboard", icons.home, "Accueil")}
       </div>
 
-      {recents.length > 0 && (
-        <div className="flex flex-col gap-0.5">
-          <SectionLabel>Récents</SectionLabel>
-          {recents.map((doc) => {
-            const style = docTypeStyles[doc.type] ?? docTypeStyles.TEXT;
-            return (
-              <Link key={doc.id} to={`/document/${doc.id}`} className={itemClass(location.pathname === `/document/${doc.id}`)}>
-                <span className={`w-2 h-2 rounded-[3px] shrink-0 ${style.dot}`} />
-                <span className="truncate">{doc.title || "Sans titre"}</span>
-              </Link>
-            );
-          })}
-        </div>
-      )}
+      <PageTree />
 
       {showScraping && (
         <div className="flex flex-col gap-0.5">

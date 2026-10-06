@@ -244,7 +244,7 @@ describe("document lifecycle", () => {
   });
   it("deletes histories before deleting their parent document", async () => {
     await call(documents.deleteDocument);
-    expect(db.documentHistory.deleteMany).toHaveBeenCalledWith({ where: { documentId: 12 } });
+    expect(db.documentHistory.deleteMany).toHaveBeenCalledWith({ where: { documentId: { in: [12] } } });
     expect(db.document.delete).toHaveBeenCalledWith({ where: { id: 12 } });
     expect(db.documentHistory.deleteMany.mock.invocationCallOrder[0]).toBeLessThan(db.document.delete.mock.invocationCallOrder[0]);
   });

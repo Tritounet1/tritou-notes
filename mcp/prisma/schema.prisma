@@ -29,9 +29,15 @@ model Document {
   author            User              @relation(fields: [authorId], references: [id])
   authorId          Int
   type              DocumentType      @default(TEXT)
+  // Sub-pages: deleting a page deletes its whole subtree.
+  parentId          Int?
+  parent            Document?         @relation("DocumentTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children          Document[]        @relation("DocumentTree")
   documentHistories DocumentHistory[]
   conversations     Conversation[]
   images            DocumentImage[]
+
+  @@index([parentId])
 }
 
 enum DocumentType {

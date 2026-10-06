@@ -10,6 +10,19 @@ export interface SlashCommand {
 
 export const slashCommands: SlashCommand[] = [
   {
+    name: "page",
+    description: "Crée une sous-page et l’ouvre",
+    opensModal: true,
+    execute: (currentText, cursorPosition, commandStart) => {
+      const beforeCommand = currentText.slice(0, commandStart);
+      const afterCursor = currentText.slice(cursorPosition);
+      return {
+        newText: beforeCommand + afterCursor,
+        newCursorPosition: beforeCommand.length,
+      };
+    },
+  },
+  {
     name: "image",
     description: "Ajouter des images depuis votre appareil",
     opensModal: true,

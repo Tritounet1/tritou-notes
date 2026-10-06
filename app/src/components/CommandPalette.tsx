@@ -18,6 +18,7 @@ interface DocumentSummary {
   title: string;
   last_update: string;
   type: keyof typeof docTypeStyles;
+  parentId: number | null;
 }
 
 const fetchList = async <T,>(url: string): Promise<T[]> => {
@@ -77,6 +78,7 @@ export const CommandPalette = ({ onClose }: { onClose: () => void }) => {
       group: q ? "Pages" : "Récents",
       label: d.title || "Sans titre",
       dot: (docTypeStyles[d.type] ?? docTypeStyles.TEXT).dot,
+      hint: d.parentId !== null ? documents.find((p) => p.id === d.parentId)?.title : undefined,
       run: go(`/document/${d.id}`),
     }));
 
