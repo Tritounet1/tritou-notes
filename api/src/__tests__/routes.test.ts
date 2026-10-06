@@ -11,15 +11,13 @@ const mocks = vi.hoisted(() => ({ decode: vi.fn(), mail: vi.fn(), preview: vi.fn
 vi.mock("../utils/jwtUtils", () => ({ decodeToken: mocks.decode, createToken: () => "jwt" }));
 vi.mock("../config/mailClient", () => ({ sendEmail: mocks.mail }));
 vi.mock("../config/queue", () => ({ scrapeQueue: { add: vi.fn(), getRepeatableJobs: async () => [] } }));
-vi.mock("../config/anthropicClient", () => ({ getAnthropicModels: async () => [], getResponse: async () => [] }));
 vi.mock("../utils/utils", () => ({ encrypt: (value: string) => value, makeid: () => "token" }));
 vi.mock("../utils/linkPreview", () => ({ getLinkPreview: mocks.preview, parsePublicUrl: mocks.parse }));
 import documents from "../routes/documentRoutes";
-import conversations from "../routes/conversationRoutes";
 import scrapers from "../routes/scraperRoutes";
 import instances from "../routes/instanceScrapeRoutes";
 import schedulers from "../routes/scrapingSchedulerRoutes";
-import ai from "../routes/anthropicClientRoutes";
+import ai from "../routes/aiRoutes";
 import users from "../routes/userRoutes";
 import permissions from "../routes/userPermissionsRoutes";
 import settings from "../routes/settingsRoutes";
@@ -39,16 +37,22 @@ beforeEach(() => {
 type ProtectedRoute = { area: string; router: Router; method: string; url: string; permission: string };
 const protectedRoutes: ProtectedRoute[] = [
   ...[["POST", "/", "createDocument"], ["PUT", "/12", "modifyDocument"], ["DELETE", "/12", "deleteDocument"]].map(([method, url, permission]) => ({ area: "documents", router: documents, method, url, permission })),
-  ...[["GET", "/"], ["GET", "/12"], ["DELETE", "/12"]].map(([method, url]) => ({ area: "conversations", router: conversations, method, url, permission: "useAiChatBot" })),
   ...[["GET", "/", "accessScrapersPage"], ["GET", "/12", "accessScrapersPage"], ["POST", "/", "modifyScraper"], ["PUT", "/12", "modifyScraper"], ["DELETE", "/12", "deleteScraper"]].map(([method, url, permission]) => ({ area: "scrapers", router: scrapers, method, url, permission })),
   ...[["GET", "/", "accessInstancesScrapersPage"], ["GET", "/12", "accessInstancesScrapersPage"], ["POST", "/", "useScraper"], ["DELETE", "/12", "useScraper"]].map(([method, url, permission]) => ({ area: "instances", router: instances, method, url, permission })),
   ...[["GET", "/", "accessScrapersPage"], ["GET", "/12", "accessScrapersPage"], ["GET", "/12/preview", "accessScrapersPage"], ["POST", "/", "modifyScraperStatus"], ["PUT", "/12", "modifyScraperStatus"], ["DELETE", "/12", "modifyScraperStatus"]].map(([method, url, permission]) => ({ area: "schedulers", router: schedulers, method, url, permission })),
-  ...["GET", "POST"].map(method => ({ area: "AI", router: ai, method, url: "/", permission: "useAiChatBot" })),
+  ...[["GET", "/status"], ["GET", "/conversations"], ["POST", "/conversations"], ["GET", "/conversations/12"], ["PATCH", "/conversations/12"], ["DELETE", "/conversations/12"]]
+    .map(([method, url]) => ({ area: "AI", router: ai, method, url, permission: "useAiChatBot" })),
   { area: "link preview", router: preview, method: "GET", url: "/", permission: "modifyDocument" },
 ];
 
+// Gated routes whose success path needs a configured OpenRouter key (covered in ai.test.ts).
+const blockOnlyRoutes: ProtectedRoute[] = [
+  { area: "AI", router: ai, method: "POST", url: "/conversations/12/messages", permission: "useAiChatBot" },
+  { area: "AI", router: ai, method: "POST", url: "/images", permission: "useAiChatBot" },
+];
+
 describe("route permission matrix", () => {
-  it.each(protectedRoutes)("blocks $area $method $url without $permission", async route => {
+  it.each([...protectedRoutes, ...blockOnlyRoutes])("blocks $area $method $url without $permission", async route => {
     db.userPermissions.findUnique.mockResolvedValue({});
     const ctx = await dispatch(route.router, route.method, route.url, { user: regular });
     expect(ctx.status).toHaveBeenCalledWith(403);

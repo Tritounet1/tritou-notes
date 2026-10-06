@@ -6,10 +6,9 @@ import config from "./config/config";
 import { prisma } from "./config/prismaClient";
 import { authHandler } from "./middlewares/authMiddleware";
 import { errorHandler } from "./middlewares/errorHandler";
-import anthropicClientRoutes from "./routes/anthropicClientRoutes";
+import aiRoutes from "./routes/aiRoutes";
 import authAdminRoutes from "./routes/authAdminRoutes";
 import authRoutes from "./routes/authRoutes";
-import conversationRoutes from "./routes/conversationRoutes";
 import documentHistoryRoutes from "./routes/documentHistoryRoutes";
 import documentRoutes from "./routes/documentRoutes";
 import instanceScrapeHistoryRoutes from "./routes/instanceScrapeHistoryRoutes";
@@ -47,7 +46,8 @@ app.use(
 );
 
 app.use(cookieParser());
-app.use(express.json());
+// /api/ai parses its own, larger bodies (chat attachments).
+app.use(/^(?!\/api\/ai\/)/, express.json());
 
 app.use("/health", (req, res) => res.sendStatus(200));
 
@@ -68,11 +68,10 @@ app.use(authHandler);
 // Routes with connection needed
 app.use("/api/documents", documentRoutes);
 app.use("/api/document-histories", documentHistoryRoutes);
-app.use("/api/conversations", conversationRoutes);
 app.use("/api/scrapers", scraperRoutes);
 app.use("/api/instance-scrape", instanceScrapeRoutes);
 app.use("/api/user-permissions", userPermissionsRoutes);
-app.use("/api/ai-client", anthropicClientRoutes);
+app.use("/api/ai", aiRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/scraping-schedulers", scrapingSchedulerRoutes);
 app.use("/api/instance-scrape-histories", instanceScrapeHistoryRoutes);

@@ -120,16 +120,34 @@ model InstanceScrapeHistory {
   scrapingSchedulerId Int?
 }
 
+// AI chat thread, attached to a document or global (documentId = null).
 model Conversation {
-  id         Int       @id @default(autoincrement())
-  message    String
-  response   String
-  model_id   String
-  document   Document? @relation(fields: [documentId], references: [id])
+  id         Int         @id @default(autoincrement())
+  title      String      @default("Nouvelle conversation")
+  document   Document?   @relation(fields: [documentId], references: [id], onDelete: Cascade)
   documentId Int?
-  author     User?     @relation(fields: [authorId], references: [id])
+  author     User?       @relation(fields: [authorId], references: [id])
   authorId   Int?
-  created_at DateTime  @default(now())
+  created_at DateTime    @default(now())
+  updated_at DateTime    @default(now())
+  messages   AiMessage[]
+
+  @@index([documentId])
+  @@index([authorId])
+}
+
+// One chat-completions message, stored as sent to OpenRouter (role, content, tool_calls, tool_call_id).
+model AiMessage {
+  id             Int          @id @default(autoincrement())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId Int
+  role           String
+  data           Json
+  /// Human-readable result of a tool call, shown in the chat.
+  summary        String?
+  created_at     DateTime     @default(now())
+
+  @@index([conversationId])
 }
 
 enum InstanceScrapeStatus {
@@ -177,7 +195,10 @@ model Invitation {
 
 model Settings {
   id              Int     @id @default(autoincrement())
-  anthropicApiKey String?
+  // OpenRouter key (encrypted) and the models used workspace-wide.
+  openrouterApiKey String?
+  aiTextModel      String?
+  aiImageModel     String?
   smtpUser        String?
   smtpPassword    String?
   smtpHost        String?

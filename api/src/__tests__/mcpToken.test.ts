@@ -33,8 +33,8 @@ describe("MCP token", () => {
   });
 
   it("never sends the hash to the browser", async () => {
-    db.settings.findMany.mockResolvedValue([{ id: 1, smtpPort: 587, mcpTokenHash: "secret-hash" }]);
+    db.settings.findMany.mockResolvedValue([{ id: 1, smtpPort: 587, mcpTokenHash: "secret-hash", openrouterApiKey: "encrypted-key" }]);
     const ctx = await call(settings.getSettings);
-    expect(ctx.json).toHaveBeenCalledWith([{ id: 1, smtpPort: 587, mcpTokenSet: true }]);
+    expect(ctx.json).toHaveBeenCalledWith([{ id: 1, smtpPort: 587, mcpTokenSet: true, openrouterApiKeySet: true }]);
   });
 });

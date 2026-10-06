@@ -1,13 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, resetDatabase } from "./helpers/database";
 vi.mock("../config/prismaClient", async () => ({ prisma: (await import("./helpers/database")).db }));
-const mocks = vi.hoisted(() => ({ decrypt: vi.fn(), transport: vi.fn(), verify: vi.fn(), mail: vi.fn(), messages: vi.fn(), models: vi.fn(), anthropic: vi.fn(), s3: vi.fn() }));
+const mocks = vi.hoisted(() => ({ decrypt: vi.fn(), transport: vi.fn(), verify: vi.fn(), mail: vi.fn(), s3: vi.fn() }));
 vi.mock("../utils/utils", () => ({ decrypt: mocks.decrypt }));
 vi.mock("nodemailer", () => ({ default: { createTransport: mocks.transport } }));
-vi.mock("@anthropic-ai/sdk", () => ({ default: class { models = { list: mocks.models }; messages = { create: mocks.messages }; constructor(options: unknown) { mocks.anthropic(options); } } }));
 vi.mock("../utils/s3Client", () => ({ s3Client: { send: mocks.s3 } }));
 import { sendEmail } from "../config/mailClient";
-import { getAnthropicModels, getResponse } from "../config/anthropicClient";
 import { getFile, getPublicUrl, uploadFile } from "../utils/storageService";
 
 beforeEach(() => {
@@ -15,8 +13,6 @@ beforeEach(() => {
   resetDatabase();
   mocks.decrypt.mockImplementation(value => `decoded:${value}`);
   mocks.transport.mockReturnValue({ verify: mocks.verify, sendMail: mocks.mail });
-  mocks.models.mockImplementation(async function* () { yield { id: "model-1" }; yield { id: "model-2" }; });
-  mocks.messages.mockResolvedValue({ content: [{ type: "text", text: "Answer" }] });
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
@@ -50,28 +46,6 @@ describe("SMTP adapter", () => {
   });
 });
 
-describe("Anthropic adapter", () => {
-  it("decrypts the API key and collects paginated model results", async () => {
-    db.settings.findFirst.mockResolvedValue({ anthropicApiKey: "key" });
-    expect(await getAnthropicModels()).toEqual([{ id: "model-1" }, { id: "model-2" }]);
-    expect(mocks.anthropic).toHaveBeenCalledWith({ apiKey: "decoded:key" });
-  });
-  it("sends the requested model and content with a token budget", async () => {
-    db.settings.findFirst.mockResolvedValue({ anthropicApiKey: "key" });
-    expect(await getResponse("model-1", "Question")).toEqual([{ type: "text", text: "Answer" }]);
-    expect(mocks.messages).toHaveBeenCalledWith({ model: "model-1", max_tokens: 1024, messages: [{ role: "user", content: "Question" }] });
-  });
-  it.each([null, { anthropicApiKey: null }])("propagates missing/invalid key failures %j", async settings => {
-    db.settings.findFirst.mockResolvedValue(settings);
-    mocks.decrypt.mockImplementation(() => { throw new Error("No key"); });
-    await expect(getResponse("model", "Question")).rejects.toThrow("No key");
-    expect(mocks.messages).not.toHaveBeenCalled();
-  });
-  it("propagates API failures", async () => {
-    mocks.messages.mockRejectedValue(new Error("API failed"));
-    await expect(getResponse("model", "Question")).rejects.toThrow("API failed");
-  });
-});
 
 describe("S3 adapter", () => {
   it("uploads bytes and their content type to the configured bucket", async () => {

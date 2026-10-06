@@ -28,6 +28,12 @@ const slashCommands = [
     viaMcp: "Non disponible : l'envoi du fichier passe par l'API (POST /api/documents/:id/images) depuis l'app",
   },
   {
+    name: "image-ia",
+    description: "Générer une image avec l'IA (modèle d'image choisi dans les paramètres)",
+    syntax: "::image[<JSON encodé URI : {id, caption, alt, width}>]::",
+    viaMcp: "Non disponible : la génération passe par l'API (POST /api/ai/images) depuis l'app",
+  },
+  {
     name: "planificateur",
     description: "Lier un planificateur (données live)",
     syntax: "::scheduler[<id>]::",

@@ -3,10 +3,16 @@ import { prisma } from "../config/prismaClient";
 import { encrypt } from "../utils/utils";
 import { generateMcpToken, hashMcpToken } from "../utils/mcpToken";
 
-// Never send the token hash to the browser; expose whether one is set instead.
-const toPublicSettings = ({ mcpTokenHash, ...settings }: { mcpTokenHash: string | null; [key: string]: unknown }) => ({
+// Never send the MCP token hash or the OpenRouter key to the browser; expose whether
+// they are set instead (sending the encrypted key back would get it re-encrypted on save).
+const toPublicSettings = ({
+  mcpTokenHash,
+  openrouterApiKey,
+  ...settings
+}: { mcpTokenHash: string | null; openrouterApiKey?: string | null; [key: string]: unknown }) => ({
   ...settings,
   mcpTokenSet: Boolean(mcpTokenHash),
+  openrouterApiKeySet: Boolean(openrouterApiKey),
 });
 
 export const getSettings = async (
@@ -29,12 +35,14 @@ export const updateSettings = async (
 ) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const { anthropicApiKey, smtpUser, smtpPassword, smtpHost, smtpPort } =
+    const { openrouterApiKey, aiTextModel, aiImageModel, smtpUser, smtpPassword, smtpHost, smtpPort } =
       req.body;
 
     const data: Record<string, string | number | null | undefined> = {};
 
-    if (anthropicApiKey !== undefined) data.anthropicApiKey = anthropicApiKey ? encrypt(anthropicApiKey) : null;
+    if (openrouterApiKey !== undefined) data.openrouterApiKey = openrouterApiKey ? encrypt(openrouterApiKey) : null;
+    if (aiTextModel !== undefined) data.aiTextModel = aiTextModel || null;
+    if (aiImageModel !== undefined) data.aiImageModel = aiImageModel || null;
     if (smtpUser !== undefined) data.smtpUser = smtpUser ? encrypt(smtpUser) : null;
     if (smtpPassword !== undefined) data.smtpPassword = smtpPassword ? encrypt(smtpPassword) : null;
     if (smtpHost !== undefined) data.smtpHost = smtpHost ? encrypt(smtpHost) : null;

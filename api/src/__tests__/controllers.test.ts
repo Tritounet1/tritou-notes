@@ -12,7 +12,10 @@ vi.mock("../utils/bcryptUtils", () => ({ hashPassword: mocks.hash, verifyPasswor
 vi.mock("../utils/jwtUtils", () => ({ createToken: mocks.token }));
 vi.mock("../config/mailClient", () => ({ sendEmail: mocks.email }));
 vi.mock("../utils/utils", () => ({ encrypt: mocks.encrypt, makeid: () => "safe-token" }));
-vi.mock("../config/anthropicClient", () => ({ getResponse: mocks.response, getAnthropicModels: mocks.models }));
+vi.mock("../ai/openrouter", async importOriginal => ({
+  ...await importOriginal<typeof import("../ai/openrouter")>(),
+  chatCompletion: mocks.response, listTextModels: mocks.models, listImageModels: mocks.models, generateImage: mocks.response,
+}));
 vi.mock("../utils/storageService", () => ({ uploadFile: mocks.upload }));
 vi.mock("../config/queue", () => ({ scrapeQueue: { add: mocks.add, getRepeatableJobs: mocks.jobs, removeRepeatableByKey: mocks.remove } }));
 import * as users from "../controllers/userController";
@@ -20,7 +23,6 @@ import * as auth from "../controllers/authController";
 import * as invitations from "../controllers/adminAuthController";
 import * as documents from "../controllers/documentController";
 import * as documentHistory from "../controllers/documentHistoryController";
-import * as conversation from "../controllers/conversationController";
 import * as scrapers from "../controllers/scraperController";
 import * as instances from "../controllers/instanceScrapeController";
 import * as instanceHistory from "../controllers/instanceScrapeHistoryController";
@@ -28,7 +30,7 @@ import * as schedulers from "../controllers/scrapingSchedulerController";
 import * as settings from "../controllers/settingsController";
 import * as permissions from "../controllers/userPermissionsController";
 import * as images from "../controllers/imagesController";
-import * as ai from "../controllers/anthropicClientController";
+import * as ai from "../controllers/aiController";
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -37,7 +39,7 @@ beforeEach(() => {
   mocks.verify.mockResolvedValue(true);
   mocks.token.mockReturnValue("jwt");
   mocks.encrypt.mockImplementation(value => `encrypted:${value}`);
-  mocks.response.mockResolvedValue([{ type: "text", text: "Answer" }]);
+  mocks.response.mockResolvedValue({ role: "assistant", content: "Answer" });
   mocks.models.mockResolvedValue([{ id: "model" }]);
   mocks.jobs.mockResolvedValue([]);
   db.invitation.findUnique.mockResolvedValue({ email: "invited@example.com", used: false, expires_at: new Date(Date.now() + 10000) });
@@ -198,7 +200,7 @@ it.each(reads.map(([handler, model]) => ({ handler, model, name: handler.name })
 });
 const lists = [
   [documents.getDocuments, db.document], [documentHistory.getDocumentsHistories, db.documentHistory],
-  [conversation.getConversations, db.conversation], [scrapers.getScrapers, db.scraper],
+  [scrapers.getScrapers, db.scraper],
   [instances.getInstancesScrape, db.instanceScrape], [instanceHistory.getInstancesScrapeHistory, db.instanceScrapeHistory],
   [schedulers.getScrapingScheduler, db.scrapingScheduler], [settings.getSettings, db.settings], [images.getImages, db.images],
 ] as const;
@@ -209,7 +211,6 @@ it.each(lists.map(([handler, model]) => ({ handler, model, name: handler.name })
 });
 const histories = [
   [documentHistory.getDocumentHistoriesByDocumentId, db.documentHistory, "documentId"],
-  [conversation.getConversationsByDocumentId, db.conversation, "documentId"],
   [instanceHistory.getInstancesScrapeHistoryByInstanceScrapeId, db.instanceScrapeHistory, "instanceScrapeId"],
 ] as const;
 it.each(histories.map(([handler, model, key]) => ({ handler, model, key, name: handler.name })))("$name filters histories by their parent", async ({ handler, model, key }) => {
@@ -323,14 +324,14 @@ describe("scraping resources", () => {
 
 describe("settings, permissions, images and AI", () => {
   it("encrypts secrets and updates only provided settings", async () => {
-    await call(settings.updateSettings, { smtpPassword: "secret", smtpHost: "smtp.example.com", smtpUser: "mail", anthropicApiKey: "key", smtpPort: 465, role: "ADMIN" });
-    expect(db.settings.update).toHaveBeenCalledWith({ where: { id: 12 }, data: { smtpPassword: "encrypted:secret", smtpHost: "encrypted:smtp.example.com", smtpUser: "encrypted:mail", anthropicApiKey: "encrypted:key", smtpPort: 465 } });
+    await call(settings.updateSettings, { smtpPassword: "secret", smtpHost: "smtp.example.com", smtpUser: "mail", openrouterApiKey: "key", aiTextModel: "openai/gpt-x", smtpPort: 465, role: "ADMIN" });
+    expect(db.settings.update).toHaveBeenCalledWith({ where: { id: 12 }, data: { smtpPassword: "encrypted:secret", smtpHost: "encrypted:smtp.example.com", smtpUser: "encrypted:mail", openrouterApiKey: "encrypted:key", aiTextModel: "openai/gpt-x", smtpPort: 465 } });
     await call(settings.updateSettings, { smtpPort: 587 });
     expect(db.settings.update).toHaveBeenLastCalledWith({ where: { id: 12 }, data: { smtpPort: 587 } });
   });
   it("supports clearing configured secrets", async () => {
-    await call(settings.updateSettings, { smtpPassword: "", smtpHost: "", smtpUser: "", anthropicApiKey: "", smtpPort: null });
-    expect(db.settings.update).toHaveBeenCalledWith({ where: { id: 12 }, data: { smtpPassword: null, smtpHost: null, smtpUser: null, anthropicApiKey: null, smtpPort: null } });
+    await call(settings.updateSettings, { smtpPassword: "", smtpHost: "", smtpUser: "", openrouterApiKey: "", aiImageModel: "", smtpPort: null });
+    expect(db.settings.update).toHaveBeenCalledWith({ where: { id: 12 }, data: { smtpPassword: null, smtpHost: null, smtpUser: null, openrouterApiKey: null, aiImageModel: null, smtpPort: null } });
     expect(mocks.encrypt).not.toHaveBeenCalled();
   });
   it("loads permissions for the target user", async () => {
@@ -362,26 +363,16 @@ describe("settings, permissions, images and AI", () => {
     expect(ctx.next).toHaveBeenCalledWith(expect.objectContaining({ message: "Storage unavailable" }));
     expect(db.images.create).not.toHaveBeenCalled();
   });
-  it.each([[[{ type: "text", text: "Answer" }]], [[{ type: "tool_use" }]], [null]])("handles AI content %j", async content => {
-    mocks.response.mockResolvedValue(content);
-    const ctx = await call(ai.sendMessage, { model_id: "model", message: "Question", document_id: 12 });
-    expect(ctx.status).toHaveBeenCalledWith(201);
-    if (content) expect(db.conversation.create).toHaveBeenCalledWith({ data: { message: "Question", response: content[0].type === "text" ? "Answer" : "Pas de réponse", model_id: "model", documentId: 12, authorId: 7 } });
-    else expect(db.conversation.create).not.toHaveBeenCalled();
-  });
-  it("lists available AI models", async () => {
-    expect((await call(ai.getModels)).json).toHaveBeenCalledWith([{ id: "model" }]);
-  });
 });
 
-const deletes = [[scrapers.deleteScraper, db.scraper, "id"], [instances.deleteInstanceScrape, db.instanceScrape, "id"], [schedulers.deleteScrapingScheduler, db.scrapingScheduler, "id"], [images.deleteImage, db.images, "id"], [conversation.deleteConversationsByDocumentId, db.conversation, "documentId"]] as const;
+const deletes = [[scrapers.deleteScraper, db.scraper, "id"], [instances.deleteInstanceScrape, db.instanceScrape, "id"], [schedulers.deleteScrapingScheduler, db.scrapingScheduler, "id"], [images.deleteImage, db.images, "id"]] as const;
 it.each(deletes.map(([handler, model, key]) => ({ handler, model, key, name: handler.name })))("$name deletes only the requested resource", async ({ handler, model, key }) => {
   await call(handler);
-  expect(key === "documentId" ? model.deleteMany : model.delete).toHaveBeenCalledWith({ where: { [key]: 12 } });
+  expect(model.delete).toHaveBeenCalledWith({ where: { [key]: 12 } });
 });
 
 // A rejected dependency must reach Express's error handler, never a success response.
-const modules = [users, auth, invitations, documents, documentHistory, conversation, scrapers, instances, instanceHistory, schedulers, settings, permissions, images, ai];
+const modules = [users, auth, invitations, documents, documentHistory, scrapers, instances, instanceHistory, schedulers, settings, permissions, images, ai];
 for (const module of modules) {
   for (const [name, handler] of Object.entries(module)) {
     it(`${name} forwards dependency failures`, async () => {

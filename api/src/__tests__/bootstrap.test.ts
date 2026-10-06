@@ -8,7 +8,6 @@ vi.mock("../utils/bcryptUtils", () => ({ hashPassword: mocks.hash }));
 vi.mock("../utils/jwtUtils", () => ({ createToken: mocks.token, decodeToken: vi.fn() }));
 vi.mock("../config/mailClient", () => ({ sendEmail: vi.fn() }));
 vi.mock("../config/queue", () => ({ scrapeQueue: {} }));
-vi.mock("../config/anthropicClient", () => ({ getResponse: vi.fn(), getAnthropicModels: vi.fn() }));
 beforeEach(() => {
   vi.resetModules();
   vi.resetAllMocks();
