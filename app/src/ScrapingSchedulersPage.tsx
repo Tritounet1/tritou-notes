@@ -2,18 +2,92 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "./api";
 import { useAuth } from "./hooks/useAuth";
+import { describeCron, formatRun, STATUS_STYLE, type ScrapingScheduler } from "./utils/schedulers";
 
-interface ScrapingScheduler {
-  id: number;
-  title: string;
-  description: string | null;
-  cron_expression: string | null;
-  status: "DESACTIVATE" | "RUNNING" | "ERROR" | "ACTIVATE";
-  last_run_at: string | null;
-  next_run_at: string | null;
-  created_at: string;
-  update_at: string;
-}
+const Icon = ({ d, className = "w-4 h-4" }: { d: string; className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+    <path d={d} />
+  </svg>
+);
+
+const DAY_MS = 86_400_000;
+
+const formatDelay = (ms: number) => {
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  const h = Math.floor(minutes / 60);
+  return h ? `${h} h ${String(minutes % 60).padStart(2, "0")} min` : `${minutes} min`;
+};
+
+/** Dark strip showing today's cron runs per scheduler, past filled, upcoming outlined. */
+const TodayTimeline = ({ schedulers }: { schedulers: ScrapingScheduler[] }) => {
+  // Frozen at mount: the page is a snapshot, like the rest of the list.
+  const [now] = useState(() => Date.now());
+  const dayStart = new Date(now).setHours(0, 0, 0, 0);
+  const lanes = schedulers.filter((s) => s.cron_expression && s.timeline?.length);
+  if (!lanes.length) return null;
+
+  const upcoming = lanes
+    .filter((s) => s.status !== "DESACTIVATE")
+    .flatMap((s) => s.timeline.map((iso) => new Date(iso).getTime()))
+    .filter((t) => t > now);
+  const next = upcoming.length ? Math.min(...upcoming) : null;
+  const pct = (t: number) => `${((t - dayStart) / DAY_MS) * 100}%`;
+
+  return (
+    <section aria-label="Exécutions d’aujourd’hui" className="cover-ink rounded-[18px] px-[22px] pt-5 pb-[18px] text-white flex flex-col gap-3.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-display text-xl font-bold">Aujourd’hui</h2>
+        {next && (
+          <span className="font-mono text-xs text-[#bdbab2]">
+            prochaine exécution dans <span className="text-neon">{formatDelay(next - now)}</span>
+          </span>
+        )}
+      </div>
+      <div className="overflow-x-auto">
+        <div className="min-w-[640px] flex flex-col gap-2">
+          {lanes.map((s) => {
+            const off = s.status === "DESACTIVATE";
+            const ticks = s.timeline
+              .map((iso) => new Date(iso).getTime())
+              .filter((t) => t >= dayStart && t < dayStart + DAY_MS);
+            return (
+              <div key={s.id} className="flex items-center gap-3">
+                <Link to={`/scraping-scheduler/${s.id}`} className="w-[140px] flex-none text-[13px] text-[#e6e4de] truncate hover:text-neon">
+                  {s.title}
+                </Link>
+                <div className="flex-1 h-[22px] relative rounded-md bg-[#2a2925]">
+                  {ticks.map((t) => {
+                    const past = t <= now;
+                    const color = off
+                      ? "bg-[#55534d]"
+                      : past
+                        ? s.status === "ERROR" ? "bg-danger" : "bg-neon-dot"
+                        : s.status === "RUNNING" ? "bg-indigo" : "bg-neon";
+                    return (
+                      <span
+                        key={t}
+                        title={new Date(t).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                        className={`absolute top-1 bottom-1 w-2 -ml-1 rounded-[3px] ${color} ${past ? "" : "ring-1 ring-white/50 ring-offset-1 ring-offset-[#2a2925]"}`}
+                        style={{ left: pct(t) }}
+                      />
+                    );
+                  })}
+                  <span className="absolute -top-1 -bottom-1 w-0.5 rounded-sm bg-white" style={{ left: pct(now) }} aria-hidden="true" />
+                </div>
+              </div>
+            );
+          })}
+          <div className="flex gap-3 font-mono text-[10px] text-[#9c9a94]" aria-hidden="true">
+            <span className="w-[140px] flex-none" />
+            <div className="flex-1 flex justify-between">
+              <span>00</span><span>06</span><span>12</span><span>18</span><span>24</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
 
 export const ScrapingSchedulersPage = () => {
   const navigate = useNavigate();
@@ -25,6 +99,7 @@ export const ScrapingSchedulersPage = () => {
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [error, setError] = useState("");
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchSchedulers();
@@ -70,252 +145,209 @@ export const ScrapingSchedulersPage = () => {
         setNewDescription("");
         navigate(`/scraping-scheduler/${scheduler.id}`);
       } else {
-        setError("Erreur lors de la creation");
+        setError("Erreur lors de la création");
       }
     } catch {
-      setError("Erreur lors de la creation");
+      setError("Erreur lors de la création");
     } finally {
       setCreating(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "ACTIVATE":
-        return "bg-green-100 text-green-700";
-      case "RUNNING":
-        return "bg-blue-100 text-blue-700";
-      case "ERROR":
-        return "bg-red-100 text-red-700";
-      case "DESACTIVATE":
-      default:
-        return "bg-gray-100 text-gray-600";
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "ACTIVATE":
-        return "Actif";
-      case "RUNNING":
-        return "En cours";
-      case "ERROR":
-        return "Erreur";
-      case "DESACTIVATE":
-      default:
-        return "Desactive";
+  // Same endpoint as the detail page's switch; RUNNING counts as "on".
+  const toggleStatus = async (scheduler: ScrapingScheduler) => {
+    const status = scheduler.status === "DESACTIVATE" ? "ACTIVATE" : "DESACTIVATE";
+    setTogglingId(scheduler.id);
+    try {
+      const response = await apiFetch(`/api/scraping-schedulers/${scheduler.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status }),
+      });
+      if (response.ok) {
+        const updated = await response.json();
+        setSchedulers((list) => list.map((s) => (s.id === scheduler.id ? { ...s, ...updated } : s)));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTogglingId(null);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Mes planificateurs
-            </h2>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  // TODO: Exporter les planificateurs
-                  console.log("TODO: Export schedulers");
-                }}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition"
-                title="Exporter les planificateurs"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-              </button>
-              <button
-                onClick={() => {
-                  // TODO: Importer des planificateurs
-                  console.log("TODO: Import schedulers");
-                }}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition"
-                title="Importer des planificateurs"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <div className="divide-y divide-gray-100">
-            {loading ? (
-              <div className="p-6">
-                <p className="text-gray-500 text-sm text-center">
-                  Chargement...
-                </p>
-              </div>
-            ) : schedulers.length === 0 ? (
-              <div className="p-6">
-                <p className="text-gray-500 text-sm text-center py-8">
-                  Aucun planificateur. Creez votre premier planificateur !
-                </p>
-              </div>
-            ) : (
-              schedulers.map((scheduler) => (
-                <Link
-                  key={scheduler.id}
-                  to={`/scraping-scheduler/${scheduler.id}`}
-                  className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900">
-                      {scheduler.title}
-                    </p>
-                    {scheduler.description && (
-                      <p className="text-sm text-gray-500 truncate">
-                        {scheduler.description}
-                      </p>
-                    )}
-                    {scheduler.cron_expression && (
-                      <p className="text-xs text-gray-400 mt-1 font-mono">
-                        Cron: {scheduler.cron_expression}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 ml-4">
-                    <span
-                      className={`px-2 py-0.5 text-xs rounded ${getStatusColor(
-                        scheduler.status,
-                      )}`}
-                    >
-                      {getStatusLabel(scheduler.status)}
-                    </span>
-                    {scheduler.next_run_at && (
-                      <span className="text-xs text-gray-400">
-                        Prochain:{" "}
-                        {new Date(scheduler.next_run_at).toLocaleDateString(
-                          "fr-FR",
-                        )}
-                      </span>
-                    )}
-                    <svg
-                      className="w-4 h-4 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                  </div>
-                </Link>
-              ))
-            )}
-          </div>
+    <div className="max-w-[1120px] mx-auto px-6 sm:px-10 pt-10 pb-16 flex flex-col gap-7">
+      <header className="flex flex-wrap items-end justify-between gap-5">
+        <div className="flex flex-col gap-2">
+          <h1 className="page-title">Planificateurs</h1>
+          <p className="text-[15px] text-ink-2">
+            Des scrapes qui tournent tout seuls, au rythme d’une expression cron.
+          </p>
         </div>
-
-        {/* Bouton Nouveau planificateur */}
-        {hasPermission("modifyScraperStatus") && (
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setShowModal(true)}
-            className="w-full mt-4 py-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-gray-400 hover:text-gray-600 hover:bg-white transition-all flex items-center justify-center gap-2 group"
+            onClick={() => {
+              // TODO: Exporter les planificateurs
+              console.log("TODO: Export schedulers");
+            }}
+            className="icon-btn"
+            aria-label="Exporter les planificateurs"
+            title="Exporter les planificateurs"
           >
-            <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center transition">
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                />
-              </svg>
-            </div>
-            <span className="font-medium">Nouveau planificateur</span>
+            <Icon d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1M8 12l4 4 4-4M12 16V4" />
           </button>
-        )}
-      </div>
+          <button
+            type="button"
+            onClick={() => {
+              // TODO: Importer des planificateurs
+              console.log("TODO: Import schedulers");
+            }}
+            className="icon-btn"
+            aria-label="Importer des planificateurs"
+            title="Importer des planificateurs"
+          >
+            <Icon d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1M16 8l-4-4-4 4M12 4v12" />
+          </button>
+          {hasPermission("modifyScraperStatus") && (
+            <button type="button" onClick={() => setShowModal(true)} className="btn-primary">
+              <Icon d="M12 5v14M5 12h14" />
+              Nouveau planificateur
+            </button>
+          )}
+        </div>
+      </header>
 
-      {/* Modal de creation */}
+      {loading ? (
+        <p className="py-24 text-center text-muted">Chargement…</p>
+      ) : schedulers.length === 0 ? (
+        <p className="py-16 text-center text-muted border border-dashed border-line-strong rounded-2xl">
+          Aucun planificateur. Créez votre premier planificateur !
+        </p>
+      ) : (
+        <>
+        <TodayTimeline schedulers={schedulers} />
+        <div className="flex flex-col gap-2.5">
+          {schedulers.map((scheduler) => {
+            const st = STATUS_STYLE[scheduler.status] ?? STATUS_STYLE.DESACTIVATE;
+            const human = scheduler.cron_expression && describeCron(scheduler.cron_expression);
+            return (
+              <div
+                key={scheduler.id}
+                className="card relative flex flex-wrap items-center gap-[18px] px-[18px] py-4 hover:border-line-strong hover:bg-paper-warm transition"
+              >
+                <span className={`w-11 h-11 flex-none rounded-xl flex items-center justify-center ${st.tile}`}>
+                  <Icon d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" className="w-5 h-5" />
+                </span>
+                <div className="flex-[999_1_220px] min-w-0 flex flex-col gap-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* The ::after overlay makes the whole card clickable while the switch stays a separate control. */}
+                    <Link
+                      to={`/scraping-scheduler/${scheduler.id}`}
+                      className="font-semibold text-base text-ink after:absolute after:inset-0 after:rounded-2xl"
+                    >
+                      {scheduler.title}
+                    </Link>
+                    <span className={`pill ${st.pill}`}>{st.label}</span>
+                  </div>
+                  {scheduler.description && (
+                    <span className="text-[13px] text-muted truncate">{scheduler.description}</span>
+                  )}
+                </div>
+                <div className="flex-[1_1_180px] flex flex-col gap-1">
+                  {scheduler.cron_expression ? (
+                    <>
+                      <code className="self-start font-mono text-xs px-2 py-[3px] rounded-[7px] bg-chip text-ink">
+                        {scheduler.cron_expression}
+                      </code>
+                      {human && <span className="text-[13px] text-ink-2">{human}</span>}
+                    </>
+                  ) : (
+                    <span className="text-[13px] text-muted">Pas de cron</span>
+                  )}
+                </div>
+                <div className="flex-[1_1_150px] flex flex-col gap-0.5 text-xs text-muted">
+                  <span>
+                    Dernière : <span className="font-mono text-ink">{formatRun(scheduler.last_run_at)}</span>
+                  </span>
+                  <span>
+                    Suivante : <span className="font-mono text-ink">{formatRun(scheduler.next_run_at)}</span>
+                  </span>
+                </div>
+                {hasPermission("modifyScraperStatus") ? (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={scheduler.status !== "DESACTIVATE"}
+                    aria-label={`Activer ${scheduler.title}`}
+                    disabled={togglingId === scheduler.id}
+                    onClick={() => toggleStatus(scheduler)}
+                    className={`relative z-10 flex-none w-[46px] h-7 rounded-full p-[3px] flex transition cursor-pointer disabled:opacity-60 ${
+                      scheduler.status !== "DESACTIVATE" ? "bg-indigo justify-end" : "bg-[#dad6ce] justify-start"
+                    }`}
+                  >
+                    <span className="w-[22px] h-[22px] rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.25)]" />
+                  </button>
+                ) : (
+                  <Icon d="M9 6l6 6-6 6" className="w-4 h-4 text-muted flex-none" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+        </>
+      )}
+
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
+        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="new-scheduler-title"
+            className="modal max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 pt-5 pb-3 flex items-center justify-between">
+              <h2 id="new-scheduler-title" className="section-title">
                 Nouveau planificateur
               </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+              <button type="button" onClick={() => setShowModal(false)} className="icon-btn" aria-label="Fermer">
+                <Icon d="M6 6l12 12M18 6L6 18" />
               </button>
             </div>
 
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
+            <form onSubmit={handleCreate} className="px-6 pb-6 flex flex-col gap-4">
               {error && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
-                  {error}
-                </div>
+                <div className="px-3 py-2.5 rounded-[10px] bg-danger-tint text-danger-ink text-sm">{error}</div>
               )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Titre
-                </label>
+              <label className="label">
+                Titre
                 <input
                   type="text"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800"
+                  className="input"
                   placeholder="Mon planificateur"
                 />
-              </div>
+              </label>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description
-                </label>
+              <label className="label">
+                Description
                 <textarea
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-800 resize-none"
+                  className="input py-2 resize-none"
                   rows={3}
-                  placeholder="Description du planificateur..."
+                  placeholder="Description du planificateur…"
                 />
-              </div>
+              </label>
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition"
-                >
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary flex-1">
                   Annuler
                 </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="flex-1 px-4 py-2 text-sm bg-gray-800 text-white rounded-md hover:bg-gray-700 transition disabled:opacity-50"
-                >
-                  {creating ? "Creation..." : "Creer"}
+                <button type="submit" disabled={creating} className="btn-primary flex-1">
+                  {creating ? "Création…" : "Créer"}
                 </button>
               </div>
             </form>
