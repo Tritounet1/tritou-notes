@@ -12,7 +12,7 @@ export const AssistantPage = () => (
       </span>
       <div className="flex flex-col gap-1">
         <h1 className="page-title text-[36px]">Assistant</h1>
-        <p className="text-[15px] text-ink-2">Cherche, crée et modifie tes pages en discutant.</p>
+        <p className="text-[15px] text-ink-2">Pilote toute l’app en discutant : pages, dossiers, scrapers, planificateurs.</p>
       </div>
     </header>
     <AiChat documentId={null} variant="page" />

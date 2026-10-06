@@ -1,43 +1,17 @@
 import { prisma } from "../config/prismaClient";
-import type { UserPermissions } from "../generated/prisma/client";
 import { reviseDocument } from "../utils/documentRevision";
 import { ancestorsOf, resolveParent } from "../utils/documentTree";
 import { resolveFolder } from "../utils/folderTree";
 import type { ToolDefinition } from "./openrouter";
+import { can, label, positiveInt, requirePermission, string, ToolError, type Tool, type ToolContext, type ToolResult } from "./toolKit";
+import { scrapingTools } from "./scrapingTools";
+import { workspaceTools } from "./workspaceTools";
 
-type PermissionKey = keyof Omit<UserPermissions, "id" | "userId">;
-
-export interface ToolContext {
-  userId: number;
-  isAdmin: boolean;
-  permissions: UserPermissions | null;
-  /** Ids of pages created or modified during this turn, so the UI can reload them. */
-  changed: Set<number>;
-}
-
-export interface ToolResult {
-  /** JSON sent back to the model. */
-  output: unknown;
-  /** Short French label shown in the chat. */
-  summary: string;
-  ok: boolean;
-}
+export type { ToolContext } from "./toolKit";
 
 const MAX_READ_CHARS = 60_000;
 
-class ToolError extends Error {}
-
-const can = (ctx: ToolContext, permission: PermissionKey) => ctx.isAdmin || ctx.permissions?.[permission] === true;
-
-const requirePermission = (ctx: ToolContext, permission: PermissionKey) => {
-  if (!can(ctx, permission)) throw new ToolError(`Permission « ${permission} » manquante pour cet utilisateur.`);
-};
-
-const pageId = (value: unknown) => {
-  const id = Number(value);
-  if (!Number.isInteger(id) || id <= 0) throw new ToolError("Identifiant de page invalide.");
-  return id;
-};
+const pageId = (value: unknown) => positiveInt(value, "page");
 
 const findPage = async (value: unknown) => {
   const page = await prisma.document.findUnique({ where: { id: pageId(value) } });
@@ -93,16 +67,7 @@ const isCellKey = (key: string) => {
   return Boolean(match) && Number(match![2]) <= 50;
 };
 
-const label = (title: string) => `« ${title || "Sans titre"} »`;
-
-const string = (value: unknown, name: string, { allowEmpty = false } = {}) => {
-  if (typeof value !== "string" || (!allowEmpty && !value.trim())) throw new ToolError(`Paramètre « ${name} » manquant.`);
-  return value;
-};
-
-type Handler = (args: Record<string, unknown>, ctx: ToolContext) => Promise<Omit<ToolResult, "ok">>;
-
-const tools: Record<string, { definition: ToolDefinition["function"]; run: Handler }> = {
+const pageTools: Record<string, Tool> = {
   list_pages: {
     definition: {
       name: "list_pages",
@@ -188,20 +153,22 @@ const tools: Record<string, { definition: ToolDefinition["function"]; run: Handl
     definition: {
       name: "create_page",
       description:
-        "Crée une page texte (Markdown), soit comme sous-page d’une autre (parentId), soit à la racine d’un dossier (folderId). " +
+        "Crée une page (texte Markdown par défaut, ou tableur EXCEL / liste TODO à remplir ensuite avec set_cells / update_todos), " +
+        "soit comme sous-page d’une autre (parentId), soit à la racine d’un dossier (folderId). " +
         "Un lien ::page[id]:: est ajouté à la fin du parent s’il s’agit d’une page texte.",
       parameters: {
         type: "object",
         properties: {
           title: { type: "string" },
-          text: { type: "string", description: "Contenu Markdown initial" },
+          type: { type: "string", enum: ["TEXT", "EXCEL", "TODO"] },
+          text: { type: "string", description: "Contenu Markdown initial (pages TEXT)" },
           parentId: { type: "integer", description: "Page parente (optionnel)" },
           folderId: { type: "integer", description: "Dossier, pour une page sans parent (optionnel, voir list_folders)" },
         },
         required: ["title"],
       },
     },
-    run: async ({ title, text, parentId, folderId }, ctx) => {
+    run: async ({ title, type, text, parentId, folderId }, ctx) => {
       requirePermission(ctx, "createDocument");
       const name = string(title, "title");
       const parent = parentId === undefined || parentId === null ? null : await resolveParent(parentId);
@@ -209,8 +176,8 @@ const tools: Record<string, { definition: ToolDefinition["function"]; run: Handl
       const page = await prisma.document.create({
         data: {
           title: name,
-          type: "TEXT",
-          text: typeof text === "string" ? text : "",
+          type: type === "EXCEL" || type === "TODO" ? type : "TEXT",
+          text: type === "EXCEL" || type === "TODO" ? "" : typeof text === "string" ? text : "",
           author: { connect: { id: ctx.userId } },
           ...(parent !== null && { parent: { connect: { id: parent } } }),
           ...(folder !== null && { folder: { connect: { id: folder } } }),
@@ -277,21 +244,23 @@ const tools: Record<string, { definition: ToolDefinition["function"]; run: Handl
     definition: {
       name: "rewrite_page",
       description:
-        "Remplace entièrement le titre et/ou le contenu d’une page. Le contenu n’est modifiable que pour les pages texte. " +
+        "Remplace entièrement le titre et/ou le contenu d’une page, et/ou change sa visibilité (public = lisible sans compte via son lien). " +
+        "Le contenu n’est modifiable ici que pour les pages texte. " +
         "Conserve les blocs ::page[…]::, ::scheduler[…]::, ::link[…]:: et ::image[…]:: existants.",
       parameters: {
         type: "object",
-        properties: { id: { type: "integer" }, title: { type: "string" }, text: { type: "string" } },
+        properties: { id: { type: "integer" }, title: { type: "string" }, text: { type: "string" }, public: { type: "boolean" } },
         required: ["id"],
       },
     },
-    run: async ({ id, title, text }, ctx) => {
+    run: async ({ id, title, text, public: isPublic }, ctx) => {
       requirePermission(ctx, "modifyDocument");
-      if (title === undefined && text === undefined) throw new ToolError("Indique au moins `title` ou `text`.");
+      if (title === undefined && text === undefined && isPublic === undefined) throw new ToolError("Indique au moins `title`, `text` ou `public`.");
       const page = text === undefined ? await findPage(id) : await findTextPage(id);
       await reviseDocument(page.id, ctx.userId, {
         ...(title !== undefined && { title: string(title, "title") }),
         ...(text !== undefined && { text: string(text, "text", { allowEmpty: true }) }),
+        ...(typeof isPublic === "boolean" && { public: isPublic }),
       });
       ctx.changed.add(page.id);
       const name = typeof title === "string" ? title : page.title;
@@ -425,32 +394,9 @@ const tools: Record<string, { definition: ToolDefinition["function"]; run: Handl
     },
   },
 
-  list_folders: {
-    definition: {
-      name: "list_folders",
-      description: "Liste les dossiers (id, nom, parentId). Les dossiers rangent les pages racines ; les sous-pages restent sous leur page parente.",
-      parameters: { type: "object", properties: {} },
-    },
-    run: async () => {
-      const folders = await prisma.folder.findMany({ select: { id: true, name: true, parentId: true }, orderBy: { name: "asc" } });
-      return { output: folders, summary: `${folders.length} dossier${folders.length > 1 ? "s" : ""} listé${folders.length > 1 ? "s" : ""}` };
-    },
-  },
-
-  list_schedulers: {
-    definition: {
-      name: "list_schedulers",
-      description: "Liste les planificateurs de scraping (id, titre, statut, cron). Pour afficher leurs données live dans une page, insère ::scheduler[id]:: sur sa propre ligne.",
-      parameters: { type: "object", properties: {} },
-    },
-    run: async () => {
-      const schedulers = await prisma.scrapingScheduler.findMany({
-        select: { id: true, title: true, description: true, status: true, cron_expression: true, last_run_at: true },
-      });
-      return { output: schedulers, summary: `${schedulers.length} planificateur${schedulers.length > 1 ? "s" : ""} listé${schedulers.length > 1 ? "s" : ""}` };
-    },
-  },
 };
+
+const tools: Record<string, Tool> = { ...pageTools, ...workspaceTools, ...scrapingTools };
 
 export const toolDefinitions: ToolDefinition[] = Object.values(tools).map(({ definition }) => ({ type: "function", function: definition }));
 

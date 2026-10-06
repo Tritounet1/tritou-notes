@@ -60,8 +60,8 @@ type StreamEvent =
   | { type: "text"; text: string }
   | { type: "tool"; name: string }
   | { type: "action"; summary: string; ok: boolean }
-  | { type: "done"; messages: DisplayMessage[]; changedDocumentIds: number[] }
-  | { type: "error"; message: string; messages?: DisplayMessage[]; changedDocumentIds?: number[] };
+  | { type: "done"; messages: DisplayMessage[]; changedDocumentIds: number[]; treeChanged?: boolean }
+  | { type: "error"; message: string; messages?: DisplayMessage[]; changedDocumentIds?: number[]; treeChanged?: boolean };
 
 const TOOL_LABELS: Record<string, string> = {
   list_pages: "Liste des pages",
@@ -75,6 +75,29 @@ const TOOL_LABELS: Record<string, string> = {
   update_todos: "Mise à jour des tâches",
   set_cells: "Mise à jour du tableur",
   list_schedulers: "Lecture des planificateurs",
+  read_scheduler: "Lecture du planificateur",
+  create_scheduler: "Création d’un planificateur",
+  update_scheduler: "Mise à jour du planificateur",
+  add_scheduler_url: "Ajout d’une URL au planificateur",
+  remove_scheduler_url: "Retrait d’une URL du planificateur",
+  delete_scheduler: "Suppression du planificateur",
+  list_scrapers: "Lecture des scrapers",
+  read_scraper: "Lecture du scraper",
+  create_scraper: "Création d’un scraper",
+  update_scraper: "Mise à jour du scraper",
+  delete_scraper: "Suppression du scraper",
+  list_instances: "Lecture des instances",
+  read_instance: "Lecture de l’instance",
+  run_scrape: "Lancement du scrape",
+  wait_for_instance: "Scrape en cours",
+  delete_instance: "Suppression de l’instance",
+  list_folders: "Lecture des dossiers",
+  create_folder: "Création d’un dossier",
+  update_folder: "Mise à jour du dossier",
+  delete_folder: "Suppression du dossier",
+  delete_page: "Suppression de la page",
+  list_users: "Lecture des utilisateurs",
+  update_user_permissions: "Mise à jour des permissions",
 };
 
 /** Parses a text/event-stream body into its `data:` JSON payloads. */
@@ -261,10 +284,8 @@ export const AiChat = ({ documentId, variant, onClose, onDocumentsChanged }: AiC
           reply = { ...reply, tool: null, actions: [...reply.actions, { summary: event.summary, ok: event.ok }] };
         } else {
           if (event.messages) setMessages(event.messages);
-          if (event.changedDocumentIds?.length) {
-            notifyDocumentsChanged();
-            onDocumentsChanged?.(event.changedDocumentIds);
-          }
+          if (event.changedDocumentIds?.length || event.treeChanged) notifyDocumentsChanged();
+          if (event.changedDocumentIds?.length) onDocumentsChanged?.(event.changedDocumentIds);
           if (event.type === "error") setError(event.message);
           break;
         }
@@ -291,7 +312,7 @@ export const AiChat = ({ documentId, variant, onClose, onDocumentsChanged }: AiC
 
   const suggestions =
     documentId === null
-      ? ["Quelles pages parlent de … ?", "Crée une page avec un plan pour …", "Fais le point sur mes planificateurs"]
+      ? ["Quelles pages parlent de … ?", "Crée un planificateur qui suit le prix de … chaque jour", "Fais le point sur mes planificateurs et scrapers"]
       : ["Résume cette page", "Corrige l’orthographe de cette page", "Crée une sous-page avec un plan détaillé"];
 
   const notConfigured = status !== null && (!status.configured || !status.textModel);
@@ -370,7 +391,7 @@ export const AiChat = ({ documentId, variant, onClose, onDocumentsChanged }: AiC
         ) : messages.length === 0 && !sending ? (
           <div className="m-auto flex w-full max-w-sm flex-col gap-2">
             <span className="text-center text-muted">
-              {documentId === null ? "Demandez à l’assistant de chercher, créer ou modifier vos pages." : "L’assistant connaît cette page et peut la modifier."}
+              {documentId === null ? "L’assistant peut gérer toute l’app : pages, dossiers, scrapers, planificateurs…" : "L’assistant connaît cette page et peut la modifier, comme le reste de l’app."}
             </span>
             {suggestions.map((s) => (
               <button

@@ -264,7 +264,7 @@ describe("AI controller", () => {
     expect(res.set).toHaveBeenCalledWith(expect.objectContaining({ "Content-Type": "text/event-stream; charset=utf-8" }));
     expect(written.map((w) => JSON.parse(w.replace(/^data: /, "")))).toEqual([
       { type: "text", text: "Bonjour !" },
-      { type: "done", messages: [], changedDocumentIds: [] },
+      { type: "done", messages: [], changedDocumentIds: [], treeChanged: false },
     ]);
     expect(res.end).toHaveBeenCalled();
   });

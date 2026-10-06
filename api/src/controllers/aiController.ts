@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import { runTurn, toDisplayMessages } from "../ai/agent";
 import { attachmentToPart, MAX_ATTACHMENTS, type Attachment } from "../ai/attachments";
+import type { ToolContext } from "../ai/toolKit";
 import { generateImage as generateWithOpenRouter, getAiConfig, listImageModels, listTextModels } from "../ai/openrouter";
 import { prisma } from "../config/prismaClient";
 import { prepareImage, removeImage, storeImage } from "../utils/documentImageStorage";
@@ -20,7 +21,7 @@ const ownConversation = async (req: Request<{ id: string }>) => {
   return conversation;
 };
 
-const toolContext = async (req: Request) => ({
+const toolContext = async (req: Request): Promise<ToolContext> => ({
   userId: req.user.id,
   isAdmin: req.user.role === "ADMIN",
   permissions: await prisma.userPermissions.findUnique({ where: { userId: req.user.id } }),
@@ -159,7 +160,7 @@ export const sendMessage = async (req: Request<{ id: string }>, res: Response, n
     const finish = async () => {
       await prisma.conversation.update({ where: { id: conversation.id }, data: { updated_at: new Date() } });
       const rows = await prisma.aiMessage.findMany({ where: { conversationId: conversation.id }, orderBy: { id: "asc" } });
-      return { messages: toDisplayMessages(rows), changedDocumentIds: [...ctx.changed] };
+      return { messages: toDisplayMessages(rows), changedDocumentIds: [...ctx.changed], treeChanged: Boolean(ctx.treeChanged) };
     };
     try {
       await runTurn({
