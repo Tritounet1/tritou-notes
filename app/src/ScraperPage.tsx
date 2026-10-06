@@ -6,6 +6,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { apiFetch } from "./api";
 import { useDebounce } from "./hooks/useDebounce";
 import type { TemplateBlock } from "./types/scraper";
+import { useConfirm } from "./hooks/useConfirm";
 
 interface Scraper {
   id: number;
@@ -142,6 +143,7 @@ const CLOSE_PATH = "M6 18 18 6M6 6l12 12";
 export const ScraperPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [confirm, confirmDialog] = useConfirm();
   const [scraper, setScraper] = useState<Scraper | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -225,7 +227,7 @@ export const ScraperPage = () => {
   );
 
   const handleDelete = async () => {
-    if (!confirm("Supprimer ce scraper ?")) return;
+    if (!(await confirm({ title: "Supprimer ce scraper ?", message: "Les URLs de ses domaines ne seront plus scrapées tant qu’aucun autre scraper ne les couvre. Cette action est définitive." }))) return;
 
     try {
       const response = await apiFetch(`/api/scrapers/${id}`, {
@@ -375,6 +377,7 @@ export const ScraperPage = () => {
 
   return (
     <>
+      {confirmDialog}
       {/* Fullscreen code editor overlay */}
       {isFullscreen && (
         <div className="fixed inset-0 z-50 bg-code flex">

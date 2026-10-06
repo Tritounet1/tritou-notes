@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiFetch } from "./api";
 import { useDebounce } from "./hooks/useDebounce";
+import { useConfirm } from "./hooks/useConfirm";
 
 interface InstanceScrape {
   id: number;
@@ -78,6 +79,7 @@ const formatDate = (iso: string) => new Date(iso).toLocaleString("fr-FR");
 export const ScrapingSchedulerPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [confirm, confirmDialog] = useConfirm();
   const [scheduler, setScheduler] = useState<ScrapingScheduler | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -169,7 +171,7 @@ export const ScrapingSchedulerPage = () => {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Supprimer ce planificateur ?")) return;
+    if (!(await confirm({ title: "Supprimer ce planificateur ?", message: "Ses URLs ne seront plus scrapées automatiquement ; les instances existantes sont conservées. Cette action est définitive." }))) return;
 
     try {
       const response = await apiFetch(`/api/scraping-schedulers/${id}`, {
@@ -280,6 +282,7 @@ export const ScrapingSchedulerPage = () => {
 
   return (
     <div className="max-w-[1120px] mx-auto px-6 sm:px-10 pt-10 pb-16 flex flex-col gap-7">
+      {confirmDialog}
       <header className="flex flex-col gap-4">
         <button
           type="button"

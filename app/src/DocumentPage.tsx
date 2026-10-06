@@ -22,6 +22,7 @@ import { CodeBlock } from "./components/CodeBlock";
 import { WebLinkBlock } from "./components/WebLinkBlock";
 import { insertPastedWebLink, webUrlOnLine, serializeWebLink, type WebLink } from "./utils/webLinks";
 import { codeValue, convertStandaloneLinks, normalizeSegments, parseSegments, segmentGlobalOffset, segmentsToText, updateCodeSegment, type Segment } from "./utils/documentSegments";
+import { useConfirm } from "./hooks/useConfirm";
 
 interface Document {
   id: number;
@@ -140,6 +141,7 @@ function computeDiff(oldText: string, newText: string): DiffLine[] {
 export const DocumentPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [confirm, confirmDialog] = useConfirm();
   const { isAuthenticated, hasPermission } = useAuth();
   const [document, setDocument] = useState<Document | null>(null);
   const [title, setTitle] = useState("");
@@ -909,7 +911,17 @@ export const DocumentPage = () => {
 
   const handleDelete = async () => {
     const subPages = document?.children?.length ?? 0;
-    if (!confirm(subPages ? `Supprimer ce document et ses sous-pages (${subPages} directe${subPages > 1 ? "s" : ""}) ?` : "Supprimer ce document ?")) return;
+    const ok = await confirm({
+      title: subPages ? "Supprimer la page et ses sous-pages ?" : "Supprimer cette page ?",
+      message: subPages ? (
+        <>
+          « {title || "Sans titre"} » et ses {subPages} sous-page{subPages > 1 ? "s" : ""} (ainsi que leurs propres sous-pages) seront supprimées avec leur historique. Cette action est définitive.
+        </>
+      ) : (
+        <>« {title || "Sans titre"} » et son historique seront supprimés. Cette action est définitive.</>
+      ),
+    });
+    if (!ok) return;
 
     try {
       const response = await apiFetch(`/api/documents/${id}`, {
@@ -1005,6 +1017,7 @@ export const DocumentPage = () => {
 
   return (
     <div className={`flex flex-wrap items-stretch xl:h-[calc(100vh-20px)] ${isAuthenticated ? "" : "paper m-2.5 min-h-[calc(100vh-20px)] overflow-hidden"}`}>
+      {confirmDialog}
       {showMoveModal && (
         <MovePageModal documentId={document.id} currentParentId={document.parentId} onMoved={handleMoved} onClose={() => setShowMoveModal(false)} />
       )}
