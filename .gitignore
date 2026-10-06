@@ -4,3 +4,6 @@ dist
 .claude
 CLAUDE.md
 .env
+
+# Generated test reports
+coverage/

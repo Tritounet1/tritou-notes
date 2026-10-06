@@ -18,7 +18,10 @@ export const authHandler: RequestHandler = async (
     }
 
     if (token) {
-      const verifytoken: any = decodeToken(token);
+      const verifytoken = decodeToken(token);
+      if (!verifytoken || typeof verifytoken === "string" || typeof verifytoken.id !== "string" || !/^\d+$/.test(verifytoken.id)) {
+        throw new Error("Invalid token identity");
+      }
       const user = await prisma.user.findUnique({
         where: {
           id: parseInt(verifytoken.id),

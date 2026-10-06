@@ -6,9 +6,6 @@ const algorithm = "aes-256-gcm";
 export function encrypt(text: string) {
   const masterKey = Buffer.from(config.encryptionKey, "hex");
 
-  console.log("encryptionKey : ", config.encryptionKey);
-  console.log("text : ", text);
-
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv(algorithm, masterKey, iv);
 
@@ -26,6 +23,7 @@ export function decrypt(data: string) {
   const masterKey = Buffer.from(config.encryptionKey, "hex");
 
   const b = Buffer.from(data, "base64");
+  if (b.length < 28) throw new Error("Invalid encrypted payload");
 
   const iv = b.subarray(0, 12);
   const tag = b.subarray(12, 28);
@@ -43,7 +41,7 @@ export function makeid(length: number) {
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   const charactersLength = characters.length;
   for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    result += characters.charAt(crypto.randomInt(charactersLength));
   }
   return result;
 }

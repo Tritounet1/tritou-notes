@@ -6,6 +6,7 @@ import {
   sendInvitation,
   verifyInvitation,
 } from "../controllers/adminAuthController";
+import { adminMiddleware } from "../middlewares/adminMiddleware";
 import { authHandler } from "../middlewares/authMiddleware";
 import { hashPassword } from "../utils/bcryptUtils";
 import { setAuthCookie } from "../utils/cookieUtils";
@@ -15,7 +16,7 @@ import { makeid } from "../utils/utils";
 const router = Router();
 
 // Routes pour les invitations (protegees par auth)
-router.post("/invite", authHandler, sendInvitation);
+router.post("/invite", authHandler, adminMiddleware(), sendInvitation);
 
 // Routes publiques pour l'inscription via invitation
 router.get("/invitation/:token", verifyInvitation);
@@ -32,6 +33,11 @@ const initFirstAdmin = async () => {
 
     router.post("/" + randomUrl, async (req, res, next) => {
       try {
+        // The bootstrap URL must stop working as soon as an admin exists.
+        if (await prisma.user.count({ where: { role: "ADMIN" } }) > 0) {
+          res.status(409).json({ message: "Un administrateur existe déjà" });
+          return;
+        }
         const { email, username, password } = req.body;
         const hashedPassword = await hashPassword(password);
 

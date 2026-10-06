@@ -9,7 +9,7 @@ export const createImage = async (
 ) => {
   try {
     const { name, file_body } = req.body;
-    uploadFile(file_body, name, "test");
+    await uploadFile(file_body, name, "test");
     const image = await prisma.images.create({
       data: {
         name: name,

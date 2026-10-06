@@ -1,3 +1,4 @@
+import jwt from "jsonwebtoken";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../config/config", () => ({
@@ -30,6 +31,21 @@ describe("JWT tests", () => {
     expect(decoded.username).toBe(user.username);
     expect(decoded.email).toBe(user.email);
     expect(decoded.role).toBe(user.role);
+  });
+
+  it("rejects expired tokens", () => {
+    const token = jwt.sign({ id: "1" }, "2c1f304bbe12d0e73428ec71c3057fe0", { expiresIn: -1 });
+    expect(() => decodeToken(token)).toThrow("jwt expired");
+  });
+
+  it("rejects tokens signed with another key", () => {
+    const token = jwt.sign({ id: "1" }, "another-key");
+    expect(() => decodeToken(token)).toThrow("invalid signature");
+  });
+
+  it("limits session validity to two days", () => {
+    const decoded = decodeToken(createToken(user.id, user.username, user.email, user.role)!) as { exp: number; iat: number };
+    expect(decoded.exp - decoded.iat).toBe(2 * 86400);
   });
 
   it("should throw on invalid token", () => {

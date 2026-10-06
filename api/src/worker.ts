@@ -6,9 +6,11 @@ dotenv.config();
 import * as cheerio from "cheerio";
 import IORedis from "ioredis";
 import puppeteer from "puppeteer-extra";
+import type { Browser } from "puppeteer";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import vm from "vm";
 import { prisma } from "./config/prismaClient";
+import type { Prisma } from "./generated/prisma/client";
 
 const REDIS_HOST = process.env.REDIS_HOST || "127.0.0.1";
 const REDIS_PORT = parseInt(process.env.REDIS_PORT || "6379");
@@ -28,8 +30,9 @@ const sleep = (ms: number): Promise<void> => {
 };
 
 const scrapeWithBrowser = async (url: string, code: string) => {
+  let browser: Browser | undefined;
   try {
-    const browser = await puppeteer.launch({
+    browser = await puppeteer.launch({
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       args: ["--start-maximized", "--no-sandbox", "--disable-setuid-sandbox"],
@@ -58,14 +61,14 @@ const scrapeWithBrowser = async (url: string, code: string) => {
     vm.createContext(context);
     vm.runInContext(code, context);
 
-    await browser.close();
-
     return {
       url: url,
-      ...(context.result as any),
+      ...(context.result as Prisma.InputJsonObject | null),
     };
   } catch (e) {
     console.log("error : ", e);
+  } finally {
+    await browser?.close();
   }
 };
 
