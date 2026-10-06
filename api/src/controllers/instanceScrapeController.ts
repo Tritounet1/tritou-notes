@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
-import { scrapeQueue } from "../config/queue";
+import { createInstance } from "../services/instanceService";
 
 export const createInstanceScrape = async (
   req: Request,
@@ -10,22 +10,11 @@ export const createInstanceScrape = async (
   try {
     const { url, scrapingSchedulerId, scraperId } = req.body;
 
-    const instanceScrape = await prisma.instanceScrape.create({
-      data: {
-        url: url,
-        scrapingSchedulerId: scrapingSchedulerId
-          ? parseInt(scrapingSchedulerId, 10)
-          : undefined,
-        scraperId: scraperId ? parseInt(scraperId, 10) : undefined,
-      },
+    const instanceScrape = await createInstance({
+      url,
+      scrapingSchedulerId: scrapingSchedulerId ? parseInt(scrapingSchedulerId, 10) : undefined,
+      scraperId: scraperId ? parseInt(scraperId, 10) : undefined,
     });
-
-    if (!scrapingSchedulerId) {
-      await scrapeQueue.add("scrape-url", {
-        id: instanceScrape.id,
-      });
-    }
-
     res.status(201).json(instanceScrape);
   } catch (error) {
     next(error);

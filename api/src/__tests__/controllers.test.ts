@@ -289,7 +289,7 @@ describe("scraping resources", () => {
     expect((await call(schedulers.updateScrapingScheduler)).next).toHaveBeenCalledWith(expect.any(Error));
   });
   it("activates recurring jobs and computes their next execution", async () => {
-    db.scrapingScheduler.findFirst.mockResolvedValue({ status: "INACTIVE" });
+    db.scrapingScheduler.findFirst.mockResolvedValue({ status: "DESACTIVATE" });
     db.scrapingScheduler.update.mockResolvedValue({ id: 12, status: "ACTIVATE", cron_expression: "0 * * * *" });
     await call(schedulers.updateScrapingScheduler, { status: "ACTIVATE", cron_expression: "0 * * * *" });
     expect(mocks.add).toHaveBeenCalledWith("scheduler-12", { schedulerId: 12 }, { repeat: { pattern: "0 * * * *" }, jobId: "scheduler-12" });
@@ -297,15 +297,15 @@ describe("scraping resources", () => {
   });
   it.each([[[]], [[{ name: "scheduler-12", key: "repeat-key" }]]])("deactivates a scheduler with repeatable jobs %j", async jobs => {
     db.scrapingScheduler.findFirst.mockResolvedValue({ status: "ACTIVATE" });
-    db.scrapingScheduler.update.mockResolvedValue({ status: "INACTIVE" });
+    db.scrapingScheduler.update.mockResolvedValue({ status: "DESACTIVATE" });
     mocks.jobs.mockResolvedValue(jobs);
-    await call(schedulers.updateScrapingScheduler, { status: "INACTIVE" });
+    await call(schedulers.updateScrapingScheduler, { status: "DESACTIVATE" });
     expect(db.scrapingScheduler.update).toHaveBeenLastCalledWith({ where: { id: 12 }, data: { next_run_at: null } });
     if (jobs.length) expect(mocks.remove).toHaveBeenCalledWith("repeat-key");
     else expect(mocks.remove).not.toHaveBeenCalled();
   });
   it("does not queue a scheduler without a cron expression", async () => {
-    db.scrapingScheduler.findFirst.mockResolvedValue({ status: "INACTIVE" });
+    db.scrapingScheduler.findFirst.mockResolvedValue({ status: "DESACTIVATE" });
     db.scrapingScheduler.update.mockResolvedValue({ status: "ACTIVATE", cron_expression: null });
     await call(schedulers.updateScrapingScheduler, { status: "ACTIVATE" });
     expect(mocks.add).not.toHaveBeenCalled();

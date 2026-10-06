@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
-import { resolveFolder, resolveFolderParent } from "../utils/folderTree";
+import { deleteFolderKeepingContent, resolveFolder, resolveFolderParent } from "../utils/folderTree";
 
 const httpError = (message: string, status = 400) => Object.assign(new Error(message), { status });
 
@@ -59,13 +59,7 @@ export const updateFolder = async (req: Request<{ id: string }>, res: Response, 
 export const deleteFolder = async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
-    const folder = await prisma.folder.findUnique({ where: { id }, select: { id: true, parentId: true } });
-    if (!folder) throw httpError("Dossier introuvable", 404);
-    await prisma.$transaction([
-      prisma.folder.updateMany({ where: { parentId: id }, data: { parentId: folder.parentId } }),
-      prisma.document.updateMany({ where: { folderId: id }, data: { folderId: folder.parentId } }),
-      prisma.folder.delete({ where: { id } }),
-    ]);
+    const folder = await deleteFolderKeepingContent(id);
     res.json({ success: true, movedTo: folder.parentId });
   } catch (error) {
     next(error);

@@ -39,6 +39,18 @@ export const resolveFolderParent = async (raw: unknown, id: number): Promise<num
   return parent;
 };
 
+/** Deletes a folder without deleting anything in it: its pages and subfolders move up one level. */
+export const deleteFolderKeepingContent = async (id: number) => {
+  const folder = await prisma.folder.findUnique({ where: { id }, select: { id: true, parentId: true } });
+  if (!folder) throw Object.assign(new Error("Dossier introuvable"), { status: 404 });
+  await prisma.$transaction([
+    prisma.folder.updateMany({ where: { parentId: id }, data: { parentId: folder.parentId } }),
+    prisma.document.updateMany({ where: { folderId: id }, data: { folderId: folder.parentId } }),
+    prisma.folder.delete({ where: { id } }),
+  ]);
+  return folder;
+};
+
 /** Folder path of a folder, root first. */
 export const folderChain = async (id: number | null): Promise<{ id: number; name: string }[]> => {
   const chain: { id: number; name: string }[] = [];

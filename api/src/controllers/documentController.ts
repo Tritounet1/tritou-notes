@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
-import { removeDocumentImages } from "../utils/documentImageStorage";
-import { ancestorsOf, descendantIds, resolveParent } from "../utils/documentTree";
+import { deleteDocumentTree } from "../services/documentService";
+import { ancestorsOf, resolveParent } from "../utils/documentTree";
 import { reviseDocument } from "../utils/documentRevision";
 import { folderChain, resolveFolder } from "../utils/folderTree";
 
@@ -113,22 +113,7 @@ export const deleteDocument = async (
 ) => {
   try {
     const id = parseInt(req.params.id, 10);
-    // Sub-pages go with their parent (DB cascade); their histories must go first.
-    const subtree = [id, ...(await descendantIds(id))];
-    await prisma.documentHistory.deleteMany({
-      where: {
-        documentId: { in: subtree },
-      },
-    });
-    const deletedDocument = await prisma.document.delete({
-      where: {
-        id: id,
-      },
-    });
-    // Metadata is removed by the cascading DocumentImage relation.
-    await Promise.all(subtree.map(pageId =>
-      removeDocumentImages(pageId).catch(error => console.error("Image cleanup failed for document", pageId, error)),
-    ));
+    const { deleted: deletedDocument } = await deleteDocumentTree(id);
     res.json(deletedDocument);
   } catch (error) {
     next(error);

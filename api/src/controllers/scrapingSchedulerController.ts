@@ -1,7 +1,6 @@
-import cronParser from "cron-parser";
 import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
-import { scrapeQueue } from "../config/queue";
+import { deleteScheduler, updateScheduler } from "../services/schedulerService";
 import { cronRunsAround, recentRuns, RECENT_RUNS } from "../utils/schedulerRuns";
 
 export const createScrapingScheduler = async (
@@ -96,84 +95,7 @@ export const updateScrapingScheduler = async (
   try {
     const id = parseInt(req.params.id, 10);
     const { title, description, status, cron_expression } = req.body;
-
-    const previous_scraping_scheduler =
-      await prisma.scrapingScheduler.findFirst({
-        where: { id: id },
-      });
-
-    if (!previous_scraping_scheduler) {
-      throw new Error("La Scraping Scheduler n'existe pas");
-    }
-
-    const author = await prisma.user.findFirst({ where: { id: req.user.id } });
-
-    if (!author) {
-      throw new Error("Utilisateur introuvable");
-    }
-
-    // TODO: vérifier si l'user à y accès
-
-    const scrapingScheduler = await prisma.scrapingScheduler.update({
-      where: {
-        id: id,
-      },
-      data: {
-        title: title,
-        description: description,
-        status: status,
-        cron_expression: cron_expression,
-      },
-    });
-
-    const jobName = `scheduler-${id}`;
-
-    // Si on active le scheduler et qu'il y a une cron expression
-    if (
-      previous_scraping_scheduler.status !== "ACTIVATE" &&
-      scrapingScheduler.status === "ACTIVATE"
-    ) {
-      if (scrapingScheduler.cron_expression) {
-        await scrapeQueue.add(
-          jobName,
-          { schedulerId: id },
-          {
-            repeat: {
-              pattern: scrapingScheduler.cron_expression,
-            },
-            jobId: jobName,
-          },
-        );
-
-        const interval = cronParser.parse(scrapingScheduler.cron_expression);
-        const nextRun = interval.next().toDate();
-
-        await prisma.scrapingScheduler.update({
-          where: { id },
-          data: {
-            start_at: scrapingScheduler.start_at || new Date(),
-            next_run_at: nextRun,
-          },
-        });
-      }
-    }
-
-    if (
-      previous_scraping_scheduler.status === "ACTIVATE" &&
-      scrapingScheduler.status !== "ACTIVATE"
-    ) {
-      const repeatableJobs = await scrapeQueue.getRepeatableJobs();
-      const jobToRemove = repeatableJobs.find((job) => job.name === jobName);
-      if (jobToRemove) {
-        await scrapeQueue.removeRepeatableByKey(jobToRemove.key);
-      }
-      await prisma.scrapingScheduler.update({
-        where: { id },
-        data: { next_run_at: null },
-      });
-    }
-
-    res.json(scrapingScheduler);
+    res.json(await updateScheduler(id, req.user.id, { title, description, status, cron_expression }));
   } catch (error) {
     next(error);
   }
@@ -228,11 +150,7 @@ export const deleteScrapingScheduler = async (
 ) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const deletedScrapingScheduler = await prisma.scrapingScheduler.delete({
-      where: {
-        id: id,
-      },
-    });
+    const deletedScrapingScheduler = await deleteScheduler(id);
     res.json(deletedScrapingScheduler);
   } catch (error) {
     next(error);
