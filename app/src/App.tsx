@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { AdminAuthPage } from "./AdminAuthPage";
 import { AuthProvider } from "./components/AuthProvider";
 import { Navigation } from "./components/Navigation";
@@ -18,6 +18,10 @@ import { SettingsPage } from "./SettingsPage";
 import { useAuth } from "./hooks/useAuth";
 import { useEffect, useState, type ReactNode } from "react";
 import { CommandPalette } from "./components/CommandPalette";
+
+// One DocumentPage per document: switching between sub-pages remounts it, which
+// flushes the previous page's pending save instead of mixing the two pages' state.
+const DocumentRoute = () => <DocumentPage key={useParams().id} />;
 
 // Signed-in pages sit on a white "paper" sheet next to the sidebar; auth pages get the bare frame.
 const Shell = ({ children }: { children: ReactNode }) => {
@@ -66,7 +70,7 @@ export const App = () => {
               </ProtectedRoute>
             }
           />
-          <Route path="/document/:id" element={<DocumentPage />} />
+          <Route path="/document/:id" element={<DocumentRoute />} />
           <Route
             path="/scrapers"
             element={
