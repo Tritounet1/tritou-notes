@@ -21,14 +21,15 @@ export const instanceTools: Tool[] = [
   },
   {
     name: "run_scrape",
-    description: "Create a new scrape instance and immediately queue it for execution. Use this to test a scraper against a URL.",
+    description:
+      "Create a new scrape instance and immediately queue it for execution. The scraper is picked automatically, like in the app: " +
+      "the ACTIVE scraper whose base_url list contains the URL's origin (e.g. https://example.com). Fails early if none matches.",
     inputSchema: {
       type: "object",
       properties: {
-        url: { type: "string", description: "URL to scrape" },
-        scraperId: { type: "number", description: "ID of the scraper to use" },
+        url: { type: "string", description: "Absolute URL to scrape" },
       },
-      required: ["url", "scraperId"],
+      required: ["url"],
     },
   },
   {
@@ -74,15 +75,24 @@ export async function handleInstanceTool(name: string, args: Args): Promise<unkn
     }
 
     case "run_scrape": {
-      const { url, scraperId } = args as { url: string; scraperId: number };
+      const { url } = args as { url: string };
+      let origin: string;
+      try {
+        origin = new URL(url).origin;
+      } catch {
+        throw new Error(`Invalid URL: ${url}`);
+      }
+      // Same lookup as api/src/worker.ts, which makes the final choice when the job runs.
+      const scraper = await prisma.scraper.findFirst({
+        where: { base_url: { has: origin }, status: "ACTIVE" },
+        select: { id: true, name: true },
+      });
+      if (!scraper) throw new Error(`No ACTIVE scraper has ${origin} in its base_url`);
       const instance = await prisma.instanceScrape.create({
-        data: {
-          url,
-          scraperId: Number(scraperId),
-        },
+        data: { url, scraperId: scraper.id },
       });
       await scrapeQueue.add("scrape-url", { id: instance.id });
-      return { ...instance, queued: true };
+      return { ...instance, scraper, queued: true };
     }
 
     case "delete_instance": {
