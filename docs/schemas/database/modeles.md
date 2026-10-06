@@ -5,7 +5,8 @@
 | Modèle | Responsabilité |
 | --- | --- |
 | `User` | Compte, mot de passe haché et rôle. |
-| `Document` | Contenu TEXT, EXCEL ou TODO, auteur, visibilité et page parente optionnelle (sous-pages). |
+| `Document` | Contenu TEXT, EXCEL ou TODO, auteur, visibilité, page parente optionnelle (sous-pages) et dossier optionnel (pages racines). |
+| `Folder` | Dossier de rangement, éventuellement dans un dossier parent ; sa suppression fait remonter son contenu d’un niveau. |
 | `ScrapingScheduler` | Expression cron, activation et dates d’exécution. |
 | `DocumentHistory` | Ancien contenu et utilisateur associé à la modification. |
 | `Scraper` | Code de scraping, origines autorisées et template de rendu JSON. |

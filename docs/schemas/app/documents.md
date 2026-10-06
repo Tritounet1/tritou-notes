@@ -45,6 +45,10 @@ La commande `/image` ouvre le sélecteur. Le dépôt de fichiers est disponible 
 
 Une page peut avoir une page parente (`Document.parentId`). La commande `/page` et le « + » de l’arborescence de la sidebar créent une sous-page puis l’ouvrent. Dans une page texte, la sous-page est aussi insérée comme bloc `::page[id]::` ; retirer ce bloc ne supprime pas la sous-page, qui reste listée sous « Sous-pages ». `GET /api/documents/:id` renvoie `ancestors` (fil d’Ariane) et `children` ; le bouton « Déplacer » envoie `parentId` dans `PUT /api/documents/:id`, l’API refusant une page déplacée sous elle-même ou sous une de ses sous-pages. Supprimer une page supprime ses sous-pages.
 
+## Dossiers
+
+Les dossiers (`Folder`, `/api/folders`) rangent les pages racines ; une sous-page reste sous sa page parente et suit son dossier. Dans la sidebar, les dossiers sont fermés par défaut (état mémorisé dans le navigateur) et s’ouvrent seuls quand ils contiennent la page affichée ; leurs actions (nouvelle page, sous-dossier, renommer, déplacer, supprimer) n’apparaissent qu’au survol. Pages et dossiers se déplacent par glisser-déposer sur un dossier, ou sur « Pages » pour revenir à la racine ; « Déplacer la page » propose aussi les dossiers. Supprimer un dossier ne supprime aucune page : pages et sous-dossiers remontent d’un niveau. L’assistant dispose de `list_folders` et de `folderId` sur `create_page` / `move_page`.
+
 ## Sauvegarde et historique
 
 ```mermaid

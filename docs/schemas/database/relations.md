@@ -21,6 +21,13 @@ erDiagram
         Int authorId FK
         DocumentType type
         Int parentId FK "nullable"
+        Int folderId FK "nullable"
+    }
+    Folder {
+        Int id PK
+        String name
+        Int parentId FK "nullable"
+        DateTime created_at
     }
     DocumentImage {
         UUID id PK
@@ -140,6 +147,8 @@ erDiagram
     User ||--o{ Document : authorId
     Document ||--o{ DocumentImage : "documentId (cascade)"
     Document |o--o{ Document : "parentId (cascade)"
+    Folder |o--o{ Document : "folderId (set null)"
+    Folder |o--o{ Folder : parentId
     Document ||--o{ DocumentHistory : documentId
     User ||--o{ DocumentHistory : authorId
     ScrapingScheduler |o--o{ InstanceScrape : scrapingSchedulerId

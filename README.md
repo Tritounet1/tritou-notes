@@ -2,7 +2,7 @@
 
 A self-hosted workspace for writing notes and pulling data from the web into them — with an AI assistant that can read and edit your pages.
 
-- **Pages** — Markdown documents, spreadsheets and to-do lists, organised as a tree of sub-pages, with version history, code blocks, web-link previews and images.
+- **Pages** — Markdown documents, spreadsheets and to-do lists, organised in folders and as a tree of sub-pages, with version history, code blocks, web-link previews and images.
 - **Scraping** — write small scrapers in JavaScript, run them on demand or on a cron schedule, and embed their live results in any page.
 - **AI assistant** — chat with any model available on [OpenRouter](https://openrouter.ai): it can search, read, create and edit pages, to-dos and spreadsheets, and accepts images, PDFs and text files. `/image-ia` generates images straight into a page.
 - **MCP server** — let Claude (Code or Desktop) work with your notes and scrapers.
