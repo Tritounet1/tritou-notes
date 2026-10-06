@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
 import { removeDocumentImages } from "../utils/documentImageStorage";
 import { ancestorsOf, descendantIds, resolveParent } from "../utils/documentTree";
+import { reviseDocument } from "../utils/documentRevision";
 
 export const createDocument = async (
   req: Request,
@@ -89,60 +90,7 @@ export const updateDocument = async (
   try {
     const id = parseInt(req.params.id, 10);
     const { title, text, is_public, parentId } = req.body;
-
-    const previous_document = await prisma.document.findFirst({
-      where: { id: id },
-    });
-
-    if (!previous_document) {
-      throw new Error("Le document n'existe pas");
-    }
-
-    const author = await prisma.user.findFirst({ where: { id: req.user.id } });
-
-    if (!author) {
-      throw new Error("Utilisateur introuvable");
-    }
-
-    // `parentId` is only sent when moving the page (null = back to the root).
-    const parent = parentId === undefined ? undefined : await resolveParent(parentId, id);
-
-    await prisma.documentHistory.create({
-      data: {
-        title: previous_document.title,
-        text: previous_document.text,
-        public: previous_document.public,
-        document: {
-          connect: {
-            id: id,
-          },
-        },
-        author: {
-          connect: {
-            id: author.id,
-          },
-        },
-      },
-    });
-
-    const document = await prisma.document.update({
-      where: {
-        id: id,
-      },
-      data: {
-        title: title,
-        text: text,
-        author: {
-          connect: { id: author.id },
-        },
-        public: is_public,
-        ...(parent !== undefined && {
-          parent: parent === null ? { disconnect: true } : { connect: { id: parent } },
-        }),
-        last_update: new Date(),
-      },
-    });
-
+    const document = await reviseDocument(id, req.user.id, { title, text, public: is_public, parentId });
     res.json(document);
   } catch (error) {
     next(error);
