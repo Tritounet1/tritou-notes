@@ -5,6 +5,7 @@ vi.mock("../utils/documentImageStorage", async importOriginal => ({
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db, resetDatabase, user } from "./helpers/database";
 import { call } from "./helpers/http";
+import { cronRunsAround, recentRuns } from "../utils/schedulerRuns";
 vi.mock("../config/prismaClient", async () => ({ prisma: (await import("./helpers/database")).db }));
 const mocks = vi.hoisted(() => ({ hash: vi.fn(), verify: vi.fn(), token: vi.fn(), email: vi.fn(), encrypt: vi.fn(), response: vi.fn(), models: vi.fn(), upload: vi.fn(), add: vi.fn(), jobs: vi.fn(), remove: vi.fn() }));
 vi.mock("../utils/bcryptUtils", () => ({ hashPassword: mocks.hash, verifyPassword: mocks.verify }));
@@ -397,3 +398,25 @@ for (const module of modules) {
     });
   }
 }
+
+describe("scheduler list extras", () => {
+  it("merges current instance statuses with history, oldest first, capped at 14", () => {
+    const at = (h: number) => new Date(Date.UTC(2026, 9, 6, h));
+    const runs = recentRuns(
+      [{ status: "FINISHED", last_update: at(20) }],
+      Array.from({ length: 14 }, (_, i) => ({ status: i === 0 ? "ERROR" : "FINISHED", created_at: at(19 - i) })),
+    );
+    expect(runs).toHaveLength(14);
+    expect(runs[13]).toEqual({ status: "FINISHED", at: at(20) });
+    expect(runs[12]).toEqual({ status: "ERROR", at: at(19) });
+  });
+  it("lists cron runs within 24 h around now and ignores invalid expressions", () => {
+    const now = new Date("2026-10-06T12:30:00Z");
+    const runs = cronRunsAround("0 */6 * * *", now);
+    expect(runs.length).toBeGreaterThanOrEqual(7);
+    expect(runs.length).toBeLessThanOrEqual(9);
+    runs.forEach((r) => expect(Math.abs(new Date(r).getTime() - now.getTime())).toBeLessThanOrEqual(24 * 3_600_000));
+    expect(cronRunsAround("not a cron", now)).toEqual([]);
+    expect(cronRunsAround(null, now)).toEqual([]);
+  });
+});

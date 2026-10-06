@@ -2,6 +2,7 @@ import cronParser from "cron-parser";
 import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
 import { scrapeQueue } from "../config/queue";
+import { cronRunsAround, recentRuns, RECENT_RUNS } from "../utils/schedulerRuns";
 
 export const createScrapingScheduler = async (
   req: Request,
@@ -35,8 +36,24 @@ export const getScrapingScheduler = async (
   next: NextFunction,
 ) => {
   try {
-    const documents = await prisma.scrapingScheduler.findMany();
-    res.json(documents);
+    const schedulers = await prisma.scrapingScheduler.findMany({
+      include: {
+        InstanceScrapes: { select: { status: true, last_update: true } },
+        instanceScrapeHistories: {
+          select: { status: true, created_at: true },
+          orderBy: { created_at: "desc" },
+          take: RECENT_RUNS,
+        },
+      },
+    });
+    const now = new Date();
+    res.json(
+      schedulers.map(({ InstanceScrapes, instanceScrapeHistories, ...scheduler }) => ({
+        ...scheduler,
+        recentRuns: recentRuns(InstanceScrapes, instanceScrapeHistories),
+        timeline: cronRunsAround(scheduler.cron_expression, now),
+      })),
+    );
   } catch (error) {
     next(error);
   }
