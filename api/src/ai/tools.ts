@@ -2,6 +2,7 @@ import { prisma } from "../config/prismaClient";
 import type { UserPermissions } from "../generated/prisma/client";
 import { reviseDocument } from "../utils/documentRevision";
 import { ancestorsOf, resolveParent } from "../utils/documentTree";
+import { resolveFolder } from "../utils/folderTree";
 import type { ToolDefinition } from "./openrouter";
 
 type PermissionKey = keyof Omit<UserPermissions, "id" | "userId">;
@@ -105,13 +106,13 @@ const tools: Record<string, { definition: ToolDefinition["function"]; run: Handl
   list_pages: {
     definition: {
       name: "list_pages",
-      description: "Liste les pages de l’espace (id, titre, type, parentId). Filtre optionnel sur le titre.",
+      description: "Liste les pages de l’espace (id, titre, type, parentId, folderId). Filtre optionnel sur le titre.",
       parameters: { type: "object", properties: { query: { type: "string", description: "Texte à chercher dans les titres" } } },
     },
     run: async ({ query }) => {
       const pages = await prisma.document.findMany({
         where: typeof query === "string" && query.trim() ? { title: { contains: query.trim(), mode: "insensitive" } } : undefined,
-        select: { id: true, title: true, type: true, parentId: true, last_update: true },
+        select: { id: true, title: true, type: true, parentId: true, folderId: true, last_update: true },
         orderBy: { last_update: "desc" },
         take: 200,
       });
@@ -187,7 +188,7 @@ const tools: Record<string, { definition: ToolDefinition["function"]; run: Handl
     definition: {
       name: "create_page",
       description:
-        "Crée une page texte (Markdown), éventuellement comme sous-page d’une autre (parentId). " +
+        "Crée une page texte (Markdown), soit comme sous-page d’une autre (parentId), soit à la racine d’un dossier (folderId). " +
         "Un lien ::page[id]:: est ajouté à la fin du parent s’il s’agit d’une page texte.",
       parameters: {
         type: "object",
@@ -195,14 +196,16 @@ const tools: Record<string, { definition: ToolDefinition["function"]; run: Handl
           title: { type: "string" },
           text: { type: "string", description: "Contenu Markdown initial" },
           parentId: { type: "integer", description: "Page parente (optionnel)" },
+          folderId: { type: "integer", description: "Dossier, pour une page sans parent (optionnel, voir list_folders)" },
         },
         required: ["title"],
       },
     },
-    run: async ({ title, text, parentId }, ctx) => {
+    run: async ({ title, text, parentId, folderId }, ctx) => {
       requirePermission(ctx, "createDocument");
       const name = string(title, "title");
       const parent = parentId === undefined || parentId === null ? null : await resolveParent(parentId);
+      const folder = parent === null && folderId != null ? await resolveFolder(folderId) : null;
       const page = await prisma.document.create({
         data: {
           title: name,
@@ -210,6 +213,7 @@ const tools: Record<string, { definition: ToolDefinition["function"]; run: Handl
           text: typeof text === "string" ? text : "",
           author: { connect: { id: ctx.userId } },
           ...(parent !== null && { parent: { connect: { id: parent } } }),
+          ...(folder !== null && { folder: { connect: { id: folder } } }),
         },
       });
       ctx.changed.add(page.id);
@@ -298,17 +302,20 @@ const tools: Record<string, { definition: ToolDefinition["function"]; run: Handl
   move_page: {
     definition: {
       name: "move_page",
-      description: "Déplace une page sous une autre page (parentId), ou à la racine avec parentId = null.",
+      description:
+        "Déplace une page : sous une autre page (parentId), dans un dossier (folderId), ou à la racine sans dossier (parentId = null). " +
+        "Une page placée dans un dossier n’a plus de parent.",
       parameters: {
         type: "object",
-        properties: { id: { type: "integer" }, parentId: { type: ["integer", "null"] } },
-        required: ["id", "parentId"],
+        properties: { id: { type: "integer" }, parentId: { type: ["integer", "null"] }, folderId: { type: "integer" } },
+        required: ["id"],
       },
     },
-    run: async ({ id, parentId }, ctx) => {
+    run: async ({ id, parentId, folderId }, ctx) => {
       requirePermission(ctx, "modifyDocument");
       const page = await findPage(id);
-      await reviseDocument(page.id, ctx.userId, { parentId: parentId ?? null });
+      if (folderId != null && parentId != null) throw new ToolError("Choisis soit parentId, soit folderId.");
+      await reviseDocument(page.id, ctx.userId, folderId != null ? { folderId, parentId: null } : { parentId: parentId ?? null, folderId: null });
       ctx.changed.add(page.id);
       return { output: { ok: true }, summary: `Page déplacée : ${label(page.title)}` };
     },
@@ -415,6 +422,18 @@ const tools: Record<string, { definition: ToolDefinition["function"]; run: Handl
       await reviseDocument(page.id, ctx.userId, { text: JSON.stringify(grid) });
       ctx.changed.add(page.id);
       return { output: { ok: true }, summary: `Tableur ${label(page.title)} : ${entries.length} cellule${entries.length > 1 ? "s" : ""} modifiée${entries.length > 1 ? "s" : ""}` };
+    },
+  },
+
+  list_folders: {
+    definition: {
+      name: "list_folders",
+      description: "Liste les dossiers (id, nom, parentId). Les dossiers rangent les pages racines ; les sous-pages restent sous leur page parente.",
+      parameters: { type: "object", properties: {} },
+    },
+    run: async () => {
+      const folders = await prisma.folder.findMany({ select: { id: true, name: true, parentId: true }, orderBy: { name: "asc" } });
+      return { output: folders, summary: `${folders.length} dossier${folders.length > 1 ? "s" : ""} listé${folders.length > 1 ? "s" : ""}` };
     },
   },
 

@@ -7,6 +7,7 @@ import { prisma } from "./config/prismaClient";
 import { authHandler } from "./middlewares/authMiddleware";
 import { errorHandler } from "./middlewares/errorHandler";
 import aiRoutes from "./routes/aiRoutes";
+import folderRoutes from "./routes/folderRoutes";
 import authAdminRoutes from "./routes/authAdminRoutes";
 import authRoutes from "./routes/authRoutes";
 import documentHistoryRoutes from "./routes/documentHistoryRoutes";
@@ -67,6 +68,7 @@ app.use(authHandler);
 
 // Routes with connection needed
 app.use("/api/documents", documentRoutes);
+app.use("/api/folders", folderRoutes);
 app.use("/api/document-histories", documentHistoryRoutes);
 app.use("/api/scrapers", scraperRoutes);
 app.use("/api/instance-scrape", instanceScrapeRoutes);

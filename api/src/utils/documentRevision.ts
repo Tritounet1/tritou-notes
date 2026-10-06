@@ -1,12 +1,15 @@
 import { prisma } from "../config/prismaClient";
-import { resolveParent } from "./documentTree";
+import { InvalidParentError, resolveParent } from "./documentTree";
+import { resolveFolder } from "./folderTree";
 
 export interface DocumentChanges {
   title?: string;
   text?: string;
   public?: boolean;
-  /** Moves the page; null = root. Validated against cycles. */
+  /** Moves the page under another page; null = root. Validated against cycles. */
   parentId?: unknown;
+  /** Moves the page into a folder (null = no folder). Only root pages live in folders. */
+  folderId?: unknown;
 }
 
 /**
@@ -31,6 +34,8 @@ export const reviseDocument = async (id: number, authorId: number, changes: Docu
 
   // `parentId` is only sent when moving the page (null = back to the root).
   const parent = changes.parentId === undefined ? undefined : await resolveParent(changes.parentId, id);
+  const folder = changes.folderId === undefined ? undefined : await resolveFolder(changes.folderId);
+  if (parent != null && folder != null) throw new InvalidParentError("Une sous-page ne peut pas être dans un dossier");
 
   await prisma.documentHistory.create({
     data: {
@@ -64,6 +69,11 @@ export const reviseDocument = async (id: number, authorId: number, changes: Docu
       ...(parent !== undefined && {
         parent: parent === null ? { disconnect: true } : { connect: { id: parent } },
       }),
+      // A page goes either under a page or into a folder: placing it in one leaves the other.
+      ...(folder !== undefined
+        ? { folder: folder === null ? { disconnect: true } : { connect: { id: folder } } }
+        : parent != null && { folder: { disconnect: true } }),
+      ...(folder != null && parent === undefined && { parent: { disconnect: true } }),
       last_update: new Date(),
     },
   });

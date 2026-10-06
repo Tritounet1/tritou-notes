@@ -39,9 +39,26 @@ model Document {
   parentId          Int?
   parent            Document?         @relation("DocumentTree", fields: [parentId], references: [id], onDelete: Cascade)
   children          Document[]        @relation("DocumentTree")
+  // Folder of a root page (sub-pages live under their parent page instead).
+  folderId          Int?
+  folder            Folder?           @relation(fields: [folderId], references: [id], onDelete: SetNull)
   documentHistories DocumentHistory[]
   conversations     Conversation[]
   images            DocumentImage[]
+
+  @@index([parentId])
+  @@index([folderId])
+}
+
+// Folders only organise pages; deleting one moves its content up a level (see folderController).
+model Folder {
+  id         Int        @id @default(autoincrement())
+  name       String
+  parentId   Int?
+  parent     Folder?    @relation("FolderTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children   Folder[]   @relation("FolderTree")
+  documents  Document[]
+  created_at DateTime   @default(now())
 
   @@index([parentId])
 }

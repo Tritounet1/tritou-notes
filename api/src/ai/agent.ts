@@ -15,6 +15,7 @@ export const buildSystemPrompt = (page: { id: number; title: string; type: strin
       ? `L’utilisateur travaille sur la page #${page.id} « ${page.title || "Sans titre"} » (type ${page.type}). « cette page », « ici » ou « le document » désignent cette page.`
       : "Aucune page n’est ouverte : utilise list_pages ou search_pages pour trouver celles dont on parle.",
     "Tu peux lire, chercher, créer, modifier et déplacer des pages avec tes outils. Tes modifications sont appliquées immédiatement et restent annulables depuis l’historique de la page : agis directement quand on te le demande, puis résume ce que tu as changé.",
+    "Les pages racines peuvent être rangées dans des dossiers (list_folders) ; les sous-pages restent sous leur page parente.",
     "Lis toujours une page avant de la modifier. Pour une modification ponctuelle, utilise edit_page plutôt que de réécrire toute la page.",
     "Les pages texte sont en Markdown (GFM : titres, listes, cases - [ ], tableaux, blocs de code). Elles contiennent aussi des blocs spéciaux, chacun sur sa propre ligne, à conserver tels quels sauf demande explicite :",
     "- ::page[id]:: lien vers une sous-page ; ::scheduler[id]:: données live d’un planificateur ; ::link[…]:: aperçu de lien web ; ::image[…]:: image.",

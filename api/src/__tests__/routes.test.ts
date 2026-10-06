@@ -18,6 +18,7 @@ import scrapers from "../routes/scraperRoutes";
 import instances from "../routes/instanceScrapeRoutes";
 import schedulers from "../routes/scrapingSchedulerRoutes";
 import ai from "../routes/aiRoutes";
+import folders from "../routes/folderRoutes";
 import users from "../routes/userRoutes";
 import permissions from "../routes/userPermissionsRoutes";
 import settings from "../routes/settingsRoutes";
@@ -37,6 +38,7 @@ beforeEach(() => {
 type ProtectedRoute = { area: string; router: Router; method: string; url: string; permission: string };
 const protectedRoutes: ProtectedRoute[] = [
   ...[["POST", "/", "createDocument"], ["PUT", "/12", "modifyDocument"], ["DELETE", "/12", "deleteDocument"]].map(([method, url, permission]) => ({ area: "documents", router: documents, method, url, permission })),
+  ...[["POST", "/", "createDocument"], ["PATCH", "/12", "modifyDocument"], ["DELETE", "/12", "deleteDocument"]].map(([method, url, permission]) => ({ area: "folders", router: folders, method, url, permission })),
   ...[["GET", "/", "accessScrapersPage"], ["GET", "/12", "accessScrapersPage"], ["POST", "/", "modifyScraper"], ["PUT", "/12", "modifyScraper"], ["DELETE", "/12", "deleteScraper"]].map(([method, url, permission]) => ({ area: "scrapers", router: scrapers, method, url, permission })),
   ...[["GET", "/", "accessInstancesScrapersPage"], ["GET", "/12", "accessInstancesScrapersPage"], ["POST", "/", "useScraper"], ["DELETE", "/12", "useScraper"]].map(([method, url, permission]) => ({ area: "instances", router: instances, method, url, permission })),
   ...[["GET", "/", "accessScrapersPage"], ["GET", "/12", "accessScrapersPage"], ["GET", "/12/preview", "accessScrapersPage"], ["POST", "/", "modifyScraperStatus"], ["PUT", "/12", "modifyScraperStatus"], ["DELETE", "/12", "modifyScraperStatus"]].map(([method, url, permission]) => ({ area: "schedulers", router: schedulers, method, url, permission })),

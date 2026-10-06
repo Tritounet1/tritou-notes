@@ -4,7 +4,7 @@ import { prisma } from "../prisma";
 export const documentTools: Tool[] = [
   {
     name: "list_documents",
-    description: "List all documents with metadata (title, type, parentId, author, dates). Pages form a tree through parentId (null = root page). Does not include full text content.",
+    description: "List all documents with metadata (title, type, parentId, folderId, author, dates). Pages form a tree through parentId (null = root page); root pages can be filed in a folder (folderId). Does not include full text content.",
     inputSchema: { type: "object", properties: {}, required: [] },
   },
   {
@@ -87,6 +87,7 @@ export async function handleDocumentTool(name: string, args: Args): Promise<unkn
           title: true,
           type: true,
           parentId: true,
+          folderId: true,
           public: true,
           created_at: true,
           last_update: true,
