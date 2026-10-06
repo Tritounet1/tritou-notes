@@ -477,11 +477,21 @@ export const DocumentPage = () => {
     debouncedSave(title, newText, isPublic);
   };
 
-  const handleStartEditing = (segIndex: number) => {
+  const handleStartEditing = (segIndex: number, atEnd = false) => {
     setEditingSegmentIndex(segIndex);
     setTimeout(() => {
-      textareaRefs.current.get(segIndex)?.focus();
+      const textarea = textareaRefs.current.get(segIndex);
+      textarea?.focus({ preventScroll: true });
+      if (textarea && atEnd) {
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+      }
     }, 0);
+  };
+
+  const handleDocumentBackgroundClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget || document?.type !== "TEXT" || !isAuthenticated || !hasPermission("modifyDocument")) return;
+    const segs = normalizeSegments(parseSegments(text));
+    handleStartEditing(segs.length - 1, true);
   };
 
   const handleStopEditing = () => {
@@ -969,7 +979,7 @@ export const DocumentPage = () => {
           </div>
         )}
 
-        <div className={`bg-white rounded-lg shadow-sm ${document.type === "EXCEL" || document.type === "TODO" ? "flex flex-col h-[calc(100vh-200px)]" : "p-8"}`}>
+        <div onClick={handleDocumentBackgroundClick} className={`bg-white rounded-lg shadow-sm ${document.type === "EXCEL" || document.type === "TODO" ? "flex flex-col h-[calc(100vh-200px)]" : "p-8"}`}>
           <div className={document.type === "EXCEL" || document.type === "TODO" ? "px-6 py-4 border-b border-gray-100" : ""}>
             {isAuthenticated && hasPermission("modifyDocument") ? (
               <input
@@ -1000,7 +1010,7 @@ export const DocumentPage = () => {
             />
           ) : (
             // TEXT document — segmented renderer (text + scheduler blocks)
-            <div className="min-h-[60vh]">
+            <div onClick={handleDocumentBackgroundClick} className={`min-h-[60vh] flex flex-col ${isAuthenticated && hasPermission("modifyDocument") ? "cursor-text" : ""}`}>
               {(() => {
                 const canEdit = isAuthenticated && hasPermission("modifyDocument");
                 const segs = normalizeSegments(parseSegments(text));
@@ -1046,11 +1056,12 @@ export const DocumentPage = () => {
 
                   const isEditingThis = canEdit && editingSegmentIndex === segIndex;
                   const isOnlySegment = segs.length === 1;
+                  const isLastSegment = segIndex === segs.length - 1;
 
                   return (
-                    <div key={`text-${segIndex}`}>
+                    <div key={`text-${segIndex}`} className={isLastSegment ? "flex flex-col flex-1" : undefined}>
                       {isEditingThis ? (
-                        <div className="relative">
+                        <div className={`relative ${isLastSegment ? "flex flex-col flex-1" : ""}`}>
                           <textarea
                             ref={el => { textareaRefs.current.set(segIndex, el); }}
                             value={seg.content}
@@ -1061,7 +1072,8 @@ export const DocumentPage = () => {
                             placeholder={isOnlySegment
                               ? "Commencez à écrire en Markdown… (tapez / pour les commandes)"
                               : "Tapez ici… (/ pour les commandes)"}
-                            className="w-full min-h-[50px] text-gray-700 border-none outline-none resize-none overflow-hidden placeholder-gray-300 leading-relaxed font-mono text-sm"
+                            aria-label="Contenu du document"
+                            className={`w-full min-h-[50px] text-gray-700 border-none outline-none resize-none overflow-hidden placeholder-gray-300 leading-relaxed font-mono text-sm ${isLastSegment ? "flex-1" : ""}`}
                           />
                           {showCommands && filteredCommands.length > 0 && (
                             <div
@@ -1088,8 +1100,16 @@ export const DocumentPage = () => {
                         </div>
                       ) : (
                         <div
-                          onClick={canEdit ? () => handleStartEditing(segIndex) : undefined}
-                          className={`${canEdit ? "cursor-text" : ""} ${seg.content ? "prose prose-gray max-w-none" : "min-h-[40px]"}`}
+                          onClick={canEdit ? event => handleStartEditing(segIndex, event.target === event.currentTarget) : undefined}
+                          tabIndex={canEdit ? 0 : undefined}
+                          onKeyDown={canEdit ? event => {
+                            if (event.target === event.currentTarget && event.key === "Enter") {
+                              event.preventDefault();
+                              handleStartEditing(segIndex, true);
+                            }
+                          } : undefined}
+                          aria-label={canEdit ? "Modifier le texte du document" : undefined}
+                          className={`${canEdit ? "cursor-text" : ""} ${isLastSegment ? "flex-1" : ""} ${seg.content ? "prose prose-gray max-w-none" : "min-h-[40px]"}`}
                         >
                           {seg.content ? (
                             <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
