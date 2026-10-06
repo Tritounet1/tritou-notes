@@ -12,11 +12,11 @@ A self-hosted workspace for writing notes and pulling data from the web into the
 
 | | |
 |---|---|
-| ![Documents](/assets/images/page-docs.png) | ![Document editor](/assets/images/page-doc.png) |
+| ![Documents](/assets/images/page-docs.webp) | ![Document editor](/assets/images/page-doc.webp) |
 | **Documents** — pages, spreadsheets and to-do lists | **Editor** — Markdown with slash commands (`/page`, `/code`, `/planificateur`…) |
-| ![Scraper configuration](/assets/images/page-config-scraper.png) | ![Schedulers](/assets/images/page-planificateurs.png) |
+| ![Scraper configuration](/assets/images/page-config-scraper.webp) | ![Schedulers](/assets/images/page-planificateurs.webp) |
 | **Scrapers** — base URLs and scraping code, with autocompletion | **Schedulers** — recurring scrapes with cron expressions |
-| ![Instances](/assets/images/page-instances.png) | ![User permissions](/assets/images/page-config-user.png) |
+| ![Instances](/assets/images/page-instances.webp) | ![User permissions](/assets/images/page-config-user.webp) |
 | **Instances** — test a scraper on a URL | **Users** — invitations and per-user permissions |
 
 ## How it works
