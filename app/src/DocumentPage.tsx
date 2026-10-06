@@ -11,55 +11,8 @@ import { useAuth } from "./hooks/useAuth";
 import { useDebounce } from "./hooks/useDebounce";
 import { jsonToMarkdownTable, templateToMarkdown } from "./utils/jsonToMarkdown";
 
-// ── Segment types for mixed text/scheduler documents ──────────────────────────
-type TextSegment = { type: "text"; content: string };
-type SchedulerSegment = { type: "scheduler"; id: number };
-type Segment = TextSegment | SchedulerSegment;
-
-const SCHEDULER_RE = /::scheduler\[(\d+)\]::/g;
-
-function parseSegments(text: string): Segment[] {
-  const segments: Segment[] = [];
-  let last = 0;
-  let m: RegExpExecArray | null;
-  SCHEDULER_RE.lastIndex = 0;
-  while ((m = SCHEDULER_RE.exec(text)) !== null) {
-    if (m.index > last) segments.push({ type: "text", content: text.slice(last, m.index) });
-    segments.push({ type: "scheduler", id: parseInt(m[1]) });
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) segments.push({ type: "text", content: text.slice(last) });
-  return segments.length ? segments : [{ type: "text", content: text }];
-}
-
-// Ensures a text segment exists before/after every scheduler segment so there
-// is always somewhere to type.
-function normalizeSegments(segs: Segment[]): Segment[] {
-  if (!segs.length) return [{ type: "text", content: "" }];
-  const out: Segment[] = [];
-  for (let i = 0; i < segs.length; i++) {
-    if (i === 0 && segs[i].type === "scheduler") out.push({ type: "text", content: "" });
-    out.push(segs[i]);
-    if (segs[i].type === "scheduler") {
-      const next = segs[i + 1];
-      if (!next || next.type === "scheduler") out.push({ type: "text", content: "" });
-    }
-  }
-  return out;
-}
-
-function segmentsToText(segs: Segment[]): string {
-  return segs.map(s => s.type === "text" ? s.content : `::scheduler[${s.id}]::`).join("");
-}
-
-function segmentGlobalOffset(segs: Segment[], upTo: number): number {
-  let offset = 0;
-  for (let i = 0; i < upTo; i++) {
-    const s = segs[i];
-    offset += s.type === "text" ? s.content.length : `::scheduler[${s.id}]::`.length;
-  }
-  return offset;
-}
+import { CodeBlock } from "./components/CodeBlock";
+import { codeValue, normalizeSegments, parseSegments, segmentGlobalOffset, segmentsToText, updateCodeSegment, type Segment } from "./utils/documentSegments";
 
 interface Document {
   id: number;
@@ -166,6 +119,7 @@ export const DocumentPage = () => {
   const [document, setDocument] = useState<Document | null>(null);
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
+  const [focusCodeIndex, setFocusCodeIndex] = useState<number | null>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -685,6 +639,17 @@ export const DocumentPage = () => {
     setShowCommands(false);
     setCommandSearch("");
 
+    if (command.name === "code") {
+      const insertedOffset = segmentGlobalOffset(segs, editingSegmentIndex) + commandStartPos;
+      const nextSegments = normalizeSegments(parseSegments(newText));
+      const codeIndex = nextSegments.findIndex((segment, index) =>
+        segment.type === "code" && segmentGlobalOffset(nextSegments, index) >= insertedOffset,
+      );
+      setEditingSegmentIndex(null);
+      setFocusCodeIndex(codeIndex >= 0 ? codeIndex : null);
+      return;
+    }
+
     if (command.opensModal && command.name === "planificateur") {
       schedulerInsertRef.current = { segIndex: editingSegmentIndex, cursorPos: result.newCursorPosition };
       fetchSchedulerList();
@@ -967,6 +932,24 @@ export const DocumentPage = () => {
                     );
                   }
 
+                  if (seg.type === "code") {
+                    return (
+                      <CodeBlock
+                        key={`code-${segIndex}`}
+                        value={codeValue(seg)}
+                        language={seg.language}
+                        readOnly={!canEdit}
+                        autoFocus={focusCodeIndex === segIndex}
+                        onFocus={() => setFocusCodeIndex(null)}
+                        onChange={canEdit ? (value, language) => {
+                          const updated = segs.map((segment, index) => index === segIndex ? updateCodeSegment(seg, value, language) : segment);
+                          handleTextChange(segmentsToText(updated));
+                        } : undefined}
+                        onDelete={canEdit ? () => handleDeleteSegment(segIndex) : undefined}
+                      />
+                    );
+                  }
+
                   const isEditingThis = canEdit && editingSegmentIndex === segIndex;
                   const isOnlySegment = segs.length === 1;
 
@@ -1017,10 +1000,6 @@ export const DocumentPage = () => {
                             <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
                               {seg.content}
                             </Markdown>
-                          ) : canEdit ? (
-                            <p className="text-gray-300 text-sm py-1">
-                              {isOnlySegment ? "Cliquez pour écrire en Markdown…" : "Cliquez pour ajouter du texte…"}
-                            </p>
                           ) : null}
                         </div>
                       )}

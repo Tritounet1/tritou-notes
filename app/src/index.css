@@ -1,1 +1,35 @@
 @import "tailwindcss";
+
+/* The document code block shares one background with its compact toolbar. */
+.document-code-block .cm-editor,
+.document-code-block .cm-gutters {
+  background-color: #202020;
+}
+
+.document-code-block .cm-editor {
+  border-radius: 0 0 14px 14px;
+  overflow: hidden;
+}
+
+.document-code-block .cm-editor.cm-focused {
+  outline: none;
+}
+
+.document-code-block .cm-scroller {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.document-code-block .cm-content {
+  padding: 12px 0 22px;
+}
+
+.document-code-block .cm-line {
+  padding: 0 24px;
+}
+
+.document-code-block select option {
+  background-color: #252525;
+  color: #d4d4d4;
+}

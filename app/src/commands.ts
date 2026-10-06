@@ -101,10 +101,11 @@ export const slashCommands: SlashCommand[] = [
     execute: (currentText, cursorPosition, commandStart) => {
       const beforeCommand = currentText.slice(0, commandStart);
       const afterCursor = currentText.slice(cursorPosition);
-      const insertedText = "```\n\n```";
+      const leadingNewline = beforeCommand && !beforeCommand.endsWith("\n") ? "\n" : "";
+      const insertedText = leadingNewline + "```\n\n```\n";
       return {
         newText: beforeCommand + insertedText + afterCursor,
-        newCursorPosition: beforeCommand.length + 4, // Position after ```\n
+        newCursorPosition: beforeCommand.length + leadingNewline.length + 4,
       };
     },
   },
