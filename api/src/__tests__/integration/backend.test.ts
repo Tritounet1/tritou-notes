@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { once } from "node:events";
@@ -63,6 +63,12 @@ describe("real HTTP + PostgreSQL + Redis", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("access-control-allow-credentials")).toBe("true");
     expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
+  });
+  it("serves the site favicon without authentication", async () => {
+    const response = await fetch(`${base}/favicon.ico`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("image/png");
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(await readFile("public/tritou-notes-logo.png"));
   });
   it("denies anonymous protected requests", async () => {
     expect((await request("/api/users", "GET", undefined, "")).status).toBe(401);

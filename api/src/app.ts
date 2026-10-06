@@ -1,6 +1,7 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
+import path from "node:path";
 import config from "./config/config";
 import { prisma } from "./config/prismaClient";
 import { authHandler } from "./middlewares/authMiddleware";
@@ -49,6 +50,11 @@ app.use(cookieParser());
 app.use(express.json());
 
 app.use("/health", (req, res) => res.sendStatus(200));
+
+// Browsers request this path when opening API resources directly, including images.
+app.get("/favicon.ico", (_req, res) => {
+  res.sendFile(path.resolve(__dirname, "../public/tritou-notes-logo.png"));
+});
 
 // Routes for init the first user (admin user) and invitations
 app.use("/api/admin-auth", authAdminRoutes);
