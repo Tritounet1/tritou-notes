@@ -7,6 +7,7 @@ import { apiFetch } from "./api";
 import { useDebounce } from "./hooks/useDebounce";
 import type { TemplateBlock } from "./types/scraper";
 import { useConfirm } from "./hooks/useConfirm";
+import { CHEERIO_METHODS, SCRAPER_GLOBALS, scraperCompletions } from "./utils/scraperApi";
 
 interface Scraper {
   id: number;
@@ -19,82 +20,6 @@ interface Scraper {
   last_update: string;
   display_template?: TemplateBlock[] | null;
 }
-
-const SCRAPER_COMMANDS = [
-  {
-    name: "sélecteur CSS",
-    syntax: "$(selector)",
-    description:
-      "Accède à l'HTML et sélectionne des éléments via un sélecteur CSS",
-    example: '$("div.content")',
-  },
-  {
-    name: "fetch",
-    syntax: "fetch(url)",
-    description: "Récupère le contenu HTML d'une URL",
-    example: 'fetch("https://example.com")',
-  },
-  {
-    name: "select element(s) with css selector",
-    syntax: "select element(s) with css selector",
-    description: "Sélectionne des éléments avec un sélecteur CSS",
-    example: '$("div.content")',
-  },
-  {
-    name: "text",
-    syntax: ".text()",
-    description: "Extrait le texte d'un élément",
-    example: 'select("h1").text()',
-  },
-  {
-    name: "attr",
-    syntax: ".attr(name)",
-    description: "Récupère la valeur d'un attribut",
-    example: 'select("a").attr("href")',
-  },
-  {
-    name: "each",
-    syntax: ".each(callback)",
-    description: "Itère sur chaque élément sélectionné",
-    example: 'selectAll("li").each((el) => { ... })',
-  },
-  {
-    name: "first",
-    syntax: ".first()",
-    description: "Retourne le premier élément",
-    example: 'selectAll("li").first()',
-  },
-  {
-    name: "last",
-    syntax: ".last()",
-    description: "Retourne le dernier élément",
-    example: 'selectAll("li").last()',
-  },
-  {
-    name: "map",
-    syntax: ".map(callback)",
-    description: "Transforme chaque élément",
-    example: 'selectAll("a").map((el) => el.attr("href"))',
-  },
-  {
-    name: "click",
-    syntax: ".click()",
-    description: "Simule un clic sur l'élément (browser requis)",
-    example: 'select("button").click()',
-  },
-  {
-    name: "wait",
-    syntax: "wait(ms)",
-    description: "Attend un certain temps en millisecondes",
-    example: "wait(1000)",
-  },
-  {
-    name: "waitFor",
-    syntax: "waitFor(selector)",
-    description: "Attend qu'un élément apparaisse",
-    example: 'waitFor("div.loaded")',
-  },
-];
 
 const Icon = ({ d, className = "w-4 h-4" }: { d: string; className?: string }) => (
   <svg
@@ -405,7 +330,7 @@ export const ScraperPage = () => {
                 height="100%"
                 style={{ height: "100%" }}
                 theme={vscodeDark}
-                extensions={[javascript()]}
+                extensions={[javascript(), scraperCompletions]}
                 onChange={handleCodeChange}
               />
             </div>
@@ -417,8 +342,12 @@ export const ScraperPage = () => {
               <span className="eyebrow text-[#a8a59e]">Documentation</span>
             </div>
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-              {SCRAPER_COMMANDS.map((cmd) => (
-                <div key={cmd.name} className="border-b border-white/10 pb-3">
+              <p className="text-xs text-[#a8a59e]">
+                Le code s’exécute de façon synchrone avec <code className="font-mono text-neon">$</code> (Cheerio, HTML de la page) et doit assigner{" "}
+                <code className="font-mono text-neon">result</code>. Ctrl+Espace pour l’autocomplétion.
+              </p>
+              {[...SCRAPER_GLOBALS, ...CHEERIO_METHODS].map((cmd) => (
+                <div key={cmd.syntax} className="border-b border-white/10 pb-3">
                   <code className="text-sm font-mono text-neon">
                     {cmd.syntax}
                   </code>
@@ -609,7 +538,7 @@ export const ScraperPage = () => {
             value={code}
             height="400px"
             theme={vscodeDark}
-            extensions={[javascript()]}
+            extensions={[javascript(), scraperCompletions]}
             onChange={handleCodeChange}
             placeholder={`var html = getHtmlPage();
 
