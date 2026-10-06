@@ -1,185 +1,154 @@
 # Tritou Notes
 
-Tritou Notes is a personal, self-hosted application for taking notes and collecting information from the web. Its features include:
+A self-hosted workspace for writing notes and pulling data from the web into them — with an AI assistant that can read and edit your pages.
 
-- Text documents, Excel-style spreadsheets, and to-do lists.
-- Online data collection through programmable scrapers.
-- AI-assisted writing and document editing.
+- **Pages** — Markdown documents, spreadsheets and to-do lists, organised as a tree of sub-pages, with version history, code blocks, web-link previews and images.
+- **Scraping** — write small scrapers in JavaScript, run them on demand or on a cron schedule, and embed their live results in any page.
+- **AI assistant** — chat with any model available on [OpenRouter](https://openrouter.ai): it can search, read, create and edit pages, to-dos and spreadsheets, and accepts images, PDFs and text files. `/image-ia` generates images straight into a page.
+- **MCP server** — let Claude (Code or Desktop) work with your notes and scrapers.
+- **Private by design** — no public sign-up: an administrator invites users and chooses what each of them may do.
 
-## Application Preview
+## Preview
 
-### Login Page
+| | |
+|---|---|
+| ![Documents](/assets/images/page-docs.png) | ![Document editor](/assets/images/page-doc.png) |
+| **Documents** — pages, spreadsheets and to-do lists | **Editor** — Markdown with slash commands (`/page`, `/code`, `/planificateur`…) |
+| ![Scraper configuration](/assets/images/page-config-scraper.png) | ![Schedulers](/assets/images/page-planificateurs.png) |
+| **Scrapers** — base URLs and scraping code, with autocompletion | **Schedulers** — recurring scrapes with cron expressions |
+| ![Instances](/assets/images/page-instances.png) | ![User permissions](/assets/images/page-config-user.png) |
+| **Instances** — test a scraper on a URL | **Users** — invitations and per-user permissions |
 
-![Login page](/assets/images/page-connexion.png)
+## How it works
 
-### Documents Page
+```text
+React app ──► Express API ──► PostgreSQL (Prisma)
+                  │
+                  ├──► Redis / BullMQ ──► Worker (Puppeteer + Cheerio) ──► websites
+                  ├──► OpenRouter (assistant, image generation)
+                  └──► Local disk (document images)
 
-This page lists your documents. Three document types are available:
+MCP server ──► PostgreSQL + Redis (same data, used by Claude)
+```
 
-- Text documents: a blank page with Markdown support.
-- Spreadsheets: Excel-style tables for organizing data.
-- To-do lists: structured task lists.
+A scraper is a piece of synchronous JavaScript that receives `$` (Cheerio loaded with the page HTML) and assigns `result`. The worker picks the active scraper whose base URLs contain the page's origin:
 
-![Documents page](/assets/images/page-docs.png)
+```js
+result = {
+  title: $("h1").first().text().trim(),
+  prices: $(".price").map((i, el) => $(el).text()).get(),
+};
+```
 
-### Document Editor
+## Getting started (development)
 
-![Document editor](/assets/images/page-doc.png)
+Requirements: Node.js 20+, Docker (for PostgreSQL and Redis).
 
-### Scrapers Page
+```sh
+# 1. Backing services
+docker compose up -d database redis
 
-Create scrapers and use them with schedulers to refresh document content from selected web pages at regular intervals.
+# 2. Dependencies — each folder is its own package
+npm install && (cd api && npm install) && (cd app && npm install)
 
-![Scrapers page](/assets/images/page-scrapers.png)
+# 3. API configuration
+cp api/.env.example api/.env
+```
 
-### Scraper Configuration
+Fill in `api/.env` (see [Configuration](#configuration)); for the Docker services above:
 
-Specify the base URLs a scraper should handle, then write custom scraping code for each website.
+```env
+DATABASE_URL=postgresql://username:password@localhost:5432/default_database
+SECRET_JTW_KEY=<openssl rand -hex 32>
+ENCRYPTION_KEY=<openssl rand -hex 32>
+```
 
-![Scraper configuration](/assets/images/page-config-scraper.png)
+```sh
+# 4. Create the database schema, then start the API, the worker and the app
+(cd api && npm run sync-database)
+npm run dev
+```
 
-### Instances Page
+The app runs on <http://localhost:5173>, the API on <http://localhost:3000>.
 
-Run scrapers against individual URLs to test their output.
+### First administrator
 
-![Instances page](/assets/images/page-instances.png)
+While no administrator exists, the API prints a one-time link at startup:
 
-### Schedulers Page
+```text
+admin auth page : http://localhost:5173/admin-auth?code=…
+```
 
-Schedule recurring scraping jobs and store their results in the database.
+Open it to create the administrator account. Other users join through email invitations (**Users** page), which requires SMTP settings (**Settings › E-mail**).
 
-![Schedulers page](/assets/images/page-planificateurs.png)
+### AI assistant
 
-### Scheduler Configuration
+In **Settings › Intelligence artificielle**, paste an [OpenRouter API key](https://openrouter.ai/keys) and pick a text model (any model with tool calling) and an image model. The key is stored encrypted and never sent back to the browser. Users need the *AI chat* permission.
 
-![Scheduler configuration](/assets/images/page-config-planificateur.png)
+## Configuration
 
-### User Management
+`api/.env` (also read by the Docker services):
 
-Public registration is disabled because this application is intended for personal, self-hosted use, including deployment on a VPS.
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `SECRET_JTW_KEY` | Secret used to sign session tokens |
+| `ENCRYPTION_KEY` | 32-byte hex key encrypting stored secrets (OpenRouter key, SMTP). **Don't change it** once secrets are saved. |
+| `FRONTEND_URL` | App URL, used for CORS and invitation links (default `http://localhost:5173`) |
+| `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD` | Redis for the scraping queue (default `127.0.0.1:6379`) |
+| `IMAGE_STORAGE_PATH` | Where uploaded and generated document images are stored (default `./uploads/images`) |
+| `PORT`, `NODE_ENV` | API port (default `3000`) and environment |
 
-Administrators can invite additional users by email and manage their permissions.
+The app reads `VITE_API_URL` at build time (default `http://localhost:3000`).
 
-![User management](/assets/images/page-users.png)
+## Deployment
 
-### User Permissions
+`docker-compose.yml` runs every service: `database`, `redis`, `api`, `worker`, `mcp` and `app` (nginx).
 
-Administrators can choose which actions each user is allowed to perform. By default, users can view documents.
+```sh
+VITE_API_URL=https://api.example.com docker compose up -d --build
+```
 
-![User permissions](/assets/images/page-config-user.png)
+- Set `FRONTEND_URL` in `api/.env` to the public app URL.
+- Document images live in the `document-images` volume: include it in your backups along with PostgreSQL.
+- On startup the API container applies the Prisma schema (`npm run sync-database`). It **refuses changes that would drop data**: review them, then apply once with `npx prisma db push --accept-data-loss` if they are expected.
+- Behind nginx, keep response buffering off for the API so assistant replies stream (the API already sends `X-Accel-Buffering: no`).
 
-## Repository Structure
+### MCP server
+
+The MCP server exposes pages, scrapers, instances, schedulers and users to Claude. In HTTP mode it only accepts the bearer token generated in **Settings › MCP**, which also shows ready-to-copy Claude Code and Claude Desktop configurations. See [mcp/README.md](mcp/README.md).
+
+## Repository structure
 
 ```text
 tritou-notes/
-├── app/                    # React frontend
-├── api/                    # Express backend and scraping worker
-├── mcp/                    # MCP server
-├── docker/
-│   ├── api/Dockerfile      # Backend container
-│   ├── app/Dockerfile      # Frontend container
-│   ├── worker/Dockerfile   # Scraping worker container
-│   ├── mcp/Dockerfile      # MCP server container
-│   └── database/docker-compose.yml # Development PostgreSQL and Redis services
-├── docker-compose.yml     # Application services
-├── docs/                   # Architecture diagrams and documentation
-├── assets/images/         # README screenshots
-└── README.md
+├── app/                 # React + Vite + Tailwind frontend
+├── api/                 # Express API and scraping worker
+│   ├── prisma/          # Database schema
+│   └── src/
+│       ├── ai/          # OpenRouter client, assistant loop and tools
+│       ├── controllers/ # Request handling
+│       ├── routes/      # Express routers
+│       ├── middlewares/ # Auth, admin and permission checks
+│       ├── utils/       # Shared helpers (page tree, revisions, storage…)
+│       ├── __tests__/   # Vitest suites
+│       ├── server.ts    # API entry point
+│       └── worker.ts    # Scraping queue consumer
+├── mcp/                 # MCP server (stdio and HTTP)
+├── docker/              # Dockerfiles for api, worker, app and mcp
+├── docs/                # Architecture diagrams and test documentation
+└── docker-compose.yml
 ```
 
-### Application Pages
-
-- **Documents:** create and manage text documents, spreadsheets, and to-do lists.
-- **Scrapers:** administrator page for creating and managing scrapers.
-- **Instances:** administrator page for running scrapers against specific URLs.
-- **Schedulers:** administrator page for scheduling scraping jobs.
-- **Users:** administrator page for listing users and inviting new accounts.
-
-## Frontend
-
-### Technologies
-
-- TypeScript
-- React
-- Tailwind CSS
-- ESLint
-- Vite
-
-## Backend
-
-### Prisma
-
-Run these commands from the `api/` directory.
-
-Synchronize the database with the schema. Review schema changes first, especially when working with an existing database:
+## Development
 
 ```sh
-npx prisma db push
+npm run lint              # ESLint for the API and the app
+npm --prefix api test     # Backend tests (Vitest)
+npm --prefix app run build
+npm --prefix mcp run build
 ```
 
-Generate the Prisma client:
+Changes to `api/prisma/schema.prisma` must be mirrored in `mcp/prisma/schema.prisma`. CI (GitHub Actions) runs lint, tests and builds; run it locally with [`act`](https://github.com/nektos/act) (`act --container-architecture linux/amd64` on Apple Silicon).
 
-```sh
-npx prisma generate
-```
-
-### Technologies
-
-- TypeScript
-- Express
-- Prisma
-- PostgreSQL
-- Redis and BullMQ
-- dotenv
-- ESLint
-
-### Structure
-
-```text
-api/
-├── prisma/
-│   └── schema.prisma       # Database schema
-├── src/
-│   ├── config/             # Environment variables and service clients
-│   ├── controllers/        # Request handling and application logic
-│   ├── middlewares/        # Authentication, permissions, and error handling
-│   ├── routes/             # Express routes
-│   ├── utils/              # Shared helpers and storage utilities
-│   ├── types/              # TypeScript declarations
-│   ├── __tests__/          # Backend tests
-│   ├── app.ts              # Express application configuration
-│   ├── server.ts           # API entry point
-│   └── worker.ts           # Scraping queue worker
-├── .env.example            # Environment configuration reference
-├── package.json            # Scripts and dependencies
-└── tsconfig.json           # TypeScript configuration
-```
-
-### Backend Tests
-
-```sh
-cd api/
-npm run test
-```
-
-See [backend testing documentation](docs/tests-backend.md) for coverage and integration tests.
-
-### Run CI Locally
-
-Install `act` on macOS:
-
-```sh
-brew install act
-```
-
-Run the GitHub Actions workflows locally:
-
-```sh
-act
-```
-
-To use an amd64 container architecture:
-
-```sh
-act --container-architecture linux/amd64
-```
+More details: [architecture diagrams](docs/schemas) and [backend tests](docs/tests-backend.md).
