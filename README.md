@@ -113,6 +113,8 @@ VITE_API_URL=https://api.example.com docker compose up -d --build
 - Document images live in the `document-images` volume: include it in your backups along with PostgreSQL.
 - On startup the API container applies the Prisma schema (`npm run sync-database`). It **refuses changes that would drop data**: review them, then apply once with `npx prisma db push --accept-data-loss` if they are expected.
 - Behind nginx, keep response buffering off for the API so assistant replies stream (the API already sends `X-Accel-Buffering: no`).
+- Images use Node 24 and run as the unprivileged `node` user; the worker also drops every Linux capability. The API and MCP containers start as root only to hand the `document-images` volume to `node`.
+- PostgreSQL, Redis and the MCP server are published on `127.0.0.1` only: reach them through the reverse proxy (or the Docker network).
 
 ### MCP server
 

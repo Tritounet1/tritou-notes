@@ -3,6 +3,7 @@ import { db, resetDatabase } from "./helpers/database";
 vi.mock("../config/prismaClient", async () => ({ prisma: (await import("./helpers/database")).db }));
 const mocks = vi.hoisted(() => {
   process.env.SCRAPER_SETTLE_MS = "0";
+  process.env.WORKER_HEARTBEAT_FILE = `${process.env.TMPDIR ?? "/tmp"}/tritou-worker-heartbeat-test`;
   return { process: undefined as undefined | ((job: { name: string; data: { id?: number; schedulerId?: number } }) => Promise<void>), run: vi.fn(), launch: vi.fn(), close: vi.fn(), kill: vi.fn(), guard: vi.fn(), runCode: vi.fn(), html: "<h1>Price</h1>", page: { setUserAgent: vi.fn(), setViewport: vi.fn(), setExtraHTTPHeaders: vi.fn(), goto: vi.fn() } };
 });
 vi.mock("dotenv", () => ({ default: { config: vi.fn() } }));
@@ -166,6 +167,22 @@ describe("worker startup", () => {
     expect(db.instanceScrape.findMany).toHaveBeenCalledWith({ where: { status: "WORKING" } });
     expect(db.scrapingScheduler.updateMany).toHaveBeenCalledWith({ where: { status: "RUNNING" }, data: { status: "ERROR", update_at: expect.any(Date) } });
     expect(db.scrapingScheduler.updateMany.mock.invocationCallOrder[0]).toBeLessThan(mocks.run.mock.invocationCallOrder[0]);
+  });
+
+  it("writes a heartbeat for the container healthcheck, and survives when it cannot", async () => {
+    const { readFileSync } = await import("node:fs");
+    await start();
+    expect(Number(readFileSync(process.env.WORKER_HEARTBEAT_FILE!, "utf8"))).toBeGreaterThan(Date.now() - 60_000);
+
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const previous = process.env.WORKER_HEARTBEAT_FILE;
+    process.env.WORKER_HEARTBEAT_FILE = "/nonexistent-dir/heartbeat";
+    try {
+      await start();
+    } finally {
+      process.env.WORKER_HEARTBEAT_FILE = previous;
+    }
+    expect(console.error).toHaveBeenCalledWith("Could not write the worker heartbeat:", expect.any(Error));
   });
 
   it("starts anyway when the recovery fails", async () => {

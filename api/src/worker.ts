@@ -1,6 +1,7 @@
 import { Worker } from "bullmq";
 import cronParser from "cron-parser";
 import dotenv from "dotenv";
+import { writeFileSync } from "node:fs";
 dotenv.config();
 
 import IORedis from "ioredis";
@@ -204,6 +205,19 @@ const worker = new Worker(
   },
   { connection, concurrency: 1, autorun: false },
 );
+
+// Liveness for the container healthcheck: written while the event loop runs (scraper code
+// runs in Chromium, so a stuck scraper does not stop it).
+const HEARTBEAT_FILE = process.env.WORKER_HEARTBEAT_FILE ?? "/tmp/worker-heartbeat";
+const beat = () => {
+  try {
+    writeFileSync(HEARTBEAT_FILE, String(Date.now()));
+  } catch (error) {
+    console.error("Could not write the worker heartbeat:", error);
+  }
+};
+beat();
+setInterval(beat, 30_000).unref();
 
 recoverInterruptedWork()
   .catch((error) => console.error("Could not recover interrupted jobs:", error))

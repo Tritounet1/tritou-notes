@@ -1,5 +1,5 @@
 # Stage 1: build
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 # Build argument for API URL
 ARG VITE_API_URL
@@ -8,7 +8,7 @@ ENV VITE_API_URL=$VITE_API_URL
 WORKDIR /app
 
 COPY app/package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY app .
 RUN npm run build
