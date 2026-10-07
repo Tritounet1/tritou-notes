@@ -8,21 +8,16 @@ import IORedis from "ioredis";
 import puppeteer from "puppeteer-extra";
 import type { Browser } from "puppeteer";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import config from "./config/config";
 import { prisma } from "./config/prismaClient";
+import { assertConfig } from "./config/validateConfig";
 import type { Prisma } from "./generated/prisma/client";
 import { guardPageRequests } from "./scraping/networkGuard";
 import { runScraperCode, ScraperTimeoutError } from "./scraping/sandbox";
 
-const REDIS_HOST = process.env.REDIS_HOST || "127.0.0.1";
-const REDIS_PORT = parseInt(process.env.REDIS_PORT || "6379");
+assertConfig("worker", {});
 
-const connection = new IORedis({
-  host: REDIS_HOST,
-  port: REDIS_PORT,
-  username: process.env.REDIS_USERNAME,
-  password: process.env.REDIS_PASSWORD,
-  maxRetriesPerRequest: null,
-});
+const connection = new IORedis({ ...config.redis, maxRetriesPerRequest: null });
 
 puppeteer.use(StealthPlugin());
 

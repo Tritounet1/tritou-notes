@@ -1,6 +1,5 @@
 import type { ContentPart } from "./openrouter";
-
-const httpError = (message: string, status = 400) => Object.assign(new Error(message), { status });
+import { httpError } from "../utils/httpError";
 
 export const MAX_ATTACHMENTS = 5;
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;

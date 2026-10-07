@@ -63,12 +63,17 @@ describe("first administrator setup", () => {
 
 describe("application composition", () => {
   it.each([true, false])("initializes settings only when absent (existing=%s)", async existing => {
-    if (!existing) db.settings.findFirstOrThrow.mockRejectedValue(new Error("Not found"));
+    db.settings.findFirst.mockResolvedValue(existing ? { id: 4 } : null);
     const { default: app } = await import("../app");
-    await Promise.resolve();
     expect(app).toBeTypeOf("function");
-    expect(db.settings.findFirstOrThrow).toHaveBeenCalledWith({ where: { id: 1 } });
+    await vi.waitFor(() => expect(db.settings.findFirst).toHaveBeenCalledWith());
     if (existing) expect(db.settings.create).not.toHaveBeenCalled();
-    else expect(db.settings.create).toHaveBeenCalledWith({ data: {} });
+    else await vi.waitFor(() => expect(db.settings.create).toHaveBeenCalledWith({ data: {} }));
+  });
+  it("does not crash when the database is not reachable at startup", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    db.settings.findFirst.mockRejectedValue(new Error("ECONNREFUSED"));
+    await import("../app");
+    await vi.waitFor(() => expect(log).toHaveBeenCalledWith("Could not initialise the settings:", expect.any(Error)));
   });
 });

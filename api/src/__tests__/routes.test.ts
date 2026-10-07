@@ -82,19 +82,19 @@ const administrative = [
 ];
 it.each(administrative)("blocks non-admin $area $method $url", async route => {
   const ctx = await dispatch(route.router, route.method, route.url, { user: regular });
-  expect(ctx.status).toHaveBeenCalledWith(401);
+  expect(ctx.status).toHaveBeenCalledWith(403);
   for (const model of Object.values(db)) for (const mock of Object.values(model)) expect(mock).not.toHaveBeenCalled();
 });
 it.each(administrative)("allows admin $area $method $url", async route => {
   const ctx = await dispatch(route.router, route.method, route.url, { body: { password: "password-long" } });
-  expect(ctx.status).not.toHaveBeenCalledWith(401);
+  expect(ctx.status).not.toHaveBeenCalledWith(403);
   expect(ctx.json).toHaveBeenCalledOnce();
 });
 
 it("rejects invitations from an authenticated regular user", async () => {
   db.user.findUnique.mockResolvedValue({ ...user, role: "USER" });
   const ctx = await dispatch(invitations, "POST", "/invite", { cookies: { auth_token: "valid" }, body: { email: "new@example.com" } });
-  expect(ctx.status).toHaveBeenCalledWith(401);
+  expect(ctx.status).toHaveBeenCalledWith(403);
   expect(mocks.mail).not.toHaveBeenCalled();
   expect(db.invitation.create).not.toHaveBeenCalled();
 });

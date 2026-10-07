@@ -59,7 +59,7 @@ Fill in `api/.env` (see [Configuration](#configuration)); for the Docker service
 
 ```env
 DATABASE_URL=postgresql://username:password@localhost:5432/default_database
-SECRET_JTW_KEY=<openssl rand -hex 32>
+JWT_SECRET=<openssl rand -hex 32>
 ENCRYPTION_KEY=<openssl rand -hex 32>
 ```
 
@@ -92,7 +92,7 @@ In **Settings › Intelligence artificielle**, paste an [OpenRouter API key](htt
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string |
-| `SECRET_JTW_KEY` | Secret used to sign session tokens |
+| `JWT_SECRET` | Secret used to sign session tokens (the former name `SECRET_JTW_KEY` is still read). The API, worker and MCP refuse to start with a missing database URL, JWT secret or malformed `ENCRYPTION_KEY` |
 | `ENCRYPTION_KEY` | 32-byte hex key encrypting stored secrets (OpenRouter key, SMTP). **Don't change it** once secrets are saved. |
 | `FRONTEND_URL` | App URL, used for CORS and invitation links (default `http://localhost:5173`) |
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD` | Redis for the scraping queue (default `127.0.0.1:6379`) |

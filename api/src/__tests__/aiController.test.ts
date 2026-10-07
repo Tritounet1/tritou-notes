@@ -261,12 +261,12 @@ describe("sendMessage", () => {
     const { res, events } = streamingResponse();
     mocks.runTurn.mockImplementation(async ({ ctx }) => {
       ctx.changed.add(5);
-      throw new Error("Provider overloaded");
+      throw Object.assign(new Error("OpenRouter : Provider overloaded"), { status: 502 });
     });
     const next = await send({ text: "Salut" }, res);
     expect(next).not.toHaveBeenCalled();
     expect(console.error).toHaveBeenCalled();
-    expect(events()).toEqual([{ type: "error", message: "Provider overloaded", messages: [], changedDocumentIds: [5], treeChanged: false }]);
+    expect(events()).toEqual([{ type: "error", message: "OpenRouter : Provider overloaded", messages: [], changedDocumentIds: [5], treeChanged: false }]);
     expect(res.end).toHaveBeenCalled();
   });
 
@@ -275,7 +275,8 @@ describe("sendMessage", () => {
     mocks.runTurn.mockRejectedValue("boom");
     db.aiMessage.findMany.mockRejectedValue(new Error("db down"));
     await send({ text: "Salut" }, res);
-    expect(events()).toEqual([{ type: "error", message: "Erreur" }]);
+    // An unexpected error is reported without its internal details.
+    expect(events()).toEqual([{ type: "error", message: "Erreur interne du serveur." }]);
   });
 
   it("stops the model silently when the client closes the stream", async () => {

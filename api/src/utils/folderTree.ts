@@ -1,5 +1,6 @@
 import { prisma } from "../config/prismaClient";
 import { InvalidParentError } from "./documentTree";
+import { notFound } from "./httpError";
 
 const folderId = (value: unknown) => {
   const id = Number(value);
@@ -42,7 +43,7 @@ export const resolveFolderParent = async (raw: unknown, id: number): Promise<num
 /** Deletes a folder without deleting anything in it: its pages and subfolders move up one level. */
 export const deleteFolderKeepingContent = async (id: number) => {
   const folder = await prisma.folder.findUnique({ where: { id }, select: { id: true, parentId: true } });
-  if (!folder) throw Object.assign(new Error("Dossier introuvable"), { status: 404 });
+  if (!folder) throw notFound("Dossier introuvable");
   await prisma.$transaction([
     prisma.folder.updateMany({ where: { parentId: id }, data: { parentId: folder.parentId } }),
     prisma.document.updateMany({ where: { folderId: id }, data: { folderId: folder.parentId } }),

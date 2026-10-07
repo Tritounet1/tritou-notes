@@ -12,7 +12,7 @@ const env = {
   ...process.env,
   NODE_ENV: "test",
   DATABASE_URL: "postgresql://backend_test:backend_test@127.0.0.1:55432/backend_test",
-  SECRET_JTW_KEY: "backend-integration-test-secret",
+  JWT_SECRET: "backend-integration-test-secret-32-bytes-long",
   ENCRYPTION_KEY: "ab".repeat(32),
   REDIS_HOST: "127.0.0.1", REDIS_PORT: "56379", REDIS_USERNAME: "", REDIS_PASSWORD: "",
   FRONTEND_URL: "http://localhost:5173",

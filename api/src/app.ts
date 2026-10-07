@@ -22,22 +22,15 @@ import userPermissionsRoutes from "./routes/userPermissionsRoutes";
 import userRoutes from "./routes/userRoutes";
 
 const app = express();
+app.disable("x-powered-by");
 
+// The settings row is a singleton read with findFirst everywhere.
 const initAppSettings = async () => {
-  try {
-    await prisma.settings.findFirstOrThrow({
-      where: {
-        id: 1,
-      },
-    });
-  } catch {
-    await prisma.settings.create({
-      data: {},
-    });
-  }
+  if (!(await prisma.settings.findFirst())) await prisma.settings.create({ data: {} });
 };
 
-initAppSettings();
+// A database that is not up yet must not crash the process with an unhandled rejection.
+initAppSettings().catch((error) => console.error("Could not initialise the settings:", error));
 
 app.use(
   cors({

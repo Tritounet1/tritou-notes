@@ -6,8 +6,8 @@ import type { ToolContext } from "../ai/toolKit";
 import { generateImage as generateWithOpenRouter, getAiConfig, listImageModels, listTextModels } from "../ai/openrouter";
 import { prisma } from "../config/prismaClient";
 import { prepareImage, removeImage, storeImage } from "../utils/documentImageStorage";
+import { httpError, toHttpError } from "../utils/httpError";
 
-const httpError = (message: string, status = 400) => Object.assign(new Error(message), { status });
 
 // ---- Helpers ----
 
@@ -186,7 +186,7 @@ export const sendMessage = async (req: Request<{ id: string }>, res: Response, n
       if (!abort.signal.aborted) {
         console.error(error);
         // Tools may already have changed pages: report them with the error.
-        send({ type: "error", message: error instanceof Error ? error.message : "Erreur", ...(await finish().catch(() => ({}))) });
+        send({ type: "error", message: toHttpError(error).message, ...(await finish().catch(() => ({}))) });
       }
     }
     res.end();

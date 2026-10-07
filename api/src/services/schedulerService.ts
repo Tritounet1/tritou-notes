@@ -1,11 +1,11 @@
 import cronParser from "cron-parser";
 import { prisma } from "../config/prismaClient";
 import { scrapeQueue } from "../config/queue";
+import { httpError, notFound } from "../utils/httpError";
 
 // Scheduler changes with queue side effects, shared by the REST controller and the AI tools.
 
 const jobName = (id: number) => `scheduler-${id}`;
-const badRequest = (message: string) => Object.assign(new Error(message), { status: 400 });
 
 /** A scheduler keeps its repeatable job unless it is explicitly deactivated (RUNNING and ERROR still run). */
 const isScheduled = (status: string | null | undefined) => Boolean(status) && status !== "DESACTIVATE";
@@ -14,7 +14,7 @@ export const assertValidCron = (cron: string) => {
   try {
     cronParser.parse(cron);
   } catch {
-    throw badRequest(`Expression cron invalide : « ${cron} »`);
+    throw httpError(`Expression cron invalide : « ${cron} »`);
   }
 };
 
@@ -44,7 +44,7 @@ export interface SchedulerChanges {
  */
 export const updateScheduler = async (id: number, userId: number, changes: SchedulerChanges) => {
   const previous = await prisma.scrapingScheduler.findFirst({ where: { id } });
-  if (!previous) throw new Error("La Scraping Scheduler n'existe pas");
+  if (!previous) throw notFound("Le planificateur n'existe pas");
   const author = await prisma.user.findFirst({ where: { id: userId } });
   if (!author) throw new Error("Utilisateur introuvable");
   if (changes.cron_expression) assertValidCron(changes.cron_expression);

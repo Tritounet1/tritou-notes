@@ -498,12 +498,16 @@ describe("settings, permissions, images and AI", () => {
     expect(db.userPermissions.update.mock.calls[0][0].data).not.toHaveProperty("role");
   });
   it("defends permission reads against non-admin direct calls", async () => {
-    await call(permissions.getUserPermissionsByUserId, {}, { user: { id: 7, role: "USER" } });
+    expect((await call(permissions.getUserPermissionsByUserId, {}, { user: { id: 7, role: "USER" } })).status).toHaveBeenCalledWith(403);
     expect(db.userPermissions.findFirst).not.toHaveBeenCalled();
+  });
+  it("answers 404 for a user without permissions", async () => {
+    db.userPermissions.findFirst.mockResolvedValue(null);
+    expect((await call(permissions.getUserPermissionsByUserId)).status).toHaveBeenCalledWith(404);
   });
   it("rechecks the current database role before changing permissions", async () => {
     db.user.findFirst.mockResolvedValue({ ...user, role: "USER" });
-    await call(permissions.updateUserPermissions);
+    expect((await call(permissions.updateUserPermissions)).status).toHaveBeenCalledWith(403);
     expect(db.userPermissions.update).not.toHaveBeenCalled();
   });
   it("uploads an image before creating its metadata", async () => {

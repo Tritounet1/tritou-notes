@@ -1,17 +1,15 @@
 import { NextFunction, Request, Response } from "express";
-
-interface AppError extends Error {
-  status?: number;
-}
+import { toHttpError } from "../utils/httpError";
 
 export const errorHandler = (
-  err: AppError,
+  err: unknown,
   req: Request,
   res: Response,
+  // Express recognises error handlers by their four parameters.
   next: NextFunction,
 ) => {
-  console.error(err);
-  res.status(err.status || 500).json({
-    message: err.message || "Internal Server Error",
-  });
+  const { status, message } = toHttpError(err);
+  // The details stay in the logs, never in the response.
+  if (status >= 500) console.error(err);
+  res.status(status).json({ message });
 };

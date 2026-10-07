@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
 import { deleteFolderKeepingContent, resolveFolder, resolveFolderParent } from "../utils/folderTree";
+import { httpError } from "../utils/httpError";
 
-const httpError = (message: string, status = 400) => Object.assign(new Error(message), { status });
 
 const folderName = (value: unknown) => {
   const name = typeof value === "string" ? value.trim().slice(0, 120) : "";

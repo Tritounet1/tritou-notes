@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
     exclude: ["src/__tests__/integration/**"],
+    // Valid placeholder configuration: entry points check it at startup (config/validateConfig.ts).
+    env: { DATABASE_URL: "postgresql://unit-tests", JWT_SECRET: "unit-test-jwt-secret-of-at-least-32-bytes", ENCRYPTION_KEY: "ab".repeat(32) },
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],

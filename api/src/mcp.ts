@@ -4,6 +4,9 @@ dotenv.config();
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createMcpApp } from "./mcp/http";
 import { buildServer, stdioUser } from "./mcp/server";
+import { assertConfig } from "./config/validateConfig";
+
+assertConfig("mcp", {});
 
 // MCP server entry point: HTTP on MCP_HTTP_PORT (production), stdio otherwise (local client).
 

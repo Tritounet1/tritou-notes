@@ -2,6 +2,7 @@ import { prisma } from "../config/prismaClient";
 import type { Prisma } from "../generated/prisma/client";
 import { InvalidParentError, resolveParent } from "./documentTree";
 import { resolveFolder } from "./folderTree";
+import { notFound } from "./httpError";
 
 export interface DocumentChanges {
   title?: string;
@@ -47,7 +48,7 @@ export const reviseDocument = async (id: number, authorId: number, changes: Docu
   });
 
   if (!previous_document) {
-    throw new Error("Le document n'existe pas");
+    throw notFound("Le document n'existe pas");
   }
   if (expectedLastUpdate && previous_document.last_update.getTime() !== expectedLastUpdate.getTime()) {
     throw new DocumentConflictError();

@@ -8,7 +8,7 @@ export const createToken = (
   role: string,
 ) => {
   if (config.secretKey === "") {
-    console.error("SECRET_KEY is not define in .env file.");
+    console.error("JWT_SECRET is not set.");
     return;
   }
 
@@ -25,7 +25,7 @@ export const createToken = (
 
 export const decodeToken = (token: string) => {
   if (!config.secretKey) {
-    console.error("SECRET_KEY is not define in .env file.");
+    console.error("JWT_SECRET is not set.");
     return;
   }
 

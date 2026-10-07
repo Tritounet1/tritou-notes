@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
 import { assertScrapableUrl } from "../scraping/networkGuard";
+import { notFound } from "../utils/httpError";
 
 export const createScraper = async (
   req: Request,
@@ -71,7 +72,7 @@ export const updateScraper = async (
     });
 
     if (!previous_scraper) {
-      throw new Error("Le scraper n'existe pas");
+      throw notFound("Le scraper n'existe pas");
     }
 
     // Scraper code runs on the server: only admins may change it.

@@ -43,6 +43,18 @@ describe("authentication", () => {
     if (isPublic) expect(ctx.next).toHaveBeenCalledOnce();
     else expect(ctx.status).toHaveBeenCalledWith(401);
   });
+  it("still serves public documents with an invalid or stale session cookie", async () => {
+    db.document.findFirst.mockResolvedValue({ public: true });
+    decode.mockImplementation(() => { throw new Error("jwt expired"); });
+    expect((await call(authHandler, {}, { path: "/api/documents/12", user: undefined, cookies: { auth_token: "old" } })).next).toHaveBeenCalledOnce();
+    decode.mockReturnValue({ id: "7" });
+    db.user.findUnique.mockResolvedValue(null);
+    expect((await call(authHandler, {}, { path: "/api/documents/12", user: undefined, cookies: { auth_token: "deleted-user" } })).next).toHaveBeenCalledOnce();
+  });
+  it("answers 401 when the public-document lookup fails", async () => {
+    db.document.findFirst.mockRejectedValue(new Error("offline"));
+    expect((await call(authHandler, {}, { path: "/api/documents/12", user: undefined })).status).toHaveBeenCalledWith(401);
+  });
   it("does not grant public-document access to other resources", async () => {
     db.document.findFirst.mockResolvedValue({ public: true });
     expect((await call(authHandler, {}, { path: "/api/document-histories/12", user: undefined })).status).toHaveBeenCalledWith(401);
@@ -75,15 +87,27 @@ describe("permissions", () => {
   it.each([undefined, "USER", "ADMIN"])("checks administrative roles: %s", async role => {
     const ctx = await call(adminMiddleware(), {}, { user: role ? { id: 7, role } : undefined });
     if (role === "ADMIN") expect(ctx.next).toHaveBeenCalledOnce();
-    else expect(ctx.status).toHaveBeenCalledWith(401);
+    else expect(ctx.status).toHaveBeenCalledWith(role ? 403 : 401);
   });
 });
 
-it.each([{ status: 409, message: "Conflict" }, { message: "Failure" }, {}])("formats application errors %j", error => {
+it.each([
+  [{ status: 409, message: "Conflict" }, 409, "Conflict"],
+  [{ status: 413 }, 413, "Erreur"],
+  // Internal details (Prisma, bcrypt, crypto…) never reach the client.
+  [new Error("connect ECONNREFUSED 10.0.0.3:5432"), 500, "Erreur interne du serveur."],
+  [{}, 500, "Erreur interne du serveur."],
+  ["boom", 500, "Erreur interne du serveur."],
+  [{ code: "P2025", message: "No record was found for a delete." }, 404, "Élément introuvable."],
+  [{ code: "P2002" }, 409, "Cet élément existe déjà."],
+  [{ code: "P2003" }, 409, "Cet élément est encore utilisé ailleurs."],
+  [{ name: "PrismaClientValidationError", message: "Argument `id`: Invalid value provided. Expected Int, provided NaN." }, 400, "Requête invalide."],
+])("formats errors %j without leaking internals", (error, status, message) => {
   const ctx = context();
-  vi.spyOn(console, "error").mockImplementation(() => {});
-  errorHandler(error as Error, ctx.req, ctx.res, ctx.next);
-  expect(ctx.status).toHaveBeenCalledWith("status" in error ? error.status : 500);
-  expect(ctx.json).toHaveBeenCalledWith({ message: error.message || "Internal Server Error" });
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  errorHandler(error, ctx.req, ctx.res, ctx.next);
+  expect(ctx.status).toHaveBeenCalledWith(status);
+  expect(ctx.json).toHaveBeenCalledWith({ message });
+  expect(log).toHaveBeenCalledTimes(status >= 500 ? 1 : 0);
   vi.restoreAllMocks();
 });

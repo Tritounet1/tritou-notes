@@ -18,7 +18,8 @@ interface Config {
 const config: Config = {
   port: Number(process.env.PORT) || 3000,
   nodeEnv: process.env.NODE_ENV || "development",
-  secretKey: process.env.SECRET_JTW_KEY || "",
+  // JWT_SECRET; SECRET_JTW_KEY is the former (misspelt) name, still accepted.
+  secretKey: process.env.JWT_SECRET || process.env.SECRET_JTW_KEY || "",
   databaseUrl: process.env.DATABASE_URL || "",
   encryptionKey: process.env.ENCRYPTION_KEY || "",
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",

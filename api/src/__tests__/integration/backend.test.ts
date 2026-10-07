@@ -81,8 +81,8 @@ describe("real HTTP + PostgreSQL + Redis", () => {
     expect((await request("/auth/login", "POST", { email: "user@test.example", password: "wrong" }, "")).status).toBe(401);
   });
   it("rejects non-admin invitations and settings access", async () => {
-    expect((await request("/api/admin-auth/invite", "POST", { email: "invited@test.example" }, regularToken)).status).toBe(401);
-    expect((await request("/api/settings", "GET", undefined, regularToken)).status).toBe(401);
+    expect((await request("/api/admin-auth/invite", "POST", { email: "invited@test.example" }, regularToken)).status).toBe(403);
+    expect((await request("/api/settings", "GET", undefined, regularToken)).status).toBe(403);
   });
   it("creates an admin-managed user with a usable hash and default permissions", async () => {
     const response = await request("/api/users", "POST", { email: "managed@test.example", username: "managed", password: "managed-password" });
