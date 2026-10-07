@@ -39,7 +39,7 @@ export const scraperTools: Tool[] = [
         id: { type: "number", description: "Scraper ID" },
         name: { type: "string", description: "New name" },
         description: { type: "string", description: "New description" },
-        code: { type: "string", description: "JavaScript scraper code executed in a VM context" },
+        code: { type: "string", description: "JavaScript scraper code, run in an isolated world of the scraped page (only `$` = Cheerio and `result`)" },
         browser: { type: "boolean", description: "Use Puppeteer browser (true) or Cheerio HTTP (false)" },
         base_url: {
           type: "array",

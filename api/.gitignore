@@ -3,3 +3,6 @@ node_modules
 node_modules/
 
 /src/generated/prisma
+
+# Cheerio bundle for the scraper sandbox (npm run build:sandbox)
+/sandbox

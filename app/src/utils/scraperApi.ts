@@ -1,10 +1,10 @@
 import { snippetCompletion, type Completion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import { javascriptLanguage } from "@codemirror/lang-javascript";
 
-// What scraper code can use, mirroring api/src/worker.ts: the code runs synchronously in a
-// `vm` context holding only `$` (Cheerio loaded with the page HTML) and `result`, the object
-// it must assign. Standard JS built-ins (JSON, Math, Array…) exist; console, fetch and timers
-// don't. One list feeds both the editor autocompletion and the documentation panel.
+// What scraper code can use, mirroring api/src/scraping/sandbox.ts: the code runs synchronously
+// in an isolated world of the scraped page, with `$` (Cheerio loaded with the page HTML) and
+// `result`, the object it must assign. Standard JS built-ins (JSON, Math, Array…) exist; there
+// is no Node (process, require) and nothing asynchronous is awaited. One list feeds both the editor autocompletion and the documentation panel.
 
 export interface ScraperApiEntry {
   /** Completion label. */

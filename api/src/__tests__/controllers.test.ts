@@ -260,6 +260,24 @@ describe("scraping resources", () => {
     await call(scrapers.updateScraper, { code: "result = {}", display_template: { title: "price" } });
     expect(db.scraper.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ code: "result = {}", display_template: { title: "price" }, last_update: expect.any(Date) }) }));
   });
+  it("lets only admins change scraper code", async () => {
+    db.scraper.findFirst.mockResolvedValue({ id: 12, code: "result = 1" });
+    const user = { user: { id: 8, role: "USER" } };
+    expect((await call(scrapers.updateScraper, { code: "result = process.env" }, user)).status).toHaveBeenCalledWith(403);
+    expect(db.scraper.update).not.toHaveBeenCalled();
+    // The page sends every field on save: an unchanged code is fine.
+    await call(scrapers.updateScraper, { name: "Renamed", code: "result = 1" }, user);
+    expect(db.scraper.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ name: "Renamed", code: "result = 1" }) }));
+  });
+  it("validates scraper base URLs", async () => {
+    expect((await call(scrapers.updateScraper, { base_url: "https://a.example" })).status).toHaveBeenCalledWith(400);
+    expect((await call(scrapers.updateScraper, { base_url: ["http://127.0.0.1:5432"] })).next).toHaveBeenCalledWith(expect.objectContaining({ status: 400 }));
+    expect(db.scraper.update).not.toHaveBeenCalled();
+  });
+  it("refuses to scrape internal addresses", async () => {
+    expect((await call(instances.createInstanceScrape, { url: "http://169.254.169.254/latest/meta-data/" })).next).toHaveBeenCalledWith(expect.objectContaining({ status: 400 }));
+    expect(db.instanceScrape.create).not.toHaveBeenCalled();
+  });
   it("rejects updating a missing scraper", async () => {
     db.scraper.findFirst.mockResolvedValue(null);
     expect((await call(scrapers.updateScraper)).next).toHaveBeenCalledWith(expect.any(Error));
@@ -270,7 +288,7 @@ describe("scraping resources", () => {
   });
   it("associates a scheduled scrape without queuing it immediately", async () => {
     await call(instances.createInstanceScrape, { url: "https://example.com", scrapingSchedulerId: "3", scraperId: "4" });
-    expect(db.instanceScrape.create).toHaveBeenCalledWith({ data: { url: "https://example.com", scrapingSchedulerId: 3, scraperId: 4 } });
+    expect(db.instanceScrape.create).toHaveBeenCalledWith({ data: { url: "https://example.com/", scrapingSchedulerId: 3, scraperId: 4 } });
     expect(mocks.add).not.toHaveBeenCalled();
   });
   it("forwards queue failures", async () => {
@@ -379,7 +397,7 @@ for (const module of modules) {
       const failure = new Error("Dependency unavailable");
       for (const model of Object.values(db)) for (const mock of Object.values(model)) mock.mockRejectedValue(failure);
       for (const mock of [mocks.email, mocks.hash, mocks.response, mocks.models, mocks.upload]) mock.mockRejectedValue(failure);
-      const ctx = await call(handler, { password: "password-long", currentPassword: "old", newPassword: "password-long", email: "new@example.com" });
+      const ctx = await call(handler, { password: "password-long", currentPassword: "old", newPassword: "password-long", email: "new@example.com", url: "https://example.com" });
       // Logout has no database dependency; exercise a cookie write failure instead.
       if (name === "logout") {
         ctx.cookie.mockImplementation(() => { throw failure; });

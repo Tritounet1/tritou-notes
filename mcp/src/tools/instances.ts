@@ -78,9 +78,11 @@ export async function handleInstanceTool(name: string, args: Args): Promise<unkn
       const { url } = args as { url: string };
       let origin: string;
       try {
-        origin = new URL(url).origin;
+        const parsed = new URL(url);
+        if (!/^https?:$/.test(parsed.protocol)) throw new Error();
+        origin = parsed.origin;
       } catch {
-        throw new Error(`Invalid URL: ${url}`);
+        throw new Error(`Invalid URL (http or https expected): ${url}`);
       }
       // Same lookup as api/src/worker.ts, which makes the final choice when the job runs.
       const scraper = await prisma.scraper.findFirst({

@@ -3,14 +3,14 @@ import cronParser from "cron-parser";
 import dotenv from "dotenv";
 dotenv.config();
 
-import * as cheerio from "cheerio";
 import IORedis from "ioredis";
 import puppeteer from "puppeteer-extra";
 import type { Browser } from "puppeteer";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
-import vm from "vm";
 import { prisma } from "./config/prismaClient";
 import type { Prisma } from "./generated/prisma/client";
+import { guardPageRequests } from "./scraping/networkGuard";
+import { runScraperCode, ScraperTimeoutError } from "./scraping/sandbox";
 
 const REDIS_HOST = process.env.REDIS_HOST || "127.0.0.1";
 const REDIS_PORT = parseInt(process.env.REDIS_PORT || "6379");
@@ -29,6 +29,10 @@ const sleep = (ms: number): Promise<void> => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
+const NAVIGATION_TIMEOUT_MS = 45_000;
+// Time left for client-side rendering after the network settles (0 in tests).
+const SETTLE_MS = Number(process.env.SCRAPER_SETTLE_MS ?? 3000);
+
 const scrapeWithBrowser = async (url: string, code: string) => {
   let browser: Browser | undefined;
   try {
@@ -39,6 +43,8 @@ const scrapeWithBrowser = async (url: string, code: string) => {
     });
 
     const page = await browser.newPage();
+    // Only public http(s) addresses, for the page itself, its redirects and sub-resources.
+    await guardPageRequests(page);
 
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -50,25 +56,23 @@ const scrapeWithBrowser = async (url: string, code: string) => {
       "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
     });
 
-    await page.goto(url, { waitUntil: "networkidle2" });
-    await sleep(3);
+    await page.goto(url, { waitUntil: "networkidle2", timeout: NAVIGATION_TIMEOUT_MS });
+    await sleep(SETTLE_MS);
 
-    const htmlContent = await page.content();
-    const $ = cheerio.load(htmlContent);
-
-    const context = { $, result: null };
-
-    vm.createContext(context);
-    vm.runInContext(code, context);
+    // The scraper code runs in the page's isolated world, never in this Node process.
+    const result = await runScraperCode(page, code);
 
     return {
       url: url,
-      ...(context.result as Prisma.InputJsonObject | null),
+      ...(result as Prisma.InputJsonObject | null),
     };
-  } catch (e) {
-    console.log("error : ", e);
+  } catch (error) {
+    // A scraper stuck in a loop blocks its renderer: kill Chromium instead of waiting for it.
+    if (error instanceof ScraperTimeoutError) browser?.process()?.kill("SIGKILL");
+    // Keep the real cause: it is stored as the instance's error.
+    throw error;
   } finally {
-    await browser?.close();
+    await browser?.close().catch(() => {});
   }
 };
 

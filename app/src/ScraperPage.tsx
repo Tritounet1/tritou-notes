@@ -4,6 +4,7 @@ import CodeMirror from "@uiw/react-codemirror";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiFetch } from "./api";
+import { useAuth } from "./hooks/useAuth";
 import { useDebounce } from "./hooks/useDebounce";
 import type { TemplateBlock } from "./types/scraper";
 import { useConfirm } from "./hooks/useConfirm";
@@ -68,6 +69,7 @@ const CLOSE_PATH = "M6 18 18 6M6 6l12 12";
 export const ScraperPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [confirm, confirmDialog] = useConfirm();
   const [scraper, setScraper] = useState<Scraper | null>(null);
   const [loading, setLoading] = useState(true);
@@ -332,6 +334,8 @@ export const ScraperPage = () => {
                 theme={vscodeDark}
                 extensions={[javascript(), scraperCompletions]}
                 onChange={handleCodeChange}
+                editable={isAdmin}
+                readOnly={!isAdmin}
               />
             </div>
           </div>
@@ -523,6 +527,11 @@ export const ScraperPage = () => {
               <span className="font-mono text-xs text-[#e6e4de]">
                 scraper.js
               </span>
+              {!isAdmin && (
+                <span className="text-xs text-[#a8a59e]" title="Le code s’exécute sur le serveur : seuls les administrateurs peuvent le modifier.">
+                  · lecture seule (admins uniquement)
+                </span>
+              )}
             </div>
             <button
               type="button"
@@ -540,6 +549,8 @@ export const ScraperPage = () => {
             theme={vscodeDark}
             extensions={[javascript(), scraperCompletions]}
             onChange={handleCodeChange}
+            editable={isAdmin}
+            readOnly={!isAdmin}
             placeholder={`var html = getHtmlPage();
 
 var products = html.select("div.product");

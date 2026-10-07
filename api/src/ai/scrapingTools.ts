@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "../config/prismaClient";
 import type { Prisma } from "../generated/prisma/client";
+import { assertScrapableUrl } from "../scraping/networkGuard";
 import { createInstance } from "../services/instanceService";
 import { assertValidCron, deleteScheduler, updateScheduler } from "../services/schedulerService";
-import { count, label, positiveInt, requirePermission, string, ToolError, type Tool } from "./toolKit";
+import { count, label, positiveInt, requireAdmin, requirePermission, string, ToolError, type Tool, type ToolContext } from "./toolKit";
 
 // Scrapers, schedulers and instances: the assistant can do everything the Scraping pages do,
 // through the same services as the REST API (so scheduler jobs stay in sync).
@@ -13,7 +14,7 @@ const INSTANCE_STATUSES = ["IN_QUEUE", "STARTING", "WORKING", "FINISHED", "ERROR
 const MAX_WAIT_SECONDS = 60;
 
 const SCRAPER_FORMAT =
-  "Le code d’un scraper est du JavaScript synchrone exécuté dans un sandbox qui ne contient que `$` (Cheerio chargé avec le HTML de la page) " +
+  "Le code d’un scraper (modifiable par les administrateurs seulement) est du JavaScript synchrone exécuté dans un monde isolé de la page scrapée, avec `$` (Cheerio chargé avec le HTML de la page) " +
   "et `result`, à assigner : un objet (une carte) ou un tableau d’objets (une carte par élément), ex. " +
   "`result = $(\".item\").map((i, el) => ({ title: $(el).find(\"h2\").text().trim(), price: $(el).find(\".price\").text() })).get();`. " +
   "Pas de console, fetch, await ni timers. `display_template` liste des blocs { type: title|text|image|link|badge|date, field: clé de result, label? }.";
@@ -33,25 +34,19 @@ const findScheduler = async (value: unknown) => {
 /** The worker matches scrapers on the page origin, so base URLs are stored as origins. */
 const origins = (value: unknown) => {
   if (!Array.isArray(value)) throw new ToolError("`base_url` doit être une liste d’URL.");
-  return [...new Set(value.map((raw) => {
-    try {
-      return new URL(String(raw)).origin;
-    } catch {
-      throw new ToolError(`URL invalide : ${raw}`);
-    }
-  }))];
+  return [...new Set(value.map((raw) => new URL(scrapable(String(raw))).origin))];
 };
 
-const absoluteUrl = (value: unknown) => {
-  const url = string(value, "url").trim();
+/** Public http(s) URLs only: the worker would block anything else anyway. */
+const scrapable = (url: string) => {
   try {
-    const parsed = new URL(url);
-    if (!/^https?:$/.test(parsed.protocol)) throw new Error();
-    return parsed.toString();
-  } catch {
-    throw new ToolError(`URL invalide (http ou https attendu) : ${url}`);
+    return assertScrapableUrl(url);
+  } catch (error) {
+    throw new ToolError((error as Error).message);
   }
 };
+
+const absoluteUrl = (value: unknown) => scrapable(string(value, "url").trim());
 
 const template = (value: unknown) => {
   if (!Array.isArray(value)) throw new ToolError("`display_template` doit être une liste de blocs.");
@@ -72,16 +67,19 @@ const scraperStatus = (value: unknown): "ACTIVE" | "DISABLE" => {
   return value;
 };
 
-/** Scraper fields accepted by create / update, validated. */
-const scraperData = (args: Record<string, unknown>) => ({
-  ...(args.name !== undefined && { name: string(args.name, "name") }),
-  ...(args.description !== undefined && { description: String(args.description ?? "") }),
-  ...(args.code !== undefined && { code: string(args.code, "code", { allowEmpty: true }) }),
-  ...(args.browser !== undefined && { browser: Boolean(args.browser) }),
-  ...(args.base_url !== undefined && { base_url: origins(args.base_url) }),
-  ...(args.display_template !== undefined && { display_template: template(args.display_template) }),
-  ...(args.status !== undefined && { status: scraperStatus(args.status) }),
-});
+/** Scraper fields accepted by create / update, validated. Only admins may write scraper code. */
+const scraperData = (args: Record<string, unknown>, ctx: ToolContext, currentCode: string | null = "") => {
+  if (args.code !== undefined && args.code !== (currentCode ?? "")) requireAdmin(ctx);
+  return {
+    ...(args.name !== undefined && { name: string(args.name, "name") }),
+    ...(args.description !== undefined && { description: String(args.description ?? "") }),
+    ...(args.code !== undefined && { code: string(args.code, "code", { allowEmpty: true }) }),
+    ...(args.browser !== undefined && { browser: Boolean(args.browser) }),
+    ...(args.base_url !== undefined && { base_url: origins(args.base_url) }),
+    ...(args.display_template !== undefined && { display_template: template(args.display_template) }),
+    ...(args.status !== undefined && { status: scraperStatus(args.status) }),
+  };
+};
 
 const FIELD_LABELS: Record<string, string> = {
   name: "nom", description: "description", code: "code", browser: "navigateur", base_url: "sites", display_template: "template", status: "statut",
@@ -149,7 +147,7 @@ export const scrapingTools: Record<string, Tool> = {
     },
     run: async (args, ctx) => {
       requirePermission(ctx, "modifyScraper");
-      const scraper = await prisma.scraper.create({ data: { name: string(args.name, "name"), ...scraperData(args) } });
+      const scraper = await prisma.scraper.create({ data: { name: string(args.name, "name"), ...scraperData(args, ctx) } });
       return { output: { id: scraper.id, status: scraper.status }, summary: `Scraper créé : ${label(scraper.name)}` };
     },
   },
@@ -163,7 +161,7 @@ export const scrapingTools: Record<string, Tool> = {
     run: async (args, ctx) => {
       requirePermission(ctx, "modifyScraper");
       const scraper = await findScraper(args.id);
-      const data = scraperData(args);
+      const data = scraperData(args, ctx, scraper.code);
       const updated = await prisma.scraper.update({ where: { id: scraper.id }, data: { ...data, last_update: new Date() } });
       return { output: { ok: true, status: updated.status, base_url: updated.base_url }, summary: `Scraper modifié : ${label(updated.name)}${changedFields(data)}` };
     },

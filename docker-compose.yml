@@ -61,9 +61,8 @@ services:
     build:
       context: .
       dockerfile: docker/worker/Dockerfile
-    env_file:
-      - path: ./api/.env
-        required: false
+    # No api/.env here: the worker runs untrusted scraper code and only needs the
+    # database and Redis, not the JWT / encryption / AI secrets.
     environment:
       DATABASE_URL: postgresql://username:password@database:5432/default_database
       REDIS_HOST: redis

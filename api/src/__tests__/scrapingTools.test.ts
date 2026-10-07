@@ -107,6 +107,27 @@ describe("scraper tools", () => {
     });
   });
 
+  it("lets only admins write scraper code", async () => {
+    const editor = user({ modifyScraper: true });
+    expect(await run("create_scraper", { name: "X", code: "result = 1" }, editor)).toMatchObject({ ok: false, summary: expect.stringContaining("Réservé aux administrateurs") });
+    expect(db.scraper.create).not.toHaveBeenCalled();
+    db.scraper.create.mockResolvedValue({ id: 5, name: "X", status: "DISABLE" });
+    expect(await run("create_scraper", { name: "X", code: "" }, editor)).toMatchObject({ ok: true });
+
+    db.scraper.findUnique.mockResolvedValue({ id: 4, name: "Old", code: "result = 1" });
+    db.scraper.update.mockResolvedValue({ id: 4, name: "Old", status: "DISABLE", base_url: [] });
+    expect(await run("update_scraper", { id: 4, code: "result = 2" }, editor)).toMatchObject({ ok: false, summary: expect.stringContaining("Réservé aux administrateurs") });
+    expect(db.scraper.update).not.toHaveBeenCalled();
+    expect(await run("update_scraper", { id: 4, name: "New", code: "result = 1" }, editor)).toMatchObject({ ok: true });
+    db.scraper.findUnique.mockResolvedValue({ id: 4, name: "Old", code: null });
+    expect(await run("update_scraper", { id: 4, code: "" }, editor)).toMatchObject({ ok: true });
+  });
+
+  it("refuses internal addresses as base URLs", async () => {
+    expect(await run("create_scraper", { name: "X", base_url: ["http://localhost:3000"] })).toMatchObject({ ok: false, summary: expect.stringContaining("adresses http(s) publiques") });
+    expect(db.scraper.create).not.toHaveBeenCalled();
+  });
+
   it("refuses to update a missing scraper or without permission", async () => {
     db.scraper.findUnique.mockResolvedValue(null);
     expect(await run("update_scraper", { id: 3, name: "x" })).toMatchObject({ ok: false, summary: expect.stringContaining("Le scraper 3 n’existe pas") });
@@ -194,7 +215,7 @@ describe("scheduler tools", () => {
   it("validates create_scheduler before writing anything", async () => {
     expect(await run("create_scheduler", { title: "X", cron_expression: "n'importe quoi" })).toMatchObject({ ok: false, summary: expect.stringContaining("Expression cron invalide") });
     expect(await run("create_scheduler", { title: "X", activate: true })).toMatchObject({ ok: false, summary: expect.stringContaining("Un cron est nécessaire") });
-    expect(await run("create_scheduler", { title: "X", urls: ["ftp://a.example/file"] })).toMatchObject({ ok: false, summary: expect.stringContaining("URL invalide (http ou https attendu) : ftp://a.example/file") });
+    expect(await run("create_scheduler", { title: "X", urls: ["ftp://a.example/file"] })).toMatchObject({ ok: false, summary: expect.stringContaining("Seules les adresses http(s) publiques peuvent être scrapées : ftp://a.example/file") });
     expect(await run("create_scheduler", { title: "X", urls: ["nope"] })).toMatchObject({ ok: false, summary: expect.stringContaining("URL invalide") });
     expect(await run("create_scheduler", { title: "X", urls: [""] })).toMatchObject({ ok: false, summary: expect.stringContaining("« url »") });
     expect(await run("create_scheduler", { title: "" })).toMatchObject({ ok: false, summary: expect.stringContaining("« title »") });
@@ -238,7 +259,7 @@ describe("scheduler tools", () => {
     const covered = await run("add_scheduler_url", { id: 1, url: "https://nobody.example/q" });
     expect(covered.output).toEqual({ instanceId: 40, scraper: "Nobody" });
 
-    expect(await run("add_scheduler_url", { id: 1, url: "javascript:alert(1)" })).toMatchObject({ ok: false, summary: expect.stringContaining("URL invalide") });
+    expect(await run("add_scheduler_url", { id: 1, url: "javascript:alert(1)" })).toMatchObject({ ok: false, summary: expect.stringContaining("adresses http(s) publiques") });
   });
 
   it("removes a scheduler URL and its history, refusing a standalone instance", async () => {
@@ -292,7 +313,7 @@ describe("instance tools", () => {
 
   it("needs useScraper and a valid URL to run a scrape", async () => {
     expect(await run("run_scrape", { url: "https://a.example/" }, user({ accessInstancesScrapersPage: true }))).toMatchObject({ ok: false, summary: expect.stringContaining("useScraper") });
-    expect(await run("run_scrape", { url: "file:///etc/passwd" })).toMatchObject({ ok: false, summary: expect.stringContaining("URL invalide") });
+    expect(await run("run_scrape", { url: "file:///etc/passwd" })).toMatchObject({ ok: false, summary: expect.stringContaining("adresses http(s) publiques") });
     expect(await run("run_scrape", {})).toMatchObject({ ok: false, summary: expect.stringContaining("« url »") });
     db.scraper.findFirst.mockResolvedValue(null);
     expect(await run("run_scrape", { url: "https://a.example/p" })).toMatchObject({ ok: false, summary: expect.stringContaining("Aucun scraper ACTIVE ne gère https://a.example") });
