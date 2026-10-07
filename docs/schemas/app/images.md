@@ -46,7 +46,7 @@ Après mise à jour du code :
 npm --prefix api ci --legacy-peer-deps
 cd api
 npx prisma generate
-npm run sync-database
+npm run migrate
 npm run dev:api
 ```
 

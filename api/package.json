@@ -15,7 +15,8 @@
     "lint": "eslint 'src/**/*.ts'",
     "test": "vitest run",
     "test:watch": "vitest",
-    "sync-database": "npx prisma db push",
+    "migrate": "node scripts/migrate.mjs",
+    "migrate:dev": "prisma migrate dev",
     "knip": "knip",
     "test:coverage": "vitest run --coverage",
     "test:integration": "node scripts/test-integration.mjs"

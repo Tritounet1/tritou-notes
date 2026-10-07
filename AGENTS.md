@@ -3,22 +3,20 @@
 ## Project Structure & Module Organization
 
 - `app/src/`: React, TypeScript, Vite, and Tailwind frontend; pages sit at the root, with reusable `components/`, `hooks/`, and `types/`.
-- `api/src/`: Express backend organized into `routes/`, `controllers/`, `middlewares/`, `config/`, and `utils/`. `server.ts` starts the API; `worker.ts` runs BullMQ scraping jobs.
-- `api/prisma/schema.prisma`: database schema; `api/src/__tests__/`: backend tests.
-- `mcp/src/`: MCP server and tools; `mcp/prisma/`: its Prisma schema.
+- `api/src/`: Express backend organized into `routes/`, `controllers/`, `middlewares/`, `config/`, and `utils/`. `server.ts` starts the API; `worker.ts` runs BullMQ scraping jobs; `mcp.ts` starts the MCP server, which exposes the assistant's tools (`ai/`).
+- `api/prisma/schema.prisma`: database schema, with versioned migrations in `api/prisma/migrations/`; `api/src/__tests__/`: backend tests.
 - `docker/` and `docker-compose.yml`: container definitions and PostgreSQL/Redis services. `assets/images/` contains README screenshots.
 
 ## Build, Test, and Development Commands
 
-Install dependencies separately in the root, `app/`, `api/`, and `mcp/`; these are separate packages. CI uses `npm ci --legacy-peer-deps` for the API and `npm ci` for the frontend.
+Install dependencies separately in the root, `app/` and `api/`; these are separate packages. CI uses `npm ci --legacy-peer-deps` for the API and `npm ci` for the frontend.
 
 - `docker compose up -d database redis`: start local backing services.
 - `npm run dev`: run the API, worker, and Vite frontend concurrently.
 - `npm run lint`: lint the API and frontend with ESLint.
 - `npm --prefix api test`: run backend Vitest tests; use `npm --prefix api run test:watch` during development.
-- `cd api && npx prisma generate`: generate the API database client.
+- `cd api && npx prisma generate`: generate the API database client; `npm --prefix api run migrate`: apply the database migrations.
 - `npm --prefix api run build` and `npm --prefix app run build`: compile backend and frontend.
-- `npm --prefix mcp run build`: generate the MCP Prisma client and compile the server.
 
 The root `npm run build` currently invokes an undefined API `prod` script; use the explicit builds above.
 
@@ -36,4 +34,4 @@ Follow history's `feat: <summary>` and `fix: <summary>` convention. Keep commits
 
 ## Configuration
 
-Use `api/.env.example` and `mcp/.env.example` as configuration references. Keep credentials and tokens out of commits. Review database changes before running `npm --prefix api run sync-database`, which pushes the Prisma schema to the configured database.
+Use `api/.env.example` as the configuration reference. Keep credentials and tokens out of commits. Change the database with `npm --prefix api run migrate:dev -- --name <change>`, review the generated SQL in `api/prisma/migrations/`, and commit it; `npm --prefix api run migrate` applies pending migrations (the API container does it at startup).

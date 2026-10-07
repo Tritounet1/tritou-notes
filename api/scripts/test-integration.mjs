@@ -27,7 +27,8 @@ function run(command, args) {
 try {
   run("docker", [...compose, "up", "-d", "--wait", "--wait-timeout", "90"]);
   run("npx", ["prisma", "generate"]);
-  run("npx", ["prisma", "db", "push"]);
+  // Same path as production: the versioned migrations, not `db push`.
+  run("node", ["scripts/migrate.mjs"]);
   run("npx", ["vitest", "run", "--config", "vitest.integration.config.mts"]);
 } catch (error) {
   console.error(error.message);

@@ -8,7 +8,7 @@ RUN npm ci --legacy-peer-deps
 COPY api .
 RUN npx prisma generate && npm run build
 
-# Runtime. Keeps the Prisma CLI (a dev dependency) to sync the schema at startup.
+# Runtime. Keeps the Prisma CLI (a dev dependency) to apply migrations at startup.
 FROM node:24-alpine
 RUN apk add --no-cache su-exec
 WORKDIR /api
@@ -17,6 +17,7 @@ COPY api/package*.json ./
 RUN npm ci --legacy-peer-deps && npm cache clean --force
 COPY api/prisma ./prisma
 COPY api/prisma.config.ts ./
+COPY api/scripts/migrate.mjs ./scripts/
 COPY api/public ./public
 COPY --from=build /api/dist ./dist
 RUN mkdir -p /api/uploads/images && chown node:node /api/uploads/images
@@ -26,4 +27,4 @@ EXPOSE 3000
 
 # Starts as root only to hand the image volume (files written by older root containers)
 # to the `node` user, then runs everything as `node`.
-CMD ["sh", "-c", "chown -R node:node /api/uploads/images && exec su-exec node sh -c 'npx prisma db push && exec node dist/server.js'"]
+CMD ["sh", "-c", "chown -R node:node /api/uploads/images && exec su-exec node sh -c 'node scripts/migrate.mjs && exec node dist/server.js'"]

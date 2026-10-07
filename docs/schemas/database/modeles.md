@@ -48,7 +48,7 @@ stateDiagram-v2
 
 ## Persistance et initialisation
 
-PostgreSQL 18 est monté sur `/var/lib/postgresql` via le volume `postgres-data`. Redis conserve les jobs BullMQ, pas les documents. Le volume `document-images` conserve les fichiers WebP de l’API ; il doit être sauvegardé avec PostgreSQL. Pour une base locale neuve, lancer `npm --prefix api run sync-database` avant `npm run dev` ; la génération du client Prisma ne crée pas les tables.
+PostgreSQL 18 est monté sur `/var/lib/postgresql` via le volume `postgres-data`. Redis conserve les jobs BullMQ, pas les documents. Le volume `document-images` conserve les fichiers WebP de l’API ; il doit être sauvegardé avec PostgreSQL. Pour une base locale neuve, lancer `npm --prefix api run migrate` avant `npm run dev` (migrations versionnées dans `api/prisma/migrations`) ; la génération du client Prisma ne crée pas les tables.
 
 Le worker historise une réponse antérieure avant de la remplacer. Les documents sont historisés par le contrôleur lors des mises à jour. Les valeurs `Json`, les textes et les templates ne sont pas normalisés en tables supplémentaires.
 
