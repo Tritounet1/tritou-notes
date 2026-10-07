@@ -76,200 +76,135 @@ const scrapeWithBrowser = async (url: string, code: string) => {
   }
 };
 
-console.log("Start worker for scraping queue.");
+const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-const scrapeInstance = async (
-  instanceId: number,
-  schedulerId?: number | null,
-) => {
-  const instanceScrape = await prisma.instanceScrape.findFirst({
-    where: { id: instanceId },
-  });
+type InstanceRow = { id: number; url: string; response: Prisma.JsonValue | null };
 
-  if (!instanceScrape) {
-    throw "Error: Instance of scrape not found.";
-  }
+/** A stored response is a result unless it is an `{ error }` written by a failed run. */
+const isResult = (response: Prisma.JsonValue | null) =>
+  response !== null && !(typeof response === "object" && !Array.isArray(response) && "error" in response);
 
-  await prisma.instanceScrape.update({
-    where: { id: instanceId },
+/** Moves the current result to the history before it is replaced (errors are archived when they happen). */
+const archiveResult = async (instance: InstanceRow, schedulerId: number | null) => {
+  if (!isResult(instance.response)) return;
+  await prisma.instanceScrapeHistory.create({
     data: {
-      status: "WORKING",
-      last_update: new Date(),
-    },
-  });
-
-  console.log("Start scraping for instance: ", instanceScrape.id);
-
-  const instanceScrapeBaseUrl = new URL(instanceScrape.url).origin;
-
-  const scraper = await prisma.scraper.findFirst({
-    where: {
-      base_url: { has: instanceScrapeBaseUrl },
-      status: "ACTIVE",
-    },
-  });
-
-  if (!scraper) {
-    throw "Error: Scraper not found";
-  }
-
-  await prisma.instanceScrape.update({
-    where: { id: instanceId },
-    data: { scraperId: scraper.id },
-  });
-
-  if (!scraper.code) {
-    throw "Error: Scraper don't have code.";
-  }
-
-  const response = await scrapeWithBrowser(instanceScrape.url, scraper.code);
-
-  if (!response) {
-    throw "Error: No response from scraper.";
-  }
-
-  if (instanceScrape.response) {
-    await prisma.instanceScrapeHistory.create({
-      data: {
-        url: instanceScrape.url,
-        response: instanceScrape.response,
-        status: instanceScrape.status,
-        instanceScrapeId: instanceScrape.id,
-        scrapingSchedulerId: schedulerId || null,
-      },
-    });
-  }
-
-  await prisma.instanceScrape.update({
-    where: { id: instanceId },
-    data: {
+      url: instance.url,
+      response: instance.response as Prisma.InputJsonValue,
       status: "FINISHED",
-      last_update: new Date(),
-      response: response,
+      instanceScrapeId: instance.id,
+      scrapingSchedulerId: schedulerId,
     },
   });
-
-  console.log("Finish scraping for instance: ", instanceScrape.id);
 };
 
-new Worker(
+/** Keeps the last good result in the history, logs the error there once, and shows it on the instance. */
+const recordFailure = async (instance: InstanceRow, schedulerId: number | null, error: unknown) => {
+  const response = { error: errorMessage(error) };
+  try {
+    await archiveResult(instance, schedulerId);
+    await prisma.instanceScrapeHistory.create({
+      data: { url: instance.url, response, status: "ERROR", instanceScrapeId: instance.id, scrapingSchedulerId: schedulerId },
+    });
+    await prisma.instanceScrape.update({ where: { id: instance.id }, data: { status: "ERROR", last_update: new Date(), response } });
+  } catch (recordError) {
+    console.error(`Could not record the failure of instance ${instance.id}:`, recordError);
+  }
+};
+
+const scrapeInstance = async (instanceId: number, schedulerId: number | null) => {
+  const instance = await prisma.instanceScrape.findFirst({ where: { id: instanceId } });
+  // Deleted meanwhile: nothing to record.
+  if (!instance) throw new Error(`Instance de scrape ${instanceId} introuvable.`);
+
+  await prisma.instanceScrape.update({
+    where: { id: instanceId },
+    data: { status: "WORKING", last_update: new Date() },
+  });
+  console.log("Start scraping for instance: ", instance.id);
+
+  try {
+    const scraper = await prisma.scraper.findFirst({
+      where: { base_url: { has: new URL(instance.url).origin }, status: "ACTIVE" },
+    });
+    if (!scraper) throw new Error("Aucun scraper actif ne couvre ce site.");
+
+    await prisma.instanceScrape.update({ where: { id: instanceId }, data: { scraperId: scraper.id } });
+    if (!scraper.code) throw new Error("Le scraper n’a pas de code.");
+
+    const response = await scrapeWithBrowser(instance.url, scraper.code);
+
+    await archiveResult(instance, schedulerId);
+    await prisma.instanceScrape.update({
+      where: { id: instanceId },
+      data: { status: "FINISHED", last_update: new Date(), response },
+    });
+    console.log("Finish scraping for instance: ", instance.id);
+  } catch (error) {
+    await recordFailure(instance, schedulerId, error);
+    throw error;
+  }
+};
+
+const runScheduler = async (schedulerId: number) => {
+  console.log("Start scheduled scraping for scheduler: ", schedulerId);
+  try {
+    await prisma.scrapingScheduler.update({
+      where: { id: schedulerId },
+      data: { status: "RUNNING", last_run_at: new Date() },
+    });
+
+    const instances = await prisma.instanceScrape.findMany({ where: { scrapingSchedulerId: schedulerId } });
+    console.log(`Found ${instances.length} instances for scheduler ${schedulerId}`);
+
+    for (const instance of instances) {
+      // A failed URL is recorded on its instance; the others still run.
+      await scrapeInstance(instance.id, schedulerId).catch((error) => console.log(`Error scraping instance ${instance.id}: `, errorMessage(error)));
+    }
+
+    const scheduler = await prisma.scrapingScheduler.findUnique({ where: { id: schedulerId } });
+    await prisma.scrapingScheduler.update({
+      where: { id: schedulerId },
+      data: {
+        status: "ACTIVATE",
+        update_at: new Date(),
+        next_run_at: scheduler?.cron_expression ? cronParser.parse(scheduler.cron_expression).next().toDate() : null,
+      },
+    });
+    console.log("Finish scheduled scraping for scheduler: ", schedulerId);
+  } catch (error) {
+    await prisma.scrapingScheduler
+      .update({ where: { id: schedulerId }, data: { status: "ERROR", update_at: new Date() } })
+      .catch((recordError) => console.error(`Could not mark scheduler ${schedulerId} as failed:`, recordError));
+    throw error;
+  }
+};
+
+/**
+ * A worker stopped mid-job (crash, out of memory, redeploy) leaves rows WORKING / RUNNING
+ * forever. Only one worker runs, so at startup any such row is stale: mark it as failed.
+ */
+const recoverInterruptedWork = async () => {
+  const interrupted = new Error("Interrompu : le worker s’est arrêté pendant le scrape.");
+  for (const instance of await prisma.instanceScrape.findMany({ where: { status: "WORKING" } })) {
+    await recordFailure(instance, instance.scrapingSchedulerId, interrupted);
+  }
+  await prisma.scrapingScheduler.updateMany({ where: { status: "RUNNING" }, data: { status: "ERROR", update_at: new Date() } });
+};
+
+console.log("Start worker for scraping queue.");
+
+// Errors are rethrown so BullMQ marks the job as failed (kept in Redis, see config/queue.ts).
+const worker = new Worker(
   "scrape",
   async (job) => {
-    try {
-      if (job.data.schedulerId) {
-        const schedulerId = job.data.schedulerId;
-        console.log("Start scheduled scraping for scheduler: ", schedulerId);
-
-        await prisma.scrapingScheduler.update({
-          where: { id: schedulerId },
-          data: {
-            status: "RUNNING",
-            last_run_at: new Date(),
-          },
-        });
-
-        const instances = await prisma.instanceScrape.findMany({
-          where: { scrapingSchedulerId: schedulerId },
-        });
-
-        console.log(
-          `Found ${instances.length} instances for scheduler ${schedulerId}`,
-        );
-
-        for (const instance of instances) {
-          try {
-            await scrapeInstance(instance.id, schedulerId);
-          } catch (e) {
-            console.log(`Error scraping instance ${instance.id}: `, e);
-
-            await prisma.instanceScrapeHistory.create({
-              data: {
-                url: instance.url,
-                response: { error: String(e) },
-                status: "ERROR",
-                instanceScrapeId: instance.id,
-                scrapingSchedulerId: schedulerId,
-              },
-            });
-
-            await prisma.instanceScrape.update({
-              where: { id: instance.id },
-              data: {
-                status: "ERROR",
-                last_update: new Date(),
-                response: { error: String(e) },
-              },
-            });
-          }
-        }
-
-        const scheduler = await prisma.scrapingScheduler.findUnique({
-          where: { id: schedulerId },
-        });
-
-        let nextRun = null;
-        if (scheduler?.cron_expression) {
-          const interval = cronParser.parse(scheduler.cron_expression);
-          nextRun = interval.next().toDate();
-        }
-
-        await prisma.scrapingScheduler.update({
-          where: { id: schedulerId },
-          data: {
-            status: "ACTIVATE",
-            update_at: new Date(),
-            next_run_at: nextRun,
-          },
-        });
-
-        console.log("Finish scheduled scraping for scheduler: ", schedulerId);
-        return;
-      }
-
-      if (job.data.id) {
-        await scrapeInstance(job.data.id, null);
-        return;
-      }
-
-      console.log("Unknown job type: ", job.name, job.data);
-    } catch (e) {
-      if (job.data.id) {
-        const instance = await prisma.instanceScrape.findFirst({
-          where: { id: job.data.id },
-        });
-
-        if (instance) {
-          await prisma.instanceScrapeHistory.create({
-            data: {
-              url: instance.url,
-              response: { error: String(e) },
-              status: "ERROR",
-              instanceScrapeId: instance.id,
-              scrapingSchedulerId: instance.scrapingSchedulerId,
-            },
-          });
-        }
-
-        await prisma.instanceScrape.update({
-          where: { id: job.data.id },
-          data: {
-            status: "ERROR",
-            last_update: new Date(),
-            response: { error: String(e) },
-          },
-        });
-      }
-      if (job.data.schedulerId) {
-        await prisma.scrapingScheduler.update({
-          where: { id: job.data.schedulerId },
-          data: {
-            status: "ERROR",
-            update_at: new Date(),
-          },
-        });
-      }
-      console.log("Error: ", e);
-    }
+    if (job.data.schedulerId) return runScheduler(job.data.schedulerId);
+    if (job.data.id) return scrapeInstance(job.data.id, null);
+    console.log("Unknown job type: ", job.name, job.data);
   },
-  { connection, concurrency: 1 },
+  { connection, concurrency: 1, autorun: false },
 );
+
+recoverInterruptedWork()
+  .catch((error) => console.error("Could not recover interrupted jobs:", error))
+  .finally(() => void worker.run());

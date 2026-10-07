@@ -10,4 +10,5 @@ const connection = new IORedis({
   maxRetriesPerRequest: null,
 });
 
-export const scrapeQueue = new Queue("scrape", { connection });
+// Finished jobs are trimmed so Redis does not grow forever (results live in PostgreSQL).
+export const scrapeQueue = new Queue("scrape", { connection, defaultJobOptions: { removeOnComplete: 100, removeOnFail: 500 } });
