@@ -33,8 +33,13 @@ describe("first administrator setup", () => {
     db.user.count.mockResolvedValue(0);
     const ctx = await dispatch(await bootstrap(), "POST", "/bootstrap-code", { body: { email: user.email, username: user.username, password: "bootstrap-password" } });
     expect(ctx.status).toHaveBeenCalledWith(201);
-    expect(db.user.create).toHaveBeenCalledWith({ data: { email: user.email, username: user.username, password: "bootstrap-hash", role: "ADMIN" } });
-    expect(db.userPermissions.create).toHaveBeenCalledWith({ data: { userId: 7, modifyScraper: true, useScraper: true, modifyScraperStatus: true, deleteScraper: true, createDocument: true, deleteDocument: true, modifyDocument: true, useAiChatBot: true, accessScrapersPage: true, accessInstancesScrapersPage: true } });
+    expect(db.user.create).toHaveBeenCalledWith({
+      data: {
+        email: user.email, username: user.username, password: "bootstrap-hash", role: "ADMIN",
+        userPermissions: { create: { modifyScraper: true, useScraper: true, modifyScraperStatus: true, deleteScraper: true, createDocument: true, deleteDocument: true, modifyDocument: true, useAiChatBot: true, accessScrapersPage: true, accessInstancesScrapersPage: true } },
+      },
+      include: { userPermissions: true },
+    });
     expect(ctx.json.mock.calls[0][0].user).not.toHaveProperty("password");
     expect(ctx.cookie).toHaveBeenCalledOnce();
   });

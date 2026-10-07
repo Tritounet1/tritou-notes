@@ -337,8 +337,7 @@ export const scrapingTools: Record<string, Tool> = {
       requirePermission(ctx, "modifyScraperStatus");
       const instance = await prisma.instanceScrape.findUnique({ where: { id: positiveInt(instanceId, "instance") } });
       if (!instance?.scrapingSchedulerId) throw new ToolError(`L’instance ${instanceId} n’appartient à aucun planificateur.`);
-      await prisma.instanceScrapeHistory.deleteMany({ where: { instanceScrapeId: instance.id } });
-      await prisma.instanceScrape.delete({ where: { id: instance.id } });
+      await prisma.instanceScrape.delete({ where: { id: instance.id } }); // history cascades
       return { output: { ok: true }, summary: `URL retirée : ${instance.url}` };
     },
   },
@@ -450,8 +449,7 @@ export const scrapingTools: Record<string, Tool> = {
       requirePermission(ctx, "useScraper");
       const instance = await prisma.instanceScrape.findUnique({ where: { id: positiveInt(id, "instance") } });
       if (!instance) throw new ToolError(`L’instance ${id} n’existe pas.`);
-      await prisma.instanceScrapeHistory.deleteMany({ where: { instanceScrapeId: instance.id } });
-      await prisma.instanceScrape.delete({ where: { id: instance.id } });
+      await prisma.instanceScrape.delete({ where: { id: instance.id } }); // history cascades
       return { output: { ok: true }, summary: `Instance supprimée : ${instance.url}` };
     },
   },

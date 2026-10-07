@@ -113,7 +113,7 @@ describe("delete_page", () => {
     db.document.findMany.mockResolvedValueOnce([{ id: 11 }, { id: 12 }]).mockResolvedValueOnce([{ id: 13 }]).mockResolvedValueOnce([]);
     const ctx = admin();
     expect(await run("delete_page", { id: 10 }, ctx)).toMatchObject({ ok: true, summary: "Page supprimée : « Racine » (+ 3 sous-pages)", output: { deletedPages: [10, 11, 12, 13] } });
-    expect(db.documentHistory.deleteMany).toHaveBeenCalledWith({ where: { documentId: { in: [10, 11, 12, 13] } } });
+    expect(db.document.delete).toHaveBeenCalledOnce();
     expect([...ctx.changed]).toEqual([10, 11, 12, 13]);
   });
 

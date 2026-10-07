@@ -148,33 +148,29 @@ export const registerWithInvitation = async (
       return;
     }
 
-    // Creer l'utilisateur
     const hashedPassword = await hashPassword(password);
 
-    const user = await prisma.user.create({
-      data: {
-        email: invitation.email,
-        username,
-        password: hashedPassword,
-        role: "USER",
-      },
+    // Claiming the invitation and creating the account succeed or fail together; the
+    // conditional claim makes two simultaneous registrations with one token impossible.
+    const created = await prisma.$transaction(async (tx) => {
+      const claimed = await tx.invitation.updateMany({ where: { token, used: false }, data: { used: true } });
+      if (claimed.count === 0) return null;
+      return tx.user.create({
+        data: {
+          email: invitation.email,
+          username,
+          password: hashedPassword,
+          role: "USER",
+          userPermissions: { create: { createDocument: true, modifyDocument: true, deleteDocument: true } },
+        },
+        include: { userPermissions: true },
+      });
     });
-
-    // Creer les permissions par defaut
-    const userPermissions = await prisma.userPermissions.create({
-      data: {
-        createDocument: true,
-        modifyDocument: true,
-        deleteDocument: true,
-        userId: user.id,
-      },
-    });
-
-    // Marquer l'invitation comme utilisee
-    await prisma.invitation.update({
-      where: { token },
-      data: { used: true },
-    });
+    if (!created) {
+      res.status(400).json({ error: "Cette invitation a deja ete utilisee" });
+      return;
+    }
+    const { userPermissions, ...user } = created;
 
     // Generer le token JWT et le mettre dans un cookie
     const jwtToken = createToken(

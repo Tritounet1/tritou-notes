@@ -33,7 +33,7 @@ interface Document {
   text: string | null;
   public: boolean;
   last_update: string;
-  authorId: number;
+  authorId: number | null;
   type: "TEXT" | "EXCEL" | "TODO";
   parentId: number | null;
   folderId: number | null;
@@ -51,7 +51,7 @@ interface HistoryEntry {
   public: boolean;
   created_at: string;
   documentId: number;
-  authorId: number;
+  authorId: number | null;
 }
 
 interface DiffLine {

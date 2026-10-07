@@ -221,4 +221,31 @@ describe("real HTTP + PostgreSQL + Redis", () => {
     const { imagePath } = await import("../../utils/documentImageStorage");
     await expect(access(imagePath(documentId, documentImageId))).rejects.toMatchObject({ code: "ENOENT" });
   });
+  it("deletes a scrape instance together with its history", async () => {
+    await prisma.instanceScrapeHistory.create({ data: { instanceScrapeId: instanceId, url: "https://example.com/", status: "FINISHED", response: { price: 1 } } });
+    expect((await request(`/api/instance-scrape/${instanceId}`, "DELETE")).status).toBe(200);
+    expect(await prisma.instanceScrapeHistory.count({ where: { instanceScrapeId: instanceId } })).toBe(0);
+  });
+  it("deletes a user, keeps their pages without author and drops their private data", async () => {
+    const leaving = await prisma.user.create({ data: { email: "leaving@test.example", username: "leaving", password: "x" } });
+    await prisma.userPermissions.create({ data: { userId: leaving.id } });
+    const page = await prisma.document.create({ data: { title: "Shared", text: "kept", authorId: leaving.id } });
+    await prisma.documentHistory.create({ data: { documentId: page.id, title: "Shared", text: "v1", public: false, authorId: leaving.id } });
+    await prisma.conversation.create({ data: { authorId: leaving.id } });
+
+    expect((await request(`/api/users/${leaving.id}`, "DELETE")).status).toBe(200);
+    expect(await prisma.user.findUnique({ where: { id: leaving.id } })).toBeNull();
+    expect(await prisma.userPermissions.count({ where: { userId: leaving.id } })).toBe(0);
+    expect(await prisma.conversation.count({ where: { authorId: leaving.id } })).toBe(0);
+    expect(await prisma.document.findUniqueOrThrow({ where: { id: page.id } })).toMatchObject({ text: "kept", authorId: null });
+    expect(await prisma.documentHistory.findFirstOrThrow({ where: { documentId: page.id } })).toMatchObject({ text: "v1", authorId: null });
+    // The page stays editable by the remaining users.
+    expect((await request(`/api/documents/${page.id}`, "PUT", { title: "Shared", text: "edited" })).status).toBe(200);
+  });
+  it("refuses to delete the last administrator", async () => {
+    const admins = await prisma.user.findMany({ where: { role: "ADMIN" } });
+    expect(admins).toHaveLength(1);
+    expect((await request(`/api/users/${admins[0].id}`, "DELETE")).status).toBe(409);
+    expect((await request("/api/users/999999", "DELETE")).status).toBe(404);
+  });
 });

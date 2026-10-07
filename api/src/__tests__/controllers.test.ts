@@ -50,8 +50,7 @@ describe("user credentials", () => {
   it("hashes a new password and never returns credentials", async () => {
     const ctx = await call(users.createUser, { email: user.email, username: user.username, password: "password-long", role: "ADMIN" });
     expect(mocks.hash).toHaveBeenCalledWith("password-long");
-    expect(db.user.create).toHaveBeenCalledWith({ data: { email: user.email, username: user.username, password: "new-hash" } });
-    expect(db.userPermissions.create).toHaveBeenCalledOnce();
+    expect(db.user.create).toHaveBeenCalledWith({ data: { email: user.email, username: user.username, password: "new-hash", userPermissions: { create: {} } } });
     expect(ctx.status).toHaveBeenCalledWith(201);
     expect(ctx.json.mock.calls[0][0]).not.toHaveProperty("password");
   });
@@ -76,8 +75,19 @@ describe("user credentials", () => {
     expect(db.user.update).not.toHaveBeenCalled();
   });
   it.each([users.getUserById, users.deleteUser])("omits password in single-user responses ($name)", async handler => {
+    db.user.count.mockResolvedValue(2);
     const ctx = await call(handler);
     expect(ctx.json.mock.calls[0][0]).not.toHaveProperty("password");
+  });
+  it("refuses to delete a missing user or the last administrator", async () => {
+    db.user.findUnique.mockResolvedValueOnce(null);
+    expect((await call(users.deleteUser)).status).toHaveBeenCalledWith(404);
+    db.user.count.mockResolvedValue(1);
+    expect((await call(users.deleteUser)).status).toHaveBeenCalledWith(409);
+    expect(db.user.count).toHaveBeenCalledWith({ where: { role: "ADMIN" } });
+    db.user.findUnique.mockResolvedValue({ ...user, role: "USER" });
+    expect((await call(users.deleteUser)).json).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }));
+    expect(db.user.delete).toHaveBeenCalledOnce();
   });
   it("omits passwords in user listings", async () => {
     db.user.findMany.mockResolvedValue([user]);
@@ -220,12 +230,21 @@ describe("invitations", () => {
   });
   it("registers a regular account with document permissions and consumes the invitation", async () => {
     db.user.findUnique.mockResolvedValue(null);
+    db.invitation.updateMany.mockResolvedValue({ count: 1 });
     const ctx = await call(invitations.registerWithInvitation, { username: "new", password: "password-long", role: "ADMIN", email: "attacker@example.com" });
-    expect(db.user.create).toHaveBeenCalledWith({ data: { email: "invited@example.com", username: "new", password: "new-hash", role: "USER" } });
-    expect(db.userPermissions.create).toHaveBeenCalledWith({ data: { userId: 7, createDocument: true, modifyDocument: true, deleteDocument: true } });
-    expect(db.invitation.update).toHaveBeenCalledWith({ where: { token: "invitation" }, data: { used: true } });
+    expect(db.invitation.updateMany).toHaveBeenCalledWith({ where: { token: "invitation", used: false }, data: { used: true } });
+    expect(db.user.create).toHaveBeenCalledWith({
+      data: { email: "invited@example.com", username: "new", password: "new-hash", role: "USER", userPermissions: { create: { createDocument: true, modifyDocument: true, deleteDocument: true } } },
+      include: { userPermissions: true },
+    });
     expect(ctx.status).toHaveBeenCalledWith(201);
     expect(ctx.json.mock.calls[0][0].user).not.toHaveProperty("password");
+  });
+  it("lets only one of two simultaneous registrations claim the invitation", async () => {
+    db.user.findUnique.mockResolvedValue(null);
+    db.invitation.updateMany.mockResolvedValue({ count: 0 });
+    expect((await call(invitations.registerWithInvitation, { username: "new", password: "password-long" })).status).toHaveBeenCalledWith(400);
+    expect(db.user.create).not.toHaveBeenCalled();
   });
   it("does not issue a cookie if JWT generation fails", async () => {
     db.user.findUnique.mockResolvedValue(null);
@@ -296,11 +315,10 @@ describe("document lifecycle", () => {
     expect((await call(documents.updateDocument)).next).toHaveBeenCalledWith(expect.any(Error));
     expect(db.documentHistory.create).not.toHaveBeenCalled();
   });
-  it("deletes histories before deleting their parent document", async () => {
+  it("deletes a document in one statement (histories cascade)", async () => {
     await call(documents.deleteDocument);
-    expect(db.documentHistory.deleteMany).toHaveBeenCalledWith({ where: { documentId: { in: [12] } } });
     expect(db.document.delete).toHaveBeenCalledWith({ where: { id: 12 } });
-    expect(db.documentHistory.deleteMany.mock.invocationCallOrder[0]).toBeLessThan(db.document.delete.mock.invocationCallOrder[0]);
+    expect(db.documentHistory.deleteMany).not.toHaveBeenCalled();
   });
 });
 

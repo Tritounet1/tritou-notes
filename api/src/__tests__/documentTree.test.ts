@@ -80,9 +80,8 @@ describe("document controller with sub-pages", () => {
     expect(anonymous.json.mock.calls[0][0].children).toEqual([]);
   });
 
-  it("deletes the whole subtree's histories and images", async () => {
+  it("deletes the whole subtree and its images", async () => {
     await call(documents.deleteDocument, {}, { params: { id: "1" } });
-    expect(db.documentHistory.deleteMany).toHaveBeenCalledWith({ where: { documentId: { in: [1, 2, 3] } } });
     expect(db.document.delete).toHaveBeenCalledWith({ where: { id: 1 } });
     expect(vi.mocked(removeDocumentImages).mock.calls.map(([id]) => id)).toEqual([1, 2, 3]);
   });

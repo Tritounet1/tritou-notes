@@ -123,7 +123,7 @@ describe("workspace", () => {
     db.document.findMany.mockResolvedValueOnce([{ id: 11 }]).mockResolvedValueOnce([]);
     const ctx = admin();
     expect(await run("delete_page", { id: 10 }, ctx)).toMatchObject({ ok: true, summary: "Page supprimée : « Vieux » (+ 1 sous-page)" });
-    expect(db.documentHistory.deleteMany).toHaveBeenCalledWith({ where: { documentId: { in: [10, 11] } } });
+    expect(db.document.delete).toHaveBeenCalledWith({ where: { id: 10 } });
     expect([...ctx.changed]).toEqual([10, 11]);
   });
 

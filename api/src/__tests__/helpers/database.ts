@@ -3,8 +3,9 @@ import { vi } from "vitest";
 const models = ["user", "userPermissions", "invitation", "document", "documentImage", "documentHistory", "conversation", "aiMessage", "folder", "scraper", "instanceScrape", "instanceScrapeHistory", "scrapingScheduler", "settings", "images"] as const;
 const methods = ["findUnique", "findFirst", "findFirstOrThrow", "findMany", "create", "update", "updateMany", "upsert", "delete", "deleteMany", "count"] as const;
 export const db = Object.fromEntries(models.map(model => [model, Object.fromEntries(methods.map(method => [method, vi.fn()]))])) as Record<typeof models[number], Record<typeof methods[number], ReturnType<typeof vi.fn>>>;
-// Non-enumerable so loops over the models skip it. Array form only: the queries were already started by the mocks.
-Object.defineProperty(db, "$transaction", { value: (queries: Promise<unknown>[]) => Promise.all(queries), enumerable: false });
+// Non-enumerable so loops over the models skip it. Array form: the queries were already started by the mocks;
+// callback form: the callback gets the same mocks as its transaction client.
+Object.defineProperty(db, "$transaction", { value: (queries: Promise<unknown>[] | ((tx: unknown) => unknown)) => (typeof queries === "function" ? queries(db) : Promise.all(queries)), enumerable: false });
 export const user = { id: 7, email: "user@example.com", username: "user", role: "ADMIN", password: "stored-hash" };
 export function resetDatabase() {
   for (const model of Object.values(db)) {

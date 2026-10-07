@@ -236,6 +236,19 @@ describe("scheduler tools", () => {
     expect(await run("update_scheduler", { id: 1, status: "ACTIVATE", cron_expression: " " })).toMatchObject({ ok: false, summary: expect.stringContaining("n’a pas de cron") });
   });
 
+  it("restores the previous configuration when the queue refuses the change", async () => {
+    const active = { ...scheduler, status: "ACTIVATE", cron_expression: "0 * * * *", next_run_at: new Date("2026-10-07T11:00:00Z") };
+    db.scrapingScheduler.findUnique.mockResolvedValue(active);
+    db.scrapingScheduler.findFirst.mockResolvedValue(active);
+    db.scrapingScheduler.update.mockResolvedValueOnce({ ...active, cron_expression: "*/5 * * * *" });
+    queue.getRepeatableJobs.mockResolvedValue([{ name: "scheduler-1", key: "k" }]);
+    queue.add.mockRejectedValueOnce(new Error("Redis down")).mockResolvedValue(undefined);
+    expect(await run("update_scheduler", { id: 1, cron_expression: "*/5 * * * *" })).toMatchObject({ ok: false, summary: expect.stringContaining("Redis down") });
+    expect(db.scrapingScheduler.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { status: "ACTIVATE", cron_expression: "0 * * * *", next_run_at: active.next_run_at } });
+    // The previous job is scheduled again.
+    expect(queue.add).toHaveBeenLastCalledWith("scheduler-1", { schedulerId: 1 }, expect.objectContaining({ repeat: { pattern: "0 * * * *" } }));
+  });
+
   it("clears the cron and edits title/description", async () => {
     db.scrapingScheduler.findUnique.mockResolvedValue(scheduler);
     db.scrapingScheduler.findFirst.mockResolvedValue(scheduler);
@@ -271,7 +284,7 @@ describe("scheduler tools", () => {
 
     db.instanceScrape.findUnique.mockResolvedValue({ id: 9, url: "https://a.example/", scrapingSchedulerId: 1 });
     expect(await run("remove_scheduler_url", { instanceId: 9 })).toMatchObject({ ok: true, summary: "URL retirée : https://a.example/" });
-    expect(db.instanceScrapeHistory.deleteMany).toHaveBeenCalledWith({ where: { instanceScrapeId: 9 } });
+    expect(db.instanceScrapeHistory.deleteMany).not.toHaveBeenCalled();
     expect(db.instanceScrape.delete).toHaveBeenCalledWith({ where: { id: 9 } });
   });
 
@@ -365,7 +378,7 @@ describe("instance tools", () => {
 
     db.instanceScrape.findUnique.mockResolvedValue({ id: 4, url: "https://a.example/" });
     expect(await run("delete_instance", { id: 4 }, user({ useScraper: true }))).toMatchObject({ ok: true, summary: "Instance supprimée : https://a.example/" });
-    expect(db.instanceScrapeHistory.deleteMany).toHaveBeenCalledWith({ where: { instanceScrapeId: 4 } });
+    expect(db.instanceScrapeHistory.deleteMany).not.toHaveBeenCalled();
     expect(db.instanceScrape.delete).toHaveBeenCalledWith({ where: { id: 4 } });
   });
 });

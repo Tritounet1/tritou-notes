@@ -27,15 +27,8 @@ export const createUser = async (
         email: email,
         username: username,
         password: await hashPassword(password),
-      },
-    });
-    await prisma.userPermissions.create({
-      data: {
-        user: {
-          connect: {
-            id: user.id,
-          },
-        },
+        // Created in the same statement: never a user without permissions.
+        userPermissions: { create: {} },
       },
     });
     res.status(201).json(publicUser(user));
@@ -114,11 +107,18 @@ export const deleteUser = async (
 ) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const deletedUser = await prisma.user.delete({
-      where: {
-        id: id,
-      },
-    });
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target) {
+      res.status(404).json({ message: "Utilisateur introuvable" });
+      return;
+    }
+    if (target.role === "ADMIN" && (await prisma.user.count({ where: { role: "ADMIN" } })) <= 1) {
+      res.status(409).json({ message: "Impossible de supprimer le dernier administrateur" });
+      return;
+    }
+    // Permissions and AI conversations go with the account; documents and their
+    // history stay in the shared space with no author (onDelete: SetNull).
+    const deletedUser = await prisma.user.delete({ where: { id } });
     res.json(publicUser(deletedUser));
   } catch (error) {
     next(error);

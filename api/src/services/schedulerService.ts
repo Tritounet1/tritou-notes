@@ -63,14 +63,24 @@ export const updateScheduler = async (id: number, userId: number, changes: Sched
   const nowScheduled = isScheduled(scheduler.status);
   const cronChanged = changes.cron_expression !== undefined && changes.cron_expression !== previous.cron_expression;
 
-  if (wasScheduled && (!nowScheduled || cronChanged)) {
-    await unschedule(id);
-    if (!nowScheduled || !scheduler.cron_expression) {
-      await prisma.scrapingScheduler.update({ where: { id }, data: { next_run_at: null } });
+  try {
+    if (wasScheduled && (!nowScheduled || cronChanged)) {
+      await unschedule(id);
+      if (!nowScheduled || !scheduler.cron_expression) {
+        await prisma.scrapingScheduler.update({ where: { id }, data: { next_run_at: null } });
+      }
     }
-  }
-  if (nowScheduled && scheduler.cron_expression && (!wasScheduled || cronChanged)) {
-    await schedule(id, scheduler.cron_expression, scheduler.start_at);
+    if (nowScheduled && scheduler.cron_expression && (!wasScheduled || cronChanged)) {
+      await schedule(id, scheduler.cron_expression, scheduler.start_at);
+    }
+  } catch (error) {
+    // The queue refused the change: restore the previous configuration so the database
+    // never shows a scheduler as active without its job (or the reverse).
+    await prisma.scrapingScheduler
+      .update({ where: { id }, data: { status: previous.status, cron_expression: previous.cron_expression, next_run_at: previous.next_run_at } })
+      .catch(() => {});
+    if (wasScheduled && previous.cron_expression) await schedule(id, previous.cron_expression, previous.start_at).catch(() => {});
+    throw error;
   }
   return scheduler;
 };

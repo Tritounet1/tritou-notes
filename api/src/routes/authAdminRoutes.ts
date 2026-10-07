@@ -41,29 +41,29 @@ const initFirstAdmin = async () => {
         const { email, username, password } = req.body;
         const hashedPassword = await hashPassword(password);
 
-        const user = await prisma.user.create({
+        // Account and permissions in one statement.
+        const { userPermissions, ...user } = await prisma.user.create({
           data: {
             email,
             username,
             password: hashedPassword,
             role: "ADMIN",
+            userPermissions: {
+              create: {
+                modifyScraper: true,
+                useScraper: true,
+                modifyScraperStatus: true,
+                deleteScraper: true,
+                createDocument: true,
+                deleteDocument: true,
+                modifyDocument: true,
+                useAiChatBot: true,
+                accessScrapersPage: true,
+                accessInstancesScrapersPage: true,
+              },
+            },
           },
-        });
-
-        const userPermissions = await prisma.userPermissions.create({
-          data: {
-            modifyScraper: true,
-            useScraper: true,
-            modifyScraperStatus: true,
-            deleteScraper: true,
-            createDocument: true,
-            deleteDocument: true,
-            modifyDocument: true,
-            useAiChatBot: true,
-            accessScrapersPage: true,
-            accessInstancesScrapersPage: true,
-            userId: user.id,
-          },
+          include: { userPermissions: true },
         });
 
         const jwtToken = createToken(
