@@ -223,6 +223,14 @@ describe("edit_page and append_to_page", () => {
     expect(await run("edit_page", { id: 3, old_text: "x" })).toMatchObject({ ok: false, summary: "Échec de edit_page : Paramètre « new_text » manquant." });
   });
 
+  it("refuses to write over a change made since the tool read the page", async () => {
+    const readAt = new Date("2026-10-07T10:00:00Z");
+    pages({ ...page({ text: "avant" }), last_update: readAt } as Page);
+    db.document.update.mockRejectedValueOnce(Object.assign(new Error("No record"), { code: "P2025" }));
+    expect(await run("edit_page", { id: 3, old_text: "avant", new_text: "après" })).toMatchObject({ ok: false, summary: expect.stringContaining("modifiée entre-temps") });
+    expect(updated().where).toEqual({ id: 3, last_update: readAt });
+  });
+
   it("points to the right tool for structured pages", async () => {
     pages(page({ id: 5, type: "TODO", title: "Courses" }), page({ id: 6, type: "EXCEL", title: "Budget" }));
     expect((await run("edit_page", { id: 5, old_text: "a", new_text: "b" })).output).toEqual({ error: "La page « Courses » est de type TODO : utilise update_todos." });

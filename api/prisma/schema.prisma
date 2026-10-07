@@ -101,6 +101,8 @@ model DocumentHistory {
   documentId Int
   author     User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
   authorId   Int?
+
+  @@index([documentId, created_at])
 }
 
 model Scraper {

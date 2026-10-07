@@ -113,6 +113,18 @@ describe("real HTTP + PostgreSQL + Redis", () => {
     expect(history).toHaveLength(1);
     expect(history[0]).toMatchObject({ title: "Initial", text: "", public: false, authorId: regularId });
   });
+  it("refuses a save based on an outdated version", async () => {
+    const current = await prisma.document.findUniqueOrThrow({ where: { id: documentId } });
+    const saved = await request(`/api/documents/${documentId}`, "PUT", { text: "first tab", expectedLastUpdate: current.last_update }, regularToken);
+    expect(saved.status).toBe(200);
+    const stale = await request(`/api/documents/${documentId}`, "PUT", { text: "second tab", expectedLastUpdate: current.last_update }, regularToken);
+    expect(stale.status).toBe(409);
+    expect(stale.data.document.text).toBe("first tab");
+    const versions = await prisma.documentHistory.count({ where: { documentId } });
+    expect((await request(`/api/documents/${documentId}`, "PUT", { text: "second tab", expectedLastUpdate: saved.data.last_update }, regularToken)).status).toBe(200);
+    // Same author within 10 minutes: grouped with the previous version.
+    expect(await prisma.documentHistory.count({ where: { documentId } })).toBe(versions);
+  });
   it("allows anonymous public document reads but blocks modifications", async () => {
     expect((await request(`/api/documents/${documentId}`, "GET", undefined, "")).status).toBe(200);
     expect((await request(`/api/documents/${documentId}`, "DELETE", undefined, "")).status).toBe(401);
@@ -147,7 +159,8 @@ describe("real HTTP + PostgreSQL + Redis", () => {
   it("retains image files for earlier document versions after block removal", async () => {
     const marker = `::image[${encodeURIComponent(JSON.stringify({ id: documentImageId, caption: "Photo", width: 100, alt: "photo" }))}]::`;
     await request(`/api/documents/${documentId}`, "PUT", { title: "Photo", text: marker }, regularToken);
-    await request(`/api/documents/${documentId}`, "PUT", { title: "No photo", text: "Removed" }, regularToken);
+    // Another author: not grouped with the previous save, so the version with the image is kept.
+    await request(`/api/documents/${documentId}`, "PUT", { title: "No photo", text: "Removed" });
     expect(await prisma.documentImage.findUnique({ where: { id: documentImageId } })).not.toBeNull();
     expect((await prisma.documentHistory.findMany({ where: { documentId } })).some(version => version.text === marker)).toBe(true);
     const { imagePath } = await import("../../utils/documentImageStorage");

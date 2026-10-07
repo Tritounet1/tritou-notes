@@ -194,7 +194,7 @@ const pageTools: Record<string, Tool> = {
         const parentPage = await prisma.document.findUnique({ where: { id: parent } });
         if (parentPage?.type === "TEXT") {
           const separator = parentPage.text && !parentPage.text.endsWith("\n") ? "\n" : "";
-          await reviseDocument(parent, ctx.userId, { text: `${parentPage.text}${separator}::page[${page.id}]::\n` });
+          await reviseDocument(parent, ctx.userId, { text: `${parentPage.text}${separator}::page[${page.id}]::\n` }, { expectedLastUpdate: parentPage.last_update });
           ctx.changed.add(parent);
         }
       }
@@ -223,7 +223,7 @@ const pageTools: Record<string, Tool> = {
       if (count !== 1) {
         throw new ToolError(count === 0 ? "`old_text` est introuvable : relis la page et copie le passage exact." : `\`old_text\` apparaît ${count} fois : ajoute du contexte pour le rendre unique.`);
       }
-      await reviseDocument(page.id, ctx.userId, { text: page.text.replace(search, () => replacement) });
+      await reviseDocument(page.id, ctx.userId, { text: page.text.replace(search, () => replacement) }, { expectedLastUpdate: page.last_update });
       ctx.changed.add(page.id);
       return { output: { ok: true }, summary: `Page modifiée : ${label(page.title)}` };
     },
@@ -240,7 +240,7 @@ const pageTools: Record<string, Tool> = {
       const page = await findTextPage(id);
       const addition = string(text, "text");
       const separator = page.text && !page.text.endsWith("\n") ? "\n\n" : "";
-      await reviseDocument(page.id, ctx.userId, { text: `${page.text}${separator}${addition}` });
+      await reviseDocument(page.id, ctx.userId, { text: `${page.text}${separator}${addition}` }, { expectedLastUpdate: page.last_update });
       ctx.changed.add(page.id);
       return { output: { ok: true }, summary: `Contenu ajouté à ${label(page.title)}` };
     },
@@ -358,7 +358,7 @@ const pageTools: Record<string, Tool> = {
         createdAt: new Date().toISOString(),
       }));
       todos.push(...added);
-      await reviseDocument(page.id, ctx.userId, { text: JSON.stringify({ todos }) });
+      await reviseDocument(page.id, ctx.userId, { text: JSON.stringify({ todos }) }, { expectedLastUpdate: page.last_update });
       ctx.changed.add(page.id);
       const parts = [added.length && `${added.length} ajoutée(s)`, Array.isArray(update) && update.length && `${update.length} modifiée(s)`, removed.size && `${removed.size} supprimée(s)`].filter(Boolean);
       return { output: { ok: true, todos }, summary: `To-do ${label(page.title)} : ${parts.join(", ") || "aucun changement"}` };
@@ -395,7 +395,7 @@ const pageTools: Record<string, Tool> = {
         if (!value) delete grid[key];
         else grid[key] = value.startsWith("=") ? { value: "", formula: value } : { value };
       }
-      await reviseDocument(page.id, ctx.userId, { text: JSON.stringify(grid) });
+      await reviseDocument(page.id, ctx.userId, { text: JSON.stringify(grid) }, { expectedLastUpdate: page.last_update });
       ctx.changed.add(page.id);
       return { output: { ok: true }, summary: `Tableur ${label(page.title)} : ${entries.length} cellule${entries.length > 1 ? "s" : ""} modifiée${entries.length > 1 ? "s" : ""}` };
     },

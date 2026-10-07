@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
 import { deleteDocumentTree } from "../services/documentService";
 import { ancestorsOf, resolveParent } from "../utils/documentTree";
-import { reviseDocument } from "../utils/documentRevision";
+import { DocumentConflictError, reviseDocument } from "../utils/documentRevision";
 import { folderChain, resolveFolder } from "../utils/folderTree";
 
 export const createDocument = async (
@@ -98,10 +98,21 @@ export const updateDocument = async (
 ) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const { title, text, is_public, parentId, folderId } = req.body;
-    const document = await reviseDocument(id, req.user.id, { title, text, public: is_public, parentId, folderId });
+    const { title, text, is_public, parentId, folderId, expectedLastUpdate } = req.body;
+    const expected = expectedLastUpdate === undefined ? undefined : new Date(expectedLastUpdate);
+    if (expected && Number.isNaN(expected.getTime())) {
+      res.status(400).json({ message: "expectedLastUpdate invalide" });
+      return;
+    }
+    const document = await reviseDocument(id, req.user.id, { title, text, public: is_public, parentId, folderId }, { mergeRecent: true, expectedLastUpdate: expected });
     res.json(document);
   } catch (error) {
+    if (error instanceof DocumentConflictError) {
+      // The editor shows the saved version so the user can choose which one to keep.
+      const current = await prisma.document.findUnique({ where: { id: parseInt(req.params.id, 10) } }).catch(() => null);
+      res.status(409).json({ message: error.message, document: current });
+      return;
+    }
     next(error);
   }
 };

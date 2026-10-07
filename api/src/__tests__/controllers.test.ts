@@ -31,6 +31,7 @@ import * as settings from "../controllers/settingsController";
 import * as permissions from "../controllers/userPermissionsController";
 import * as images from "../controllers/imagesController";
 import * as ai from "../controllers/aiController";
+import { MAX_VERSIONS, MERGE_WINDOW_MS } from "../utils/documentRevision";
 import { accountFailures, ipFailures } from "../utils/failureLimiter";
 
 beforeEach(() => {
@@ -271,7 +272,7 @@ it.each(reads.map(([handler, model]) => ({ handler, model, name: handler.name })
   expect(ctx.json).toHaveBeenCalledOnce();
 });
 const lists = [
-  [documents.getDocuments, db.document], [documentHistory.getDocumentsHistories, db.documentHistory],
+  [documents.getDocuments, db.document],
   [scrapers.getScrapers, db.scraper],
   [instances.getInstancesScrape, db.instanceScrape], [instanceHistory.getInstancesScrapeHistory, db.instanceScrapeHistory],
   [schedulers.getScrapingScheduler, db.scrapingScheduler], [settings.getSettings, db.settings], [images.getImages, db.images],
@@ -281,14 +282,16 @@ it.each(lists.map(([handler, model]) => ({ handler, model, name: handler.name })
   expect(model.findMany).toHaveBeenCalledOnce();
   expect(ctx.json).toHaveBeenCalledWith([]);
 });
-const histories = [
-  [documentHistory.getDocumentHistoriesByDocumentId, db.documentHistory, "documentId"],
-  [instanceHistory.getInstancesScrapeHistoryByInstanceScrapeId, db.instanceScrapeHistory, "instanceScrapeId"],
-] as const;
-it.each(histories.map(([handler, model, key]) => ({ handler, model, key, name: handler.name })))("$name filters histories by their parent", async ({ handler, model, key }) => {
-  const ctx = await call(handler);
-  expect(model.findMany).toHaveBeenCalledWith({ where: { [key]: 12 } });
+it("filters instance histories by their instance", async () => {
+  const ctx = await call(instanceHistory.getInstancesScrapeHistoryByInstanceScrapeId);
+  expect(db.instanceScrapeHistory.findMany).toHaveBeenCalledWith({ where: { instanceScrapeId: 12 } });
   expect(ctx.json).toHaveBeenCalledWith([]);
+});
+it("returns the latest document versions, oldest first", async () => {
+  db.documentHistory.findMany.mockResolvedValue([{ id: 3 }, { id: 2 }]);
+  const ctx = await call(documentHistory.getDocumentHistoriesByDocumentId);
+  expect(db.documentHistory.findMany).toHaveBeenCalledWith({ where: { documentId: 12 }, orderBy: [{ created_at: "desc" }, { id: "desc" }], take: MAX_VERSIONS });
+  expect(ctx.json).toHaveBeenCalledWith([{ id: 2 }, { id: 3 }]);
 });
 
 describe("document lifecycle", () => {
@@ -309,6 +312,68 @@ describe("document lifecycle", () => {
     expect(db.documentHistory.create).toHaveBeenCalledWith({ data: { title: "Old", text: "Before", public: false, document: { connect: { id: 12 } }, author: { connect: { id: 7 } } } });
     expect(db.document.update).toHaveBeenCalledWith({ where: { id: 12 }, data: { title: "New", text: "After", public: true, author: { connect: { id: 7 } }, last_update: expect.any(Date) } });
     expect(db.documentHistory.create.mock.invocationCallOrder[0]).toBeLessThan(db.document.update.mock.invocationCallOrder[0]);
+  });
+  it("creates no version when title, text and visibility are unchanged", async () => {
+    db.document.findFirst.mockResolvedValue({ id: 12, title: "Same", text: "Same", public: false });
+    await call(documents.updateDocument, { title: "Same", text: "Same", is_public: false, parentId: null });
+    expect(db.documentHistory.create).not.toHaveBeenCalled();
+    expect(db.document.update).toHaveBeenCalled();
+  });
+  it("groups the editor saves of one author into a version per 10 minutes", async () => {
+    db.document.findFirst.mockResolvedValue({ id: 12, title: "T", text: "Before", public: false });
+    db.documentHistory.findFirst.mockResolvedValue({ id: 5, authorId: 7, created_at: new Date(Date.now() - 60_000) });
+    await call(documents.updateDocument, { text: "After" });
+    expect(db.documentHistory.findFirst).toHaveBeenCalledWith({ where: { documentId: 12 }, orderBy: [{ created_at: "desc" }, { id: "desc" }] });
+    expect(db.documentHistory.create).not.toHaveBeenCalled();
+    expect(db.document.update).toHaveBeenCalled();
+
+    for (const latest of [{ id: 5, authorId: 8, created_at: new Date() }, { id: 5, authorId: 7, created_at: new Date(Date.now() - MERGE_WINDOW_MS - 1) }, null]) {
+      db.documentHistory.create.mockClear();
+      db.documentHistory.findFirst.mockResolvedValue(latest);
+      await call(documents.updateDocument, { text: "After" });
+      expect(db.documentHistory.create).toHaveBeenCalledOnce();
+    }
+  });
+  it("keeps the newest versions only", async () => {
+    db.document.findFirst.mockResolvedValue({ id: 12, title: "T", text: "Before", public: false });
+    db.documentHistory.findFirst.mockResolvedValue(null);
+    db.documentHistory.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+    await call(documents.updateDocument, { text: "After" });
+    expect(db.documentHistory.findMany).toHaveBeenCalledWith({ where: { documentId: 12 }, orderBy: [{ created_at: "desc" }, { id: "desc" }], skip: MAX_VERSIONS, select: { id: true } });
+    expect(db.documentHistory.deleteMany).toHaveBeenCalledWith({ where: { id: { in: [1, 2] } } });
+    db.documentHistory.deleteMany.mockClear();
+    db.documentHistory.findMany.mockResolvedValue([]);
+    await call(documents.updateDocument, { text: "Again" });
+    expect(db.documentHistory.deleteMany).not.toHaveBeenCalled();
+  });
+  it("refuses a save based on an outdated version and returns the saved one", async () => {
+    const saved = { id: 12, title: "T", text: "From the assistant", public: false, last_update: new Date("2026-10-07T10:00:05Z") };
+    db.document.findFirst.mockResolvedValue(saved);
+    db.document.findUnique.mockResolvedValue(saved);
+    const ctx = await call(documents.updateDocument, { text: "Mine", expectedLastUpdate: "2026-10-07T10:00:00.000Z" });
+    expect(ctx.status).toHaveBeenCalledWith(409);
+    expect(ctx.json).toHaveBeenCalledWith({ message: expect.stringContaining("modifiée entre-temps"), document: saved });
+    expect(db.document.update).not.toHaveBeenCalled();
+    expect(db.documentHistory.create).not.toHaveBeenCalled();
+
+    // Matching version: the update is conditioned on it.
+    await call(documents.updateDocument, { text: "Mine", expectedLastUpdate: saved.last_update.toISOString() });
+    expect(db.document.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 12, last_update: saved.last_update } }));
+  });
+  it("turns a concurrent write during the save into a conflict", async () => {
+    const lastUpdate = new Date("2026-10-07T10:00:00Z");
+    db.document.findFirst.mockResolvedValue({ id: 12, title: "T", text: "A", public: false, last_update: lastUpdate });
+    db.document.update.mockRejectedValue(Object.assign(new Error("No record"), { code: "P2025" }));
+    db.document.findUnique.mockRejectedValue(new Error("gone"));
+    const ctx = await call(documents.updateDocument, { text: "B", expectedLastUpdate: lastUpdate.toISOString() });
+    expect(ctx.status).toHaveBeenCalledWith(409);
+    expect(ctx.json).toHaveBeenCalledWith(expect.objectContaining({ document: null }));
+    // Without an expected version, Prisma errors are not conflicts.
+    expect((await call(documents.updateDocument, { text: "B" })).next).toHaveBeenCalledWith(expect.objectContaining({ code: "P2025" }));
+  });
+  it("rejects an invalid expected version", async () => {
+    expect((await call(documents.updateDocument, { text: "B", expectedLastUpdate: "yesterday" })).status).toHaveBeenCalledWith(400);
+    expect(db.document.update).not.toHaveBeenCalled();
   });
   it("does not update a missing document", async () => {
     db.document.findFirst.mockResolvedValue(null);

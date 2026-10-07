@@ -15,7 +15,7 @@ import { MovePageModal, type PageLocation } from "./components/MovePageModal";
 import { SpreadsheetEditor } from "./components/SpreadsheetEditor";
 import { TodoEditor } from "./components/TodoEditor";
 import { useAuth } from "./hooks/useAuth";
-import { useDebounce } from "./hooks/useDebounce";
+import { useDebouncedAction } from "./hooks/useDebounce";
 import { jsonToMarkdownTable, templateToMarkdown } from "./utils/jsonToMarkdown";
 import { docTypeStyles } from "./utils/docTypes";
 import { notifyDocumentsChanged } from "./utils/documentEvents";
@@ -187,6 +187,9 @@ export const DocumentPage = () => {
         }
         const data = await response.json();
         setDocument(data);
+        versionRef.current = data.last_update;
+        conflictRef.current = false;
+        setConflict(false);
         savedTitleRef.current = data.title;
         setTitle(data.title || "");
         setText(data.text || "");
@@ -238,39 +241,62 @@ export const DocumentPage = () => {
 
 
   const savedTitleRef = useRef<string | null>(null);
+  // `last_update` the editor content is based on, sent with each save: the API refuses the
+  // save (409) if the page changed meanwhile (assistant, other tab, other user).
+  const versionRef = useRef<string | null>(null);
+  // Saves run one after the other, so each one is based on the version the previous one returned.
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  // While in conflict, autosaves stop and the user chooses which version to keep.
+  const conflictRef = useRef(false);
+  const [conflict, setConflict] = useState(false);
 
   const saveDocument = useCallback(
-    async (newTitle: string, newText: string, newIsPublic: boolean) => {
-      setSaving(true);
-      try {
-        const response = await apiFetch(`/api/documents/${id}`, {
-          method: "PUT",
-          body: JSON.stringify({
-            title: newTitle,
-            text: newText,
-            is_public: newIsPublic,
-          }),
-        });
-        if (!response.ok) {
-          throw new Error("Erreur lors de la sauvegarde");
+    (newTitle: string, newText: string, newIsPublic: boolean, overwrite = false) => {
+      const run = async () => {
+        if (conflictRef.current && !overwrite) return;
+        setSaving(true);
+        try {
+          const response = await apiFetch(`/api/documents/${id}`, {
+            method: "PUT",
+            body: JSON.stringify({
+              title: newTitle,
+              text: newText,
+              is_public: newIsPublic,
+              ...(!overwrite && versionRef.current && { expectedLastUpdate: versionRef.current }),
+            }),
+          });
+          if (response.status === 409) {
+            conflictRef.current = true;
+            setConflict(true);
+            return;
+          }
+          if (!response.ok) {
+            throw new Error("Erreur lors de la sauvegarde");
+          }
+          const data = await response.json();
+          versionRef.current = data.last_update;
+          conflictRef.current = false;
+          setConflict(false);
+          // PUT returns the bare row: keep the breadcrumb and sub-pages loaded by GET.
+          setDocument((previous) => (previous ? { ...previous, ...data } : data));
+          if (newTitle !== savedTitleRef.current) {
+            savedTitleRef.current = newTitle;
+            notifyDocumentsChanged();
+          }
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Erreur");
+        } finally {
+          setSaving(false);
         }
-        const data = await response.json();
-        // PUT returns the bare row: keep the breadcrumb and sub-pages loaded by GET.
-        setDocument((previous) => (previous ? { ...previous, ...data } : data));
-        if (newTitle !== savedTitleRef.current) {
-          savedTitleRef.current = newTitle;
-          notifyDocumentsChanged();
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Erreur");
-      } finally {
-        setSaving(false);
-      }
+      };
+      const queued = saveQueueRef.current.then(run);
+      saveQueueRef.current = queued;
+      return queued;
     },
     [id],
   );
 
-  const debouncedSave = useDebounce(saveDocument, 1000);
+  const { run: debouncedSave, flush: flushSave, cancel: cancelSave } = useDebouncedAction(saveDocument, 1000);
 
   const handleTitleChange = (newTitle: string) => {
     setTitle(newTitle);
@@ -706,7 +732,27 @@ export const DocumentPage = () => {
   const handleTogglePublic = async () => {
     const newIsPublic = !isPublic;
     setIsPublic(newIsPublic);
+    // A pending autosave still carries the old visibility: this save replaces it.
+    cancelSave();
     await saveDocument(title, text, newIsPublic);
+  };
+
+  /** The assistant changed this page: save local edits first, then reload unless they conflict. */
+  const handleExternalChange = () => {
+    flushSave();
+    void saveQueueRef.current.then(() => {
+      if (!conflictRef.current) setReloadKey((n) => n + 1);
+    });
+  };
+
+  const reloadSavedVersion = () => {
+    cancelSave();
+    void saveQueueRef.current.then(() => setReloadKey((n) => n + 1));
+  };
+
+  const keepMyVersion = () => {
+    cancelSave();
+    void saveDocument(title, text, isPublic, true);
   };
 
   const handleDelete = async () => {
@@ -898,6 +944,18 @@ export const DocumentPage = () => {
             </div>
           </header>
         ) : <div className="h-3" />}
+
+        {conflict && (
+          <div role="alert" className="mx-3 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-danger/30 bg-danger-tint px-4 py-3 text-sm text-danger-ink">
+            <p className="min-w-0 flex-1">
+              Cette page a été modifiée ailleurs (assistant, autre onglet ou autre utilisateur). Vos dernières modifications ne sont pas enregistrées.
+            </p>
+            <div className="flex gap-2">
+              <button type="button" onClick={reloadSavedVersion} className="btn-secondary">Recharger la version enregistrée</button>
+              <button type="button" onClick={keepMyVersion} className="btn-primary">Garder ma version</button>
+            </div>
+          </div>
+        )}
 
         <div aria-hidden="true" className={`mx-3 h-[140px] rounded-[14px] sm:h-[180px] ${typeStyle.cover}`} />
 
@@ -1120,7 +1178,7 @@ export const DocumentPage = () => {
             documentId={document.id}
             variant="panel"
             onClose={() => setShowAiChat(false)}
-            onDocumentsChanged={(ids) => ids.includes(document.id) && setReloadKey((n) => n + 1)}
+            onDocumentsChanged={(ids) => ids.includes(document.id) && handleExternalChange()}
           />
         </aside>
       )}
