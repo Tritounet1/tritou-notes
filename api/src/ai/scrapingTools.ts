@@ -9,6 +9,7 @@ import { count, label, positiveInt, requirePermission, string, ToolError, type T
 // through the same services as the REST API (so scheduler jobs stay in sync).
 
 const TEMPLATE_TYPES = ["title", "text", "image", "link", "badge", "date"] as const;
+const INSTANCE_STATUSES = ["IN_QUEUE", "STARTING", "WORKING", "FINISHED", "ERROR"] as const;
 const MAX_WAIT_SECONDS = 60;
 
 const SCRAPER_FORMAT =
@@ -66,6 +67,11 @@ const template = (value: unknown) => {
   }) as unknown as Prisma.InputJsonValue;
 };
 
+const scraperStatus = (value: unknown): "ACTIVE" | "DISABLE" => {
+  if (value !== "ACTIVE" && value !== "DISABLE") throw new ToolError("`status` doit valoir ACTIVE ou DISABLE.");
+  return value;
+};
+
 /** Scraper fields accepted by create / update, validated. */
 const scraperData = (args: Record<string, unknown>) => ({
   ...(args.name !== undefined && { name: string(args.name, "name") }),
@@ -74,7 +80,7 @@ const scraperData = (args: Record<string, unknown>) => ({
   ...(args.browser !== undefined && { browser: Boolean(args.browser) }),
   ...(args.base_url !== undefined && { base_url: origins(args.base_url) }),
   ...(args.display_template !== undefined && { display_template: template(args.display_template) }),
-  ...(args.status !== undefined && { status: args.status === "ACTIVE" ? ("ACTIVE" as const) : ("DISABLE" as const) }),
+  ...(args.status !== undefined && { status: scraperStatus(args.status) }),
 });
 
 const FIELD_LABELS: Record<string, string> = {
@@ -242,10 +248,23 @@ export const scrapingTools: Record<string, Tool> = {
       if (cron) assertValidCron(cron);
       if (activate && !cron) throw new ToolError("Un cron est nécessaire pour activer le planificateur.");
       const links = Array.isArray(urls) ? urls.map(absoluteUrl) : [];
-      const scheduler = await prisma.scrapingScheduler.create({ data: { title: name, description: typeof description === "string" ? description : null } });
-      for (const url of links) await createInstance({ url, scrapingSchedulerId: scheduler.id });
+      // Scheduler and URLs in one write (scheduler URLs wait for runs, so nothing is queued here).
+      const scheduler = await prisma.scrapingScheduler.create({
+        data: {
+          title: name,
+          description: typeof description === "string" ? description : null,
+          ...(links.length && { InstanceScrapes: { create: links.map((url) => ({ url })) } }),
+        },
+      });
       if (cron || activate) {
-        await updateScheduler(scheduler.id, ctx.userId, { cron_expression: cron, ...(activate === true && { status: "ACTIVATE" as const }) });
+        try {
+          await updateScheduler(scheduler.id, ctx.userId, { cron_expression: cron, ...(activate === true && { status: "ACTIVATE" as const }) });
+        } catch (error) {
+          // Don't leave a half-configured scheduler behind: remove it, its URLs and any job.
+          await prisma.instanceScrape.deleteMany({ where: { scrapingSchedulerId: scheduler.id } });
+          await deleteScheduler(scheduler.id);
+          throw error;
+        }
       }
       return {
         output: { id: scheduler.id, urls: links.length, cron_expression: cron, status: activate ? "ACTIVATE" : "DESACTIVATE" },
@@ -348,15 +367,18 @@ export const scrapingTools: Record<string, Tool> = {
       parameters: {
         type: "object",
         properties: {
-          status: { type: "string", enum: ["IN_QUEUE", "STARTING", "WORKING", "FINISHED", "ERROR"] },
+          status: { type: "string", enum: [...INSTANCE_STATUSES] },
           limit: { type: "integer", description: "50 par défaut, 200 max" },
         },
       },
     },
     run: async ({ status, limit }, ctx) => {
       requirePermission(ctx, "accessInstancesScrapersPage");
+      if (status !== undefined && !INSTANCE_STATUSES.includes(status as (typeof INSTANCE_STATUSES)[number])) {
+        throw new ToolError(`\`status\` doit valoir ${INSTANCE_STATUSES.join(", ")}.`);
+      }
       const instances = await prisma.instanceScrape.findMany({
-        where: typeof status === "string" ? { status: status as Prisma.EnumInstanceScrapeStatusFilter["equals"] } : undefined,
+        where: status === undefined ? undefined : { status: status as (typeof INSTANCE_STATUSES)[number] },
         select: { id: true, url: true, status: true, last_update: true, scrapingSchedulerId: true, scraper: { select: { id: true, name: true } } },
         orderBy: { last_update: "desc" },
         take: Math.min(Math.max(Number(limit) || 50, 1), 200),

@@ -147,11 +147,15 @@ export const workspaceTools: Record<string, Tool> = {
       const id = positiveInt(userId, "utilisateur");
       const user = await prisma.user.findUnique({ where: { id }, select: { username: true, role: true } });
       if (!user) throw new ToolError(`L’utilisateur ${userId} n’existe pas.`);
-      if (!permissions || typeof permissions !== "object") throw new ToolError("`permissions` doit être un objet { permission: booléen }.");
+      if (!permissions || typeof permissions !== "object" || Array.isArray(permissions)) {
+        throw new ToolError("`permissions` doit être un objet { permission: booléen }.");
+      }
       const entries = Object.entries(permissions as Record<string, unknown>);
       const unknown = entries.filter(([key]) => !PERMISSIONS.includes(key as PermissionKey)).map(([key]) => key);
       if (unknown.length) throw new ToolError(`Permissions inconnues : ${unknown.join(", ")}.`);
-      const data = Object.fromEntries(entries.map(([key, value]) => [key, value === true]));
+      const notBoolean = entries.filter(([, value]) => typeof value !== "boolean").map(([key]) => key);
+      if (notBoolean.length) throw new ToolError(`Valeurs non booléennes (true / false attendu) : ${notBoolean.join(", ")}.`);
+      const data = Object.fromEntries(entries) as Record<string, boolean>;
       await prisma.userPermissions.upsert({ where: { userId: id }, update: data, create: { userId: id, ...data } });
       return { output: { ok: true, ...(user.role === "ADMIN" && { note: "Les administrateurs ont de toute façon tous les droits." }) }, summary: `Permissions de ${label(user.username)} modifiées` };
     },

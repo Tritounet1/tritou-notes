@@ -171,13 +171,19 @@ const pageTools: Record<string, Tool> = {
     run: async ({ title, type, text, parentId, folderId }, ctx) => {
       requirePermission(ctx, "createDocument");
       const name = string(title, "title");
+      const pageType = type === undefined ? "TEXT" : String(type).toUpperCase();
+      if (pageType !== "TEXT" && pageType !== "EXCEL" && pageType !== "TODO") throw new ToolError("`type` doit valoir TEXT, EXCEL ou TODO.");
+      if (parentId != null && folderId != null) throw new ToolError("Choisis soit parentId (sous-page), soit folderId (dossier), pas les deux.");
+      if (pageType !== "TEXT" && text !== undefined) {
+        throw new ToolError(`\`text\` ne s’applique qu’aux pages TEXT : crée la page puis remplis-la avec ${pageType === "TODO" ? "update_todos" : "set_cells"}.`);
+      }
       const parent = parentId === undefined || parentId === null ? null : await resolveParent(parentId);
       const folder = parent === null && folderId != null ? await resolveFolder(folderId) : null;
       const page = await prisma.document.create({
         data: {
           title: name,
-          type: type === "EXCEL" || type === "TODO" ? type : "TEXT",
-          text: type === "EXCEL" || type === "TODO" ? "" : typeof text === "string" ? text : "",
+          type: pageType,
+          text: pageType === "TEXT" && typeof text === "string" ? text : "",
           author: { connect: { id: ctx.userId } },
           ...(parent !== null && { parent: { connect: { id: parent } } }),
           ...(folder !== null && { folder: { connect: { id: folder } } }),
@@ -256,11 +262,12 @@ const pageTools: Record<string, Tool> = {
     run: async ({ id, title, text, public: isPublic }, ctx) => {
       requirePermission(ctx, "modifyDocument");
       if (title === undefined && text === undefined && isPublic === undefined) throw new ToolError("Indique au moins `title`, `text` ou `public`.");
+      if (isPublic !== undefined && typeof isPublic !== "boolean") throw new ToolError("`public` doit être true ou false.");
       const page = text === undefined ? await findPage(id) : await findTextPage(id);
       await reviseDocument(page.id, ctx.userId, {
         ...(title !== undefined && { title: string(title, "title") }),
         ...(text !== undefined && { text: string(text, "text", { allowEmpty: true }) }),
-        ...(typeof isPublic === "boolean" && { public: isPublic }),
+        ...(isPublic !== undefined && { public: isPublic }),
       });
       ctx.changed.add(page.id);
       const name = typeof title === "string" ? title : page.title;
