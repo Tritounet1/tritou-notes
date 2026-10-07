@@ -52,7 +52,7 @@ npm run dev:api
 
 Le changement Prisma ajoute `DocumentImage` sans modifier les colonnes existantes. Le schéma MCP est synchronisé ; régénérer aussi son client si le serveur MCP est utilisé.
 
-Hors Docker, les fichiers vont dans `api/uploads/images` lorsque l’API est lancée depuis `api/`. `IMAGE_STORAGE_PATH` permet de choisir un répertoire persistant accessible en écriture par l’API. En Docker, Compose monte le volume `document-images` sur `/api/uploads/images` ; reconstruire l’API pour installer ses nouvelles dépendances Node. Les fichiers `.env` sont exclus du build ; Compose charge `api/.env` à l’exécution pour l’API et le worker, et `mcp/.env` pour le MCP (Compose 2.24+).
+Hors Docker, les fichiers vont dans `api/uploads/images` lorsque l’API est lancée depuis `api/`. `IMAGE_STORAGE_PATH` permet de choisir un répertoire persistant accessible en écriture par l’API. En Docker, Compose monte le volume `document-images` sur `/api/uploads/images` ; reconstruire l’API pour installer ses nouvelles dépendances Node. Les fichiers `.env` sont exclus du build ; Compose charge `api/.env` à l’exécution pour l’API et le serveur MCP (Compose 2.24+) ; le worker n’en reçoit pas. Le serveur MCP monte aussi le volume `document-images`, car supprimer une page via MCP supprime ses images.
 
 Sauvegarder **PostgreSQL et le dossier/volume des images ensemble**. Pour plusieurs instances d’API, partager ce dossier entre elles. Si un reverse proxy est utilisé, autoriser un corps multipart légèrement supérieur à 10 Mo (par exemple 12 Mo) ; la limite de fichier reste contrôlée par Express.
 

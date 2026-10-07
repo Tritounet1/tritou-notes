@@ -15,7 +15,7 @@ const CLIENTS: [Client, string][] = [
   ["desktop", "Claude Desktop"],
 ];
 
-// Production setups proxy /mcp on the app's domain (see mcp/README.md); override with VITE_MCP_URL.
+// Production setups proxy /mcp on the app's domain (see the README); override with VITE_MCP_URL.
 const defaultMcpUrl = import.meta.env.VITE_MCP_URL || `${window.location.origin}/mcp`;
 
 const snippet = (client: Client, url: string, token: string) => {

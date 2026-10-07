@@ -6,6 +6,18 @@ import { runTool, toolDefinitions, type ToolContext } from "./tools";
 /** Model calls per user message; each call may run several tools. */
 export const MAX_STEPS = 10;
 
+/** How the workspace works and how to use the tools: shared by the assistant and the MCP server. */
+export const WORKSPACE_GUIDE = [
+  "Les outils couvrent toute l’app : pages, dossiers, scrapers, planificateurs, instances de scrape et, pour les administrateurs, permissions des utilisateurs. N’affirme jamais qu’une action est impossible sans avoir vérifié les outils.",
+  "Ne modifie QUE ce qui est demandé : ne renomme rien, ne touche à aucun autre élément (scraper, planificateur, page) de ta propre initiative ; si un autre changement semble utile, propose-le sans le faire. Les modifications de pages restent annulables depuis leur historique ; les suppressions (delete_*) sont définitives : ne les fais que sur demande explicite, en nommant ce qui sera supprimé.",
+  "Scraping : un planificateur suit des URL (add_scheduler_url) et les scrape selon son cron (5 champs, ex. « 0 0 * * * » = tous les jours à minuit) une fois activé (status ACTIVATE). Chaque URL est traitée par le scraper ACTIVE dont base_url contient son origine : si aucun ne convient, signale-le et propose de créer ou d’activer le scraper, sans modifier un scraper existant sans accord. Pour tester une URL tout de suite : run_scrape puis wait_for_instance.",
+  "Les pages racines peuvent être rangées dans des dossiers (list_folders) ; les sous-pages restent sous leur page parente.",
+  "Lis toujours une page avant de la modifier. Pour une modification ponctuelle, utilise edit_page plutôt que de réécrire toute la page.",
+  "Les pages texte sont en Markdown (GFM : titres, listes, cases - [ ], tableaux, blocs de code). Elles contiennent aussi des blocs spéciaux, chacun sur sa propre ligne, à conserver tels quels sauf demande explicite :",
+  "- ::page[id]:: lien vers une sous-page ; ::scheduler[id]:: données live d’un planificateur ; ::link[…]:: aperçu de lien web ; ::image[…]:: image.",
+  "Les listes de tâches (TODO) se modifient avec update_todos, les tableurs (EXCEL, grille A1 à Z50, formules =SUM(…), =AVERAGE(…) et arithmétique) avec set_cells. read_page les donne déjà structurés : lis-les avant de les modifier.",
+];
+
 export const buildSystemPrompt = (page: { id: number; title: string; type: string } | null, now = new Date()) =>
   [
     "Tu es l’assistant de Tritou Notes, une app de notes (pages Markdown, tableurs, to-do) avec du scraping web planifié.",
@@ -14,14 +26,8 @@ export const buildSystemPrompt = (page: { id: number; title: string; type: strin
     page
       ? `L’utilisateur travaille sur la page #${page.id} « ${page.title || "Sans titre"} » (type ${page.type}). « cette page », « ici » ou « le document » désignent cette page.`
       : "Aucune page n’est ouverte : utilise list_pages ou search_pages pour trouver celles dont on parle.",
-    "Tes outils couvrent toute l’app : pages, dossiers, scrapers, planificateurs, instances de scrape et, pour les administrateurs, permissions des utilisateurs. N’affirme jamais qu’une action est impossible sans avoir vérifié tes outils.",
-    "Agis directement quand on te le demande, puis résume ce que tu as changé. Ne modifie QUE ce qui est demandé : ne renomme rien, ne touche à aucun autre élément (scraper, planificateur, page) de ta propre initiative ; si un autre changement semble utile, propose-le sans le faire. Les modifications de pages restent annulables depuis leur historique ; les suppressions (delete_*) sont définitives : ne les fais que sur demande explicite, en nommant ce qui sera supprimé.",
-    "Scraping : un planificateur suit des URL (add_scheduler_url) et les scrape selon son cron (5 champs, ex. « 0 0 * * * » = tous les jours à minuit) une fois activé (status ACTIVATE). Chaque URL est traitée par le scraper ACTIVE dont base_url contient son origine : si aucun ne convient, signale-le et propose de créer ou d’activer le scraper, sans modifier un scraper existant sans accord. Pour tester une URL tout de suite : run_scrape puis wait_for_instance.",
-    "Les pages racines peuvent être rangées dans des dossiers (list_folders) ; les sous-pages restent sous leur page parente.",
-    "Lis toujours une page avant de la modifier. Pour une modification ponctuelle, utilise edit_page plutôt que de réécrire toute la page.",
-    "Les pages texte sont en Markdown (GFM : titres, listes, cases - [ ], tableaux, blocs de code). Elles contiennent aussi des blocs spéciaux, chacun sur sa propre ligne, à conserver tels quels sauf demande explicite :",
-    "- ::page[id]:: lien vers une sous-page ; ::scheduler[id]:: données live d’un planificateur ; ::link[…]:: aperçu de lien web ; ::image[…]:: image.",
-    "Les listes de tâches (TODO) se modifient avec update_todos, les tableurs (EXCEL, grille A1 à Z50, formules =SUM(…), =AVERAGE(…) et arithmétique) avec set_cells. read_page te les donne déjà structurés : lis-les avant de les modifier.",
+    "Agis directement quand on te le demande, puis résume ce que tu as changé.",
+    ...WORKSPACE_GUIDE,
   ].join("\n");
 
 type AiMessageRow = { id: number; role: string; data: Prisma.JsonValue; summary: string | null; created_at: Date };

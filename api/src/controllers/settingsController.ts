@@ -69,7 +69,7 @@ export const createMcpToken = async (
     const token = generateMcpToken();
     const updated = await prisma.settings.update({
       where: { id: settings.id },
-      data: { mcpTokenHash: hashMcpToken(token), mcpTokenCreatedAt: new Date() },
+      data: { mcpTokenHash: hashMcpToken(token), mcpTokenCreatedAt: new Date(), mcpTokenUserId: req.user.id },
     });
     res.status(201).json({ token, createdAt: updated.mcpTokenCreatedAt });
   } catch (error) {
@@ -77,7 +77,7 @@ export const createMcpToken = async (
   }
 };
 
-/** Revokes the MCP token: the HTTP MCP server then rejects every request. */
+/** Revokes the MCP token: the MCP server then rejects every request. */
 export const deleteMcpToken = async (
   req: Request,
   res: Response,
@@ -87,7 +87,7 @@ export const deleteMcpToken = async (
     const settings = await prisma.settings.findFirstOrThrow({ select: { id: true } });
     await prisma.settings.update({
       where: { id: settings.id },
-      data: { mcpTokenHash: null, mcpTokenCreatedAt: null },
+      data: { mcpTokenHash: null, mcpTokenCreatedAt: null, mcpTokenUserId: null },
     });
     res.json({ success: true });
   } catch (error) {

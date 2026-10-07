@@ -79,7 +79,7 @@ services:
       context: .
       dockerfile: docker/mcp/Dockerfile
     env_file:
-      - path: ./mcp/.env
+      - path: ./api/.env
         required: false
     ports:
       - "3001:3001"
@@ -88,8 +88,13 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       MCP_HTTP_PORT: 3001
+      IMAGE_STORAGE_PATH: /api/uploads/images
+    # Deleting a page through MCP also deletes its image files.
+    volumes:
+      - document-images:/api/uploads/images
     depends_on:
-      database:
+      # The API syncs the database schema at startup.
+      api:
         condition: service_healthy
       redis:
         condition: service_healthy

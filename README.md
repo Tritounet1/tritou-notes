@@ -116,7 +116,21 @@ VITE_API_URL=https://api.example.com docker compose up -d --build
 
 ### MCP server
 
-The MCP server exposes pages, scrapers, instances, schedulers and users to Claude. In HTTP mode it only accepts the bearer token generated in **Settings › MCP**, which also shows ready-to-copy Claude Code and Claude Desktop configurations. See [mcp/README.md](mcp/README.md).
+The MCP server (`api/src/mcp.ts`) gives Claude the in-app assistant's tools: pages, folders, to-dos, spreadsheets, scrapers, schedulers and instances, with the same validation, page history and permissions. It acts as the admin who generated its token.
+
+- **Token**: generate it in **Settings › MCP** (shown once, only its SHA-256 is stored). The page also shows ready-to-copy Claude Code and Claude Desktop configurations. Regenerating replaces it, revoking cuts access. A token generated before the MCP server moved into the API is not tied to a user and must be regenerated.
+- **HTTP** (production): `MCP_HTTP_PORT=3001 npm --prefix api run start:mcp`, or the `mcp` Compose service. Proxy `/mcp` on the app's domain with buffering off; `/mcp/health` answers without a token.
+
+  ```nginx
+  location /mcp {
+      proxy_pass http://localhost:3001;
+      proxy_http_version 1.1;
+      proxy_set_header Connection "";
+      proxy_buffering off;
+  }
+  ```
+
+- **stdio** (local): `node api/dist/mcp.js` with the API's `.env`; it acts as the token's user, so generate a token first.
 
 ## Repository structure
 
@@ -132,9 +146,11 @@ tritou-notes/
 │       ├── middlewares/ # Auth, admin and permission checks
 │       ├── utils/       # Shared helpers (page tree, revisions, storage…)
 │       ├── __tests__/   # Vitest suites
+│       ├── mcp/         # MCP server (assistant tools over MCP)
+│       ├── scraping/    # Scraper sandbox and network guard
 │       ├── server.ts    # API entry point
-│       └── worker.ts    # Scraping queue consumer
-├── mcp/                 # MCP server (stdio and HTTP)
+│       ├── worker.ts    # Scraping queue consumer
+│       └── mcp.ts       # MCP server entry point
 ├── docker/              # Dockerfiles for api, worker, app and mcp
 ├── docs/                # Architecture diagrams and test documentation
 └── docker-compose.yml
@@ -146,9 +162,8 @@ tritou-notes/
 npm run lint              # ESLint for the API and the app
 npm --prefix api test     # Backend tests (Vitest)
 npm --prefix app run build
-npm --prefix mcp run build
 ```
 
-Changes to `api/prisma/schema.prisma` must be mirrored in `mcp/prisma/schema.prisma`. CI (GitHub Actions) runs lint, tests and builds; run it locally with [`act`](https://github.com/nektos/act) (`act --container-architecture linux/amd64` on Apple Silicon).
+CI (GitHub Actions) runs lint, tests and builds; run it locally with [`act`](https://github.com/nektos/act) (`act --container-architecture linux/amd64` on Apple Silicon).
 
 More details: [architecture diagrams](docs/schemas) and [backend tests](docs/tests-backend.md).

@@ -23,6 +23,7 @@ model User {
   documentHistories DocumentHistory[]
   conversations     Conversation[]
   userPermissions   UserPermissions?
+  mcpTokenSettings  Settings[]
 }
 
 model Document {
@@ -231,6 +232,9 @@ model Settings {
   // SHA-256 of the MCP server's bearer token; the token itself is shown once and never stored.
   mcpTokenHash      String?
   mcpTokenCreatedAt DateTime?
+  // The MCP server acts as this user (the admin who generated the token), with their permissions.
+  mcpTokenUser      User?     @relation(fields: [mcpTokenUserId], references: [id], onDelete: SetNull)
+  mcpTokenUserId    Int?
 }
 
 model Images {

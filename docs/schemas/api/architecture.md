@@ -19,8 +19,9 @@ flowchart LR
     Controllers --> Files["Disque API : document-images"]
     Controllers --> AI["OpenRouter : chat, outils, images"]
     Controllers --> Mail["SMTP : invitations"]
-    MCP["Serveur MCP distinct"] --> DB
+    MCP["Serveur MCP (mêmes outils que l’assistant)"] --> DB
     MCP --> Queue
+    MCP --> Files
 ```
 
 ## Parcours d’une requête
@@ -64,4 +65,4 @@ Les chemins ci-dessous sont les préfixes réels, sans préfixe `/api` implicite
 
 Les administrateurs passent automatiquement les contrôles de `requirePermission`. Les autres utilisateurs doivent posséder toutes les permissions demandées.
 
-Sources : [application Express](../../../api/src/app.ts), [routes](../../../api/src/routes/), [permissions](../../../api/src/middlewares/permissionsMiddleware.ts), [worker](../../../api/src/worker.ts), [MCP](../../../mcp/src/index.ts).
+Sources : [application Express](../../../api/src/app.ts), [routes](../../../api/src/routes/), [permissions](../../../api/src/middlewares/permissionsMiddleware.ts), [worker](../../../api/src/worker.ts), [MCP](../../../api/src/mcp/server.ts).

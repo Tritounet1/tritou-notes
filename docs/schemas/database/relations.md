@@ -175,4 +175,4 @@ Les fichiers de `DocumentImage` sont stockés localement par Express, hors Postg
 
 `Invitation`, `Settings` et `Images` n’ont aucune clé étrangère. Il n’existe pas de relation SQL entre `Document` et `ScrapingScheduler` : le frontend stocke une référence textuelle `::scheduler[id]::` dans `Document.text`.
 
-Source : [schéma Prisma API](../../../api/prisma/schema.prisma). Le serveur MCP possède également son [schéma Prisma](../../../mcp/prisma/schema.prisma) pour accéder à la même base.
+Source : [schéma Prisma API](../../../api/prisma/schema.prisma). Le serveur MCP fait partie de l’API et utilise ce même schéma.

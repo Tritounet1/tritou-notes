@@ -8,8 +8,10 @@
     "build:sandbox": "node scripts/build-sandbox.mjs",
     "start:api": "node dist/server.js",
     "start:worker": "node dist/worker.js",
+    "start:mcp": "node dist/mcp.js",
     "dev:api": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/server.ts",
     "dev:worker": "npm run build:sandbox && nodemon --watch 'src/worker.ts' --watch 'src/scraping' --exec 'ts-node' src/worker.ts",
+    "dev:mcp": "ts-node src/mcp.ts",
     "lint": "eslint 'src/**/*.ts'",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -44,6 +46,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.992.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
     "bcrypt": "^6.0.0",

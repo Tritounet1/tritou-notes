@@ -22,6 +22,8 @@ describe("MCP token", () => {
     const { token } = ctx.json.mock.calls[0][0];
     const { data } = db.settings.update.mock.calls[0][0];
     expect(data.mcpTokenHash).toBe(hashMcpToken(token));
+    // The MCP server acts as the admin who generated the token.
+    expect(data.mcpTokenUserId).toBe(7);
     expect(JSON.stringify(data)).not.toContain(token);
     expect(ctx.status).toHaveBeenCalledWith(201);
   });
@@ -29,7 +31,7 @@ describe("MCP token", () => {
   it("revokes the token", async () => {
     db.settings.findFirstOrThrow.mockResolvedValue({ id: 1 });
     await call(settings.deleteMcpToken);
-    expect(db.settings.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { mcpTokenHash: null, mcpTokenCreatedAt: null } });
+    expect(db.settings.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { mcpTokenHash: null, mcpTokenCreatedAt: null, mcpTokenUserId: null } });
   });
 
   it("never sends the hash to the browser", async () => {
