@@ -1,16 +1,17 @@
 services:
   database:
     image: "postgres:18"
+    # Reachable from the host only (local tools), never from the network.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
-      POSTGRES_USER: username
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: default_database
+      POSTGRES_USER: ${POSTGRES_USER:-username}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-default_database}
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U username"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
       interval: 5s
       retries: 5
       timeout: 5s
@@ -18,7 +19,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     command: redis-server --appendonly yes
@@ -38,7 +39,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://username:password@database:5432/default_database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-username}:${POSTGRES_PASSWORD:-password}@database:5432/${POSTGRES_DB:-default_database}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       FRONTEND_URL: http://localhost:5173
@@ -64,7 +65,7 @@ services:
     # No api/.env here: the worker runs untrusted scraper code and only needs the
     # database and Redis, not the JWT / encryption / AI secrets.
     environment:
-      DATABASE_URL: postgresql://username:password@database:5432/default_database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-username}:${POSTGRES_PASSWORD:-password}@database:5432/${POSTGRES_DB:-default_database}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:
@@ -83,7 +84,7 @@ services:
     ports:
       - "3001:3001"
     environment:
-      DATABASE_URL: postgresql://username:password@database:5432/default_database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-username}:${POSTGRES_PASSWORD:-password}@database:5432/${POSTGRES_DB:-default_database}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       MCP_HTTP_PORT: 3001
