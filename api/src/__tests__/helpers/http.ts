@@ -6,11 +6,12 @@ export function context(body: unknown = {}, overrides: Record<string, unknown> =
   const status = vi.fn();
   const json = vi.fn();
   const cookie = vi.fn();
-  const res = { status, json, cookie } as unknown as Response;
+  const setHeader = vi.fn();
+  const res = { status, json, cookie, setHeader } as unknown as Response;
   status.mockReturnValue(res);
   json.mockReturnValue(res);
   const next = vi.fn();
-  return { req, res, next, status, json, cookie };
+  return { req, res, next, status, json, cookie, setHeader };
 }
 
 export async function call(handler: (req: Request<{ id: string; token: string }>, res: Response, next: NextFunction) => unknown, body: unknown = {}, overrides: Record<string, unknown> = {}) {

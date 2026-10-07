@@ -31,6 +31,7 @@ import * as settings from "../controllers/settingsController";
 import * as permissions from "../controllers/userPermissionsController";
 import * as images from "../controllers/imagesController";
 import * as ai from "../controllers/aiController";
+import { accountFailures, ipFailures } from "../utils/failureLimiter";
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -86,18 +87,60 @@ describe("user credentials", () => {
 });
 
 describe("login and session", () => {
-  it.each([["", "username"], ["user@example.com", "email"]])("authenticates by %s with a protected cookie", async (email, field) => {
-    const ctx = await call(auth.login, { email, username: "user", password: "password" });
-    expect(db.user.findFirst).toHaveBeenCalledWith({ where: { [field]: field === "email" ? email : "user" } });
+  beforeEach(() => {
+    accountFailures.clear();
+    ipFailures.clear();
+  });
+  it("authenticates by exact email with a protected cookie", async () => {
+    const ctx = await call(auth.login, { email: " user@example.com ", username: "user", password: "password" });
+    expect(db.user.findUnique).toHaveBeenCalledWith({ where: { email: "user@example.com" } });
     expect(ctx.cookie).toHaveBeenCalledWith("auth_token", "jwt", expect.objectContaining({ httpOnly: true, path: "/" }));
     expect(ctx.json.mock.calls[0][0].user).not.toHaveProperty("password");
   });
+  it("authenticates by username only when it names a single account", async () => {
+    db.user.findMany.mockResolvedValue([user]);
+    expect((await call(auth.login, { email: "", username: "user", password: "password" })).cookie).toHaveBeenCalled();
+    expect(db.user.findMany).toHaveBeenCalledWith({ where: { username: "user" }, take: 2 });
+    db.user.findMany.mockResolvedValue([user, { ...user, id: 8 }]);
+    const ctx = await call(auth.login, { email: "", username: "user", password: "password" });
+    expect(ctx.status).toHaveBeenCalledWith(401);
+    expect(ctx.cookie).not.toHaveBeenCalled();
+  });
+  it.each([{}, { email: { not: "" }, password: "x" }, { email: "", username: "", password: "x" }, { email: "a@b.c", password: ["x"] }, { username: "user" }])("rejects malformed credentials %j without querying", async body => {
+    const ctx = await call(auth.login, body);
+    expect(ctx.status).toHaveBeenCalledWith(400);
+    expect(db.user.findUnique).not.toHaveBeenCalled();
+    expect(db.user.findFirst).not.toHaveBeenCalled();
+    expect(db.user.findMany).not.toHaveBeenCalled();
+  });
   it.each(["missing account", "wrong password"])("rejects %s without issuing a session", async reason => {
-    if (reason === "missing account") db.user.findFirst.mockResolvedValue(null);
+    if (reason === "missing account") db.user.findUnique.mockResolvedValue(null);
     else mocks.verify.mockResolvedValue(false);
     const ctx = await call(auth.login, { email: user.email, password: "wrong" });
     expect(ctx.status).toHaveBeenCalledWith(401);
     expect(ctx.cookie).not.toHaveBeenCalled();
+    // An unknown account still pays for a bcrypt comparison.
+    expect(mocks.verify).toHaveBeenCalledWith("wrong", reason === "missing account" ? "new-hash" : "stored-hash");
+  });
+  it("locks an account after 10 failures, whatever the case of the email", async () => {
+    mocks.verify.mockResolvedValue(false);
+    for (let i = 0; i < 10; i++) await call(auth.login, { email: i % 2 ? "USER@example.com" : user.email, password: "wrong" });
+    mocks.verify.mockResolvedValue(true);
+    const ctx = await call(auth.login, { email: user.email, password: "password" });
+    expect(ctx.status).toHaveBeenCalledWith(429);
+    expect(ctx.setHeader).toHaveBeenCalledWith("Retry-After", expect.any(String));
+    expect(ctx.cookie).not.toHaveBeenCalled();
+    // Other accounts are unaffected.
+    expect((await call(auth.login, { email: "other@example.com", password: "password" })).cookie).toHaveBeenCalled();
+  });
+  it("resets the account counter after a successful login", async () => {
+    mocks.verify.mockResolvedValue(false);
+    for (let i = 0; i < 9; i++) await call(auth.login, { email: user.email, password: "wrong" });
+    mocks.verify.mockResolvedValue(true);
+    await call(auth.login, { email: user.email, password: "password" });
+    mocks.verify.mockResolvedValue(false);
+    await call(auth.login, { email: user.email, password: "wrong" });
+    expect((await call(auth.login, { email: user.email, password: "wrong" })).status).toHaveBeenCalledWith(401);
   });
   it("forwards token-generation failures without a cookie", async () => {
     mocks.token.mockReturnValue(undefined);
@@ -121,6 +164,16 @@ describe("login and session", () => {
     const ctx = await call(auth.changePassword, {}, { user: undefined });
     expect(ctx.status).toHaveBeenCalledWith(401);
     expect(db.user.update).not.toHaveBeenCalled();
+  });
+  it("limits wrong current passwords", async () => {
+    accountFailures.clear();
+    mocks.verify.mockResolvedValue(false);
+    for (let i = 0; i < 10; i++) expect((await call(auth.changePassword, { currentPassword: "guess", newPassword: "new-password" })).status).toHaveBeenCalledWith(401);
+    mocks.verify.mockResolvedValue(true);
+    expect((await call(auth.changePassword, { currentPassword: "old-password", newPassword: "new-password" })).status).toHaveBeenCalledWith(429);
+    expect(db.user.update).not.toHaveBeenCalled();
+    accountFailures.clear();
+    expect((await call(auth.changePassword, { currentPassword: "old-password", newPassword: "new-password" })).status).toHaveBeenCalledWith(200);
   });
   it("rejects password changes when the account was deleted", async () => {
     db.user.findUnique.mockResolvedValue(null);

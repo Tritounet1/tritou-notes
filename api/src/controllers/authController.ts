@@ -2,7 +2,21 @@ import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
 import { hashPassword, verifyPassword } from "../utils/bcryptUtils";
 import { clearAuthCookie, setAuthCookie } from "../utils/cookieUtils";
+import { accountFailures, ipFailures } from "../utils/failureLimiter";
 import { createToken } from "../utils/jwtUtils";
+
+// Compared against when the account does not exist, so both cases take the same time.
+let dummyHash: Promise<string> | undefined;
+const unknownUserHash = () =>
+  (dummyHash ??= hashPassword("tritou-notes-unknown-user").catch((error) => {
+    dummyHash = undefined;
+    throw error;
+  }));
+
+const tooManyAttempts = (res: Response, seconds: number) => {
+  res.setHeader("Retry-After", String(seconds));
+  res.status(429).json({ error: `Trop de tentatives. Réessayez dans ${Math.ceil(seconds / 60)} min.` });
+};
 
 export const login = async (
   req: Request,
@@ -10,30 +24,43 @@ export const login = async (
   next: NextFunction,
 ) => {
   try {
-    const { email, username, password } = req.body;
+    const { email, username, password } = req.body ?? {};
+    // Strings only: an object or a missing field must never turn into a broad Prisma filter.
+    const byEmail = typeof email === "string" && email.trim() !== "";
+    const byUsername = !byEmail && typeof username === "string" && username.trim() !== "";
+    if ((!byEmail && !byUsername) || typeof password !== "string" || !password) {
+      res.status(400).json({ error: "Identifiant et mot de passe requis" });
+      return;
+    }
+
+    const account = byEmail ? `email:${email.trim().toLowerCase()}` : `username:${username.trim()}`;
+    const ip = `ip:${req.ip}`;
+    const wait = Math.max(accountFailures.retryAfter(account), ipFailures.retryAfter(ip));
+    if (wait > 0) {
+      tooManyAttempts(res, wait);
+      return;
+    }
+
     let user;
-    if (email === "") {
-      user = await prisma.user.findFirst({
-        where: { username: username },
-      });
+    if (byEmail) {
+      user = await prisma.user.findUnique({ where: { email: email.trim() } });
     } else {
-      user = await prisma.user.findFirst({
-        where: { email: email },
-      });
+      // Usernames are not unique: only an unambiguous one can log in.
+      const matches = await prisma.user.findMany({ where: { username: username.trim() }, take: 2 });
+      user = matches.length === 1 ? matches[0] : null;
     }
-    if (user === undefined || user === null) {
+
+    const isPasswordCorrect = await verifyPassword(password, user?.password ?? (await unknownUserHash()));
+    if (!user || !isPasswordCorrect) {
+      accountFailures.fail(account);
+      ipFailures.fail(ip);
       res.status(401).json({
         error: "Invalid credentials",
       });
       return;
     }
-    const isPasswordCorrect = await verifyPassword(password, user.password);
-    if (!isPasswordCorrect) {
-      res.status(401).json({
-        error: "Invalid credentials",
-      });
-      return;
-    }
+    accountFailures.reset(account);
+
     const userPermissions = await prisma.userPermissions.findFirst({
       where: {
         userId: user.id,
@@ -173,11 +200,20 @@ export const changePassword = async (
       return;
     }
 
+    const account = `user:${user.id}`;
+    const wait = accountFailures.retryAfter(account);
+    if (wait > 0) {
+      tooManyAttempts(res, wait);
+      return;
+    }
+
     const isValid = await verifyPassword(currentPassword, user.password);
     if (!isValid) {
+      accountFailures.fail(account);
       res.status(401).json({ error: "Mot de passe actuel incorrect" });
       return;
     }
+    accountFailures.reset(account);
 
     const hashed = await hashPassword(newPassword);
     await prisma.user.update({
