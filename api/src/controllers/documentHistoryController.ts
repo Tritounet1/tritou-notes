@@ -26,10 +26,6 @@ export const getDocumentHistoriesByDocumentId = async (
         documentId: id,
       },
     });
-    if (!documentHistories) {
-      res.status(404).json({ message: "DocumentHistories not found" });
-      return;
-    }
     res.json(documentHistories);
   } catch (error) {
     next(error);

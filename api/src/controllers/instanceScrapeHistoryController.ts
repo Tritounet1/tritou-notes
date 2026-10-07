@@ -26,10 +26,6 @@ export const getInstancesScrapeHistoryByInstanceScrapeId = async (
         instanceScrapeId: id,
       },
     });
-    if (!instanceScrape) {
-      res.status(404).json({ message: "Instance of Scrape History not found" });
-      return;
-    }
     res.json(instanceScrape);
   } catch (error) {
     next(error);
