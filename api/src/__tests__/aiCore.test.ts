@@ -265,6 +265,9 @@ describe("attachmentToPart", () => {
     expect(attachmentToPart({ name: "photo.jpg", data: "data:image/jpeg;name=photo.jpg;base64,AAAA" })).toMatchObject({ type: "image_url" });
   });
 
+  it("rejects a non-text file name", () => {
+    expect(() => attachmentToPart({ name: { toString: null } as unknown as string, data: "data:text/plain;base64,eA==" })).toThrow(expect.objectContaining({ status: 400, message: "Pièce jointe sans nom valide." }));
+  });
   it("rejects a missing data URL", () => {
     expect(() => attachmentToPart({ name: "x", data: undefined as unknown as string })).toThrow(expect.objectContaining({ status: 400, message: "Fichier illisible : x" }));
   });

@@ -71,6 +71,7 @@ export const login = async (
       user.username,
       user.email,
       user.role,
+      user.tokenVersion,
     );
 
     if (!jwtToken) {
@@ -135,6 +136,7 @@ export const register = async (
       newUser.username,
       newUser.email,
       newUser.role,
+      newUser.tokenVersion,
     );
 
     if (!jwtToken) {
@@ -216,10 +218,13 @@ export const changePassword = async (
     accountFailures.reset(account);
 
     const hashed = await hashPassword(newPassword);
-    await prisma.user.update({
+    // A new token version signs out every other session (a stolen token stops working).
+    const updated = await prisma.user.update({
       where: { id: user.id },
-      data: { password: hashed },
+      data: { password: hashed, tokenVersion: { increment: 1 } },
     });
+    const jwtToken = createToken(updated.id.toString(), updated.username, updated.email, updated.role, updated.tokenVersion);
+    if (jwtToken) setAuthCookie(res, jwtToken);
 
     res.status(200).json({ message: "Mot de passe mis a jour" });
   } catch (error) {

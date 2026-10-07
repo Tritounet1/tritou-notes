@@ -71,6 +71,7 @@ const initFirstAdmin = async () => {
           user.username,
           user.email,
           user.role,
+          user.tokenVersion,
         );
 
         if (!jwtToken) {

@@ -34,9 +34,19 @@ describe("MCP token", () => {
     expect(db.settings.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { mcpTokenHash: null, mcpTokenCreatedAt: null, mcpTokenUserId: null } });
   });
 
+  it("shows SMTP host and user decrypted, never the password", async () => {
+    const { encrypt } = await import("../utils/utils");
+    db.settings.findMany.mockResolvedValue([{ id: 1, smtpHost: encrypt("smtp.example.com"), smtpUser: encrypt("mail@example.com"), smtpPassword: encrypt("secret"), mcpTokenHash: null }]);
+    const [shown] = (await call(settings.getSettings)).json.mock.calls[0][0];
+    expect(shown).toEqual({ id: 1, smtpHost: "smtp.example.com", smtpUser: "mail@example.com", smtpPasswordSet: true, mcpTokenSet: false, openrouterApiKeySet: false });
+    // Unreadable values (ENCRYPTION_KEY changed) are shown as empty instead of failing.
+    db.settings.findMany.mockResolvedValue([{ id: 1, smtpHost: "not-encrypted", mcpTokenHash: null }]);
+    expect((await call(settings.getSettings)).json.mock.calls[0][0][0].smtpHost).toBeNull();
+  });
+
   it("never sends the hash to the browser", async () => {
     db.settings.findMany.mockResolvedValue([{ id: 1, smtpPort: 587, mcpTokenHash: "secret-hash", openrouterApiKey: "encrypted-key" }]);
     const ctx = await call(settings.getSettings);
-    expect(ctx.json).toHaveBeenCalledWith([{ id: 1, smtpPort: 587, mcpTokenSet: true, openrouterApiKeySet: true }]);
+    expect(ctx.json).toHaveBeenCalledWith([{ id: 1, smtpPort: 587, smtpHost: null, smtpUser: null, mcpTokenSet: true, openrouterApiKeySet: true, smtpPasswordSet: false }]);
   });
 });

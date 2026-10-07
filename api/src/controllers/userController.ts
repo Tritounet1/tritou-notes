@@ -2,9 +2,10 @@ import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
 import { hashPassword } from "../utils/bcryptUtils";
 
-const publicUser = <T extends { password: string }>(user: T) => {
-  const { password: _password, ...safeUser } = user;
+const publicUser = <T extends { password: string; tokenVersion?: number }>(user: T) => {
+  const { password: _password, tokenVersion: _tokenVersion, ...safeUser } = user;
   void _password;
+  void _tokenVersion;
   return safeUser;
 };
 
@@ -92,6 +93,8 @@ export const updateUser = async (
         email: email,
         username: username,
         password: password ? await hashPassword(password) : undefined,
+        // A password reset signs the user out everywhere.
+        ...(password && { tokenVersion: { increment: 1 } }),
       },
     });
     res.json(publicUser(user));

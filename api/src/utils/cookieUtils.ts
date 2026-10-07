@@ -1,24 +1,23 @@
 import { Response } from "express";
 import config from "../config/config";
+import { SESSION_DURATION_SECONDS } from "./session";
 
-const IS_PRODUCTION = config.nodeEnv === "production";
+// Secure cookies whenever the app is served over https, whatever NODE_ENV says.
+const SECURE = config.frontendUrl.startsWith("https://");
+
+const cookieOptions = (maxAge: number) => ({
+  httpOnly: true,
+  secure: SECURE,
+  sameSite: SECURE ? ("strict" as const) : ("lax" as const),
+  maxAge,
+  path: "/",
+});
 
 export const setAuthCookie = (res: Response, token: string) => {
-  res.cookie("auth_token", token, {
-    httpOnly: true,
-    secure: IS_PRODUCTION,
-    sameSite: IS_PRODUCTION ? "strict" : "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 jours
-    path: "/",
-  });
+  // Same lifetime as the token it carries.
+  res.cookie("auth_token", token, cookieOptions(SESSION_DURATION_SECONDS * 1000));
 };
 
 export const clearAuthCookie = (res: Response) => {
-  res.cookie("auth_token", "", {
-    httpOnly: true,
-    secure: IS_PRODUCTION,
-    sameSite: IS_PRODUCTION ? "strict" : "lax",
-    maxAge: 0,
-    path: "/",
-  });
+  res.cookie("auth_token", "", cookieOptions(0));
 };

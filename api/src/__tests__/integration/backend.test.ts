@@ -99,6 +99,11 @@ describe("real HTTP + PostgreSQL + Redis", () => {
     expect((await prisma.user.findUniqueOrThrow({ where: { id: regularId } })).role).toBe("USER");
     expect((await request("/auth/login", "POST", { email: "user@test.example", password: "old-password" }, "")).status).toBe(401);
     expect((await request("/auth/login", "POST", { email: "user@test.example", password: "new-password" }, "")).status).toBe(200);
+    // Sessions opened before the change are signed out; the new cookie works.
+    expect((await request("/api/documents", "GET", undefined, regularToken)).status).toBe(401);
+    const fresh = /auth_token=([^;]+)/.exec(response.headers.get("set-cookie") ?? "")?.[1];
+    expect((await request("/api/documents", "GET", undefined, fresh)).status).toBe(200);
+    regularToken = fresh!;
   });
   it("creates a document under the authenticated author", async () => {
     const response = await request("/api/documents", "POST", { title: "Initial", type: "TEXT", authorId: 1 }, regularToken);

@@ -23,6 +23,11 @@ describe("JWT tests", () => {
     expect(typeof token).toBe("string");
   });
 
+  it("carries the user's token version (0 by default)", () => {
+    expect((decodeToken(createToken(user.id, user.username, user.email, user.role)!) as Record<string, unknown>).v).toBe(0);
+    expect((decodeToken(createToken(user.id, user.username, user.email, user.role, 3)!) as Record<string, unknown>).v).toBe(3);
+  });
+
   it("should decode a token with correct payload", () => {
     const token = createToken(user.id, user.username, user.email, user.role)!;
     const decoded = decodeToken(token) as Record<string, unknown>;

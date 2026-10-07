@@ -19,6 +19,8 @@ model User {
   username          String
   password          String
   role              Role              @default(USER)
+  // Part of every session token: incrementing it signs out all the user's sessions.
+  tokenVersion      Int               @default(0)
   documents         Document[]
   documentHistories DocumentHistory[]
   conversations     Conversation[]

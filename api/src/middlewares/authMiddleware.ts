@@ -6,7 +6,9 @@ import { decodeToken } from "../utils/jwtUtils";
 const userFromToken = async (token: string) => {
   const payload = decodeToken(token);
   if (!payload || typeof payload === "string" || typeof payload.id !== "string" || !/^\d+$/.test(payload.id)) return null;
-  return prisma.user.findUnique({ where: { id: parseInt(payload.id) } });
+  const user = await prisma.user.findUnique({ where: { id: parseInt(payload.id) } });
+  // Tokens issued before a password change carry an older version (none = 0).
+  return user && (payload.v ?? 0) === (user.tokenVersion ?? 0) ? user : null;
 };
 
 const PUBLIC_DOCUMENT_PATH = /^\/api\/documents\/\d+(?:\/images\/[0-9a-f-]{36})?\/?$/i;

@@ -54,7 +54,7 @@ interface Settings {
   aiTextModel: string | null;
   aiImageModel: string | null;
   smtpUser: string | null;
-  smtpPassword: string | null;
+  smtpPasswordSet: boolean;
   smtpHost: string | null;
   smtpPort: number | null;
   mcpTokenSet: boolean;
@@ -81,7 +81,9 @@ export const SettingsPage = () => {
   const [smtpHost, setSmtpHost] = useState("");
   const [smtpPort, setSmtpPort] = useState("587");
   const [smtpUser, setSmtpUser] = useState("");
+  // The stored password never comes back from the API: type one only to replace it.
   const [smtpPassword, setSmtpPassword] = useState("");
+  const [smtpPasswordSet, setSmtpPasswordSet] = useState(false);
   const [showSmtpHost, setShowSmtpHost] = useState(false);
   const [showSmtpUser, setShowSmtpUser] = useState(false);
   const [showSmtpPassword, setShowSmtpPassword] = useState(false);
@@ -106,7 +108,7 @@ export const SettingsPage = () => {
             setSmtpHost(s.smtpHost || "");
             setSmtpPort(s.smtpPort?.toString() || "587");
             setSmtpUser(s.smtpUser || "");
-            setSmtpPassword(s.smtpPassword || "");
+            setSmtpPasswordSet(s.smtpPasswordSet);
             setMcp({ tokenSet: s.mcpTokenSet, createdAt: s.mcpTokenCreatedAt });
           }
         }
@@ -134,21 +136,20 @@ export const SettingsPage = () => {
     }, 3000);
   };
 
-  const saveSettings = async (data: Partial<Settings>) => {
-    if (!isAdmin || !settingsId || saving) return;
+  /** Saves settings fields; resolves to whether the save succeeded. */
+  const saveSettings = async (data: Record<string, unknown>) => {
+    if (!isAdmin || !settingsId || saving) return false;
     setSaving(true);
     try {
       const response = await apiFetch(`/api/settings/${settingsId}`, {
         method: "PUT",
         body: JSON.stringify(data),
       });
-      if (response.ok) {
-        showFeedback("success", "Paramètres enregistrés");
-      } else {
-        showFeedback("error", "Erreur lors de la sauvegarde");
-      }
+      showFeedback(response.ok ? "success" : "error", response.ok ? "Paramètres enregistrés" : "Erreur lors de la sauvegarde");
+      return response.ok;
     } catch {
       showFeedback("error", "Erreur lors de la sauvegarde");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -191,13 +192,17 @@ export const SettingsPage = () => {
     }
   };
 
-  const handleSaveSmtp = () => {
-    saveSettings({
+  const handleSaveSmtp = async () => {
+    const saved = await saveSettings({
       smtpHost,
       smtpPort: smtpPort ? parseInt(smtpPort) : null,
       smtpUser,
-      smtpPassword,
+      ...(smtpPassword && { smtpPassword }),
     });
+    if (saved && smtpPassword) {
+      setSmtpPasswordSet(true);
+      setSmtpPassword("");
+    }
   };
 
   if (isAdmin && loading) {
@@ -366,6 +371,7 @@ export const SettingsPage = () => {
                   onChange={setSmtpPassword}
                   shown={showSmtpPassword}
                   onToggle={() => setShowSmtpPassword(!showSmtpPassword)}
+                  placeholder={smtpPasswordSet ? "Mot de passe enregistré — saisir pour le remplacer" : undefined}
                 />
               </label>
               <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-line-soft">

@@ -115,6 +115,7 @@ VITE_API_URL=https://api.example.com docker compose up -d --build
 - Behind nginx, keep response buffering off for the API so assistant replies stream (the API already sends `X-Accel-Buffering: no`).
 - Images use Node 24 and run as the unprivileged `node` user; the worker also drops every Linux capability. The API and MCP containers start as root only to hand the `document-images` volume to `node`.
 - PostgreSQL, Redis and the MCP server are published on `127.0.0.1` only: reach them through the reverse proxy (or the Docker network).
+- Session cookies are `Secure` and `SameSite=Strict` when `FRONTEND_URL` is https, and last as long as the session (2 days). Changing a password signs out every other session.
 
 ### MCP server
 

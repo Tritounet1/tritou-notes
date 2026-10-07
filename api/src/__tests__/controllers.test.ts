@@ -68,7 +68,8 @@ describe("user credentials", () => {
   });
   it("hashes administrator password resets", async () => {
     await call(users.updateUser, { password: "reset-password" });
-    expect(db.user.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ password: "new-hash" }) }));
+    // ...and sign the user out of every session.
+    expect(db.user.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ password: "new-hash", tokenVersion: { increment: 1 } }) }));
   });
   it.each([null, [], "short", "é".repeat(37)])("rejects unsafe administrator resets: %s", async password => {
     const ctx = await call(users.updateUser, { password });

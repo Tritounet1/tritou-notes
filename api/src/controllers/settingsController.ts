@@ -1,18 +1,35 @@
 import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
-import { encrypt } from "../utils/utils";
+import { decrypt, encrypt } from "../utils/utils";
 import { generateMcpToken, hashMcpToken } from "../utils/mcpToken";
 
-// Never send the MCP token hash or the OpenRouter key to the browser; expose whether
-// they are set instead (sending the encrypted key back would get it re-encrypted on save).
+/** Plain value of an encrypted setting, or null if it cannot be read (e.g. ENCRYPTION_KEY changed). */
+const readable = (value: unknown) => {
+  if (typeof value !== "string" || !value) return null;
+  try {
+    return decrypt(value);
+  } catch {
+    return null;
+  }
+};
+
+// Never send secrets to the browser (MCP token hash, OpenRouter key, SMTP password): expose
+// whether they are set instead. The SMTP host and user are shown decrypted so the form can
+// display and send them back as plain text.
 const toPublicSettings = ({
   mcpTokenHash,
   openrouterApiKey,
+  smtpPassword,
+  smtpHost,
+  smtpUser,
   ...settings
-}: { mcpTokenHash: string | null; openrouterApiKey?: string | null; [key: string]: unknown }) => ({
+}: { mcpTokenHash: string | null; openrouterApiKey?: string | null; smtpPassword?: string | null; smtpHost?: string | null; smtpUser?: string | null; [key: string]: unknown }) => ({
   ...settings,
+  smtpHost: readable(smtpHost),
+  smtpUser: readable(smtpUser),
   mcpTokenSet: Boolean(mcpTokenHash),
   openrouterApiKeySet: Boolean(openrouterApiKey),
+  smtpPasswordSet: Boolean(smtpPassword),
 });
 
 export const getSettings = async (

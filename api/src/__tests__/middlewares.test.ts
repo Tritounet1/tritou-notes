@@ -43,6 +43,15 @@ describe("authentication", () => {
     if (isPublic) expect(ctx.next).toHaveBeenCalledOnce();
     else expect(ctx.status).toHaveBeenCalledWith(401);
   });
+  it("refuses tokens issued before a password change", async () => {
+    db.user.findUnique.mockResolvedValue({ ...user, role: "USER", tokenVersion: 2 });
+    decode.mockReturnValue({ id: "7", v: 1 });
+    expect((await call(authHandler, {}, { user: undefined, cookies: { auth_token: "old" } })).status).toHaveBeenCalledWith(401);
+    decode.mockReturnValue({ id: "7" });
+    expect((await call(authHandler, {}, { user: undefined, cookies: { auth_token: "older" } })).status).toHaveBeenCalledWith(401);
+    decode.mockReturnValue({ id: "7", v: 2 });
+    expect((await call(authHandler, {}, { user: undefined, cookies: { auth_token: "current" } })).next).toHaveBeenCalledOnce();
+  });
   it("still serves public documents with an invalid or stale session cookie", async () => {
     db.document.findFirst.mockResolvedValue({ public: true });
     decode.mockImplementation(() => { throw new Error("jwt expired"); });

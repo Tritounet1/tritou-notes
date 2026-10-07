@@ -18,6 +18,7 @@ export interface Attachment {
  * model as-is, text files are inlined. Anything else is rejected.
  */
 export const attachmentToPart = ({ name, data }: Attachment): ContentPart => {
+  if (typeof name !== "string") throw httpError("Pièce jointe sans nom valide.");
   const match = /^data:([^;,]*)(?:;[^,]*)?;base64,(.*)$/s.exec(data ?? "");
   if (!match) throw httpError(`Fichier illisible : ${name}`);
   const [, mime, base64] = match;

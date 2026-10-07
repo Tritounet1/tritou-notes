@@ -1,11 +1,14 @@
 import jwt from "jsonwebtoken";
 import config from "../config/config";
+import { SESSION_DURATION_SECONDS } from "./session";
 
 export const createToken = (
   id: string,
   username: string,
   email: string,
   role: string,
+  /** User.tokenVersion: a token whose version is outdated is refused (see authHandler). */
+  version = 0,
 ) => {
   if (config.secretKey === "") {
     console.error("JWT_SECRET is not set.");
@@ -13,10 +16,10 @@ export const createToken = (
   }
 
   const token = jwt.sign(
-    { id: id, username: username, email: email, role: role },
+    { id: id, username: username, email: email, role: role, v: version },
     config.secretKey,
     {
-      expiresIn: "2 days",
+      expiresIn: SESSION_DURATION_SECONDS,
     },
   );
 
