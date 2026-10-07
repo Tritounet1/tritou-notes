@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { evaluateArithmetic } from "../utils/arithmetic";
 
 interface CellData {
   value: string;
@@ -162,9 +163,7 @@ export const SpreadsheetEditor = ({
           return isNaN(num) ? "0" : num.toString();
         });
 
-        // Evaluate simple arithmetic
-
-        const result = new Function(`return ${expression}`)();
+        const result = evaluateArithmetic(expression);
         return isNaN(result) ? "#ERROR!" : result.toString();
       } catch {
         return "#ERROR!";
