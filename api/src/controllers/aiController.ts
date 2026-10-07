@@ -127,9 +127,15 @@ export const deleteConversation = async (req: Request<{ id: string }>, res: Resp
  * then `done` with the whole conversation and the ids of pages the assistant changed
  * (or `error`). Validation errors happen before the stream starts and stay plain JSON.
  */
+// Conversations with a turn in progress (one API process: memory is enough). A second
+// message would interleave its rows with the running turn and corrupt the history.
+const busyConversations = new Set<number>();
+
 export const sendMessage = async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+  let locked: number | undefined;
   try {
     const conversation = await ownConversation(req);
+    if (busyConversations.has(conversation.id)) throw httpError("Une réponse est déjà en cours dans cette conversation.", 409);
     const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
     const attachments: Attachment[] = Array.isArray(req.body?.attachments) ? req.body.attachments : [];
     if (!text && !attachments.length) throw httpError("Message vide");
@@ -137,6 +143,8 @@ export const sendMessage = async (req: Request<{ id: string }>, res: Response, n
     const parts = attachments.map(attachmentToPart);
     const config = await getAiConfig();
     const ctx = await toolContext(req);
+    busyConversations.add(conversation.id);
+    locked = conversation.id;
 
     if (conversation.title === "Nouvelle conversation" && text) {
       await prisma.conversation.update({ where: { id: conversation.id }, data: { title: text.slice(0, 60) } });
@@ -184,6 +192,8 @@ export const sendMessage = async (req: Request<{ id: string }>, res: Response, n
     res.end();
   } catch (error) {
     next(error);
+  } finally {
+    if (locked !== undefined) busyConversations.delete(locked);
   }
 };
 

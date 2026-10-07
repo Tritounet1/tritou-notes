@@ -83,6 +83,31 @@ export type TurnEvent =
   | { type: "action"; summary: string; ok: boolean };
 
 /**
+ * Makes a stored history acceptable to the provider: every tool call gets a result right
+ * after its assistant message, and stray tool results are dropped. A turn interrupted
+ * between the model call and its tool results (crash, redeploy) would otherwise make
+ * every following request fail.
+ */
+export const repairHistory = (history: ChatMessage[]): ChatMessage[] => {
+  const repaired: ChatMessage[] = [];
+  for (let i = 0; i < history.length; i++) {
+    const message = history[i];
+    if (message.role === "tool") continue; // consumed with its assistant message below
+    repaired.push(message);
+    if (message.role !== "assistant" || !message.tool_calls?.length) continue;
+    const results = new Map<string, ChatMessage>();
+    while (history[i + 1]?.role === "tool") {
+      const result = history[++i] as Extract<ChatMessage, { role: "tool" }>;
+      results.set(result.tool_call_id, result);
+    }
+    for (const call of message.tool_calls) {
+      repaired.push(results.get(call.id) ?? { role: "tool", tool_call_id: call.id, content: JSON.stringify({ error: "Action interrompue avant son résultat." }) });
+    }
+  }
+  return repaired;
+};
+
+/**
  * Runs one user turn: stores the user message, then alternates model calls and
  * tool calls until the model answers without tools (or MAX_STEPS is reached).
  * Every message is persisted as it is produced, so a failure keeps the history valid.
@@ -109,7 +134,7 @@ export const runTurn = async ({
   const history = await prisma.aiMessage.findMany({ where: { conversationId }, orderBy: { id: "asc" } });
   const messages: ChatMessage[] = [
     { role: "system", content: buildSystemPrompt(page) },
-    ...history.map((row) => row.data as unknown as ChatMessage),
+    ...repairHistory(history.map((row) => row.data as unknown as ChatMessage)),
     userMessage,
   ];
 

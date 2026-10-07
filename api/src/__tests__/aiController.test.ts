@@ -183,6 +183,23 @@ describe("sendMessage", () => {
     db.userPermissions.findUnique.mockResolvedValue({ modifyDocument: true });
   });
 
+  it("refuses a second message while a turn is running, then accepts it again", async () => {
+    let finish!: () => void;
+    mocks.runTurn.mockReturnValueOnce(new Promise<void>((resolve) => { finish = resolve; }));
+    const first = send({ text: "one" }, streamingResponse().res);
+    await vi.waitFor(() => expect(mocks.runTurn).toHaveBeenCalledOnce());
+
+    const { res } = streamingResponse();
+    const next = await send({ text: "two" }, res);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 409 }));
+    expect(res.flushHeaders).not.toHaveBeenCalled();
+
+    finish();
+    await first;
+    expect(await send({ text: "three" }, streamingResponse().res)).not.toHaveBeenCalled();
+    expect(mocks.runTurn).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects more attachments than allowed before streaming", async () => {
     const { res } = streamingResponse();
     const attachments = Array.from({ length: 6 }, (_, i) => ({ name: `${i}.txt`, data: dataUrl("text/plain", "x") }));

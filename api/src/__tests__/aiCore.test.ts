@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, resetDatabase } from "./helpers/database";
 vi.mock("../config/prismaClient", async () => ({ prisma: (await import("./helpers/database")).db }));
 vi.mock("../utils/utils", () => ({ decrypt: (value: string) => `plain:${value}`, encrypt: (value: string) => value }));
-import { buildSystemPrompt, MAX_STEPS, runTurn, toDisplayMessages } from "../ai/agent";
+import { buildSystemPrompt, MAX_STEPS, repairHistory, runTurn, toDisplayMessages } from "../ai/agent";
 import { attachmentToPart } from "../ai/attachments";
 import { chatCompletion, generateImage, getAiConfig, listImageModels, listTextModels } from "../ai/openrouter";
 import type { ToolContext } from "../ai/tools";
@@ -170,6 +170,30 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("page #4 « Sans titre » (type EXCEL)");
     expect(prompt).toContain("Date du jour : dimanche 15 mars 2026.");
     expect(prompt).not.toContain("Aucune page n’est ouverte");
+  });
+});
+
+describe("repairHistory", () => {
+  const call = (id: string) => ({ id, type: "function" as const, function: { name: "read_page", arguments: "{}" } });
+  it("keeps a valid history unchanged", () => {
+    const history = [
+      { role: "user" as const, content: "hi" },
+      { role: "assistant" as const, content: null, tool_calls: [call("a")] },
+      { role: "tool" as const, tool_call_id: "a", content: "{}" },
+      { role: "assistant" as const, content: "done" },
+    ];
+    expect(repairHistory(history)).toEqual(history);
+  });
+  it("adds missing tool results and drops stray ones", () => {
+    const repaired = repairHistory([
+      { role: "tool", tool_call_id: "orphan", content: "{}" },
+      { role: "assistant", content: null, tool_calls: [call("a"), call("b")] },
+      { role: "tool", tool_call_id: "b", content: "\"b\"" },
+      { role: "user", content: "again" },
+    ]);
+    expect(repaired.map((m) => m.role)).toEqual(["assistant", "tool", "tool", "user"]);
+    expect(repaired[1]).toEqual({ role: "tool", tool_call_id: "a", content: expect.stringContaining("interrompue") });
+    expect(repaired[2]).toEqual({ role: "tool", tool_call_id: "b", content: "\"b\"" });
   });
 });
 
