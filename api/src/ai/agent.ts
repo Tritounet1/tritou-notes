@@ -46,7 +46,7 @@ const textOf = (content: string | ContentPart[] | null) =>
   typeof content === "string"
     ? content
     : (content ?? [])
-        .filter((part): part is Extract<ContentPart, { type: "text" }> => part.type === "text" && !part.text.startsWith("<fichier "))
+        .filter((part): part is Extract<ContentPart, { type: "text" }> => part.type === "text" && !part.text.startsWith("<fichier ") && !part.text.startsWith(ATTACHMENT_NOTE))
         .map((part) => part.text)
         .join("\n");
 
@@ -113,6 +113,47 @@ export const repairHistory = (history: ChatMessage[]): ChatMessage[] => {
   return repaired;
 };
 
+/** Characters of earlier conversation sent with each call (~50k tokens); the current turn is never cut. */
+export const HISTORY_BUDGET_CHARS = 200_000;
+/** Earlier tool results and inlined files are shortened to this; the current turn keeps them whole. */
+const OLD_PART_CHARS = 4_000;
+const ATTACHMENT_NOTE = "<pièce-jointe ";
+
+/**
+ * Attachments are sent to the model once, with the message that brings them: what is stored, and
+ * earlier messages sent again, keep a note instead of the base64 file (and a shortened text file).
+ */
+export const withoutAttachments = (message: ChatMessage): ChatMessage => {
+  if (message.role !== "user" || typeof message.content === "string") return message;
+  return {
+    ...message,
+    content: message.content.map((part): ContentPart => {
+      if (part.type === "image_url") return { type: "text", text: `${ATTACHMENT_NOTE}type="image">envoyée dans ce message, plus disponible</pièce-jointe>` };
+      if (part.type === "file") return { type: "text", text: `${ATTACHMENT_NOTE}nom="${part.file.filename.replace(/"/g, "'")}">envoyée dans ce message, plus disponible</pièce-jointe>` };
+      if (part.text.startsWith("<fichier ") && part.text.length > OLD_PART_CHARS) return { type: "text", text: `${part.text.slice(0, OLD_PART_CHARS)}\n[… tronqué]\n</fichier>` };
+      return part;
+    }),
+  };
+};
+
+/** Earlier messages as sent to the model: repaired, lightened, then cut to the budget from the oldest. */
+export const compactHistory = (history: ChatMessage[], budget = HISTORY_BUDGET_CHARS): ChatMessage[] => {
+  const light = repairHistory(history).map((message) =>
+    message.role === "tool" && message.content.length > OLD_PART_CHARS
+      ? { ...message, content: `${message.content.slice(0, OLD_PART_CHARS)}… [résultat tronqué]` }
+      : withoutAttachments(message),
+  );
+  let start = light.length;
+  for (let total = 0, i = light.length - 1; i >= 0; i--) {
+    total += JSON.stringify(light[i]).length;
+    if (total > budget) break;
+    start = i;
+  }
+  // Start on a user message: no tool result without its call, no reply without its question.
+  while (start < light.length && light[start].role !== "user") start++;
+  return light.slice(start);
+};
+
 /**
  * Runs one user turn: stores the user message, then alternates model calls and
  * tool calls until the model answers without tools (or MAX_STEPS is reached).
@@ -140,7 +181,7 @@ export const runTurn = async ({
   const history = await prisma.aiMessage.findMany({ where: { conversationId }, orderBy: { id: "asc" } });
   const messages: ChatMessage[] = [
     { role: "system", content: buildSystemPrompt(page) },
-    ...repairHistory(history.map((row) => row.data as unknown as ChatMessage)),
+    ...compactHistory(history.map((row) => row.data as unknown as ChatMessage)),
     userMessage,
   ];
 
@@ -149,7 +190,7 @@ export const runTurn = async ({
       data: { conversationId, role: message.role, data: message as unknown as Prisma.InputJsonValue, summary },
     });
 
-  await save(userMessage, attachmentNames.length ? attachmentNames.join("\n") : null);
+  await save(withoutAttachments(userMessage), attachmentNames.length ? attachmentNames.join("\n") : null);
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const reply = await chatCompletion(config, messages, toolDefinitions, { onText: (text) => emit({ type: "text", text }), signal });

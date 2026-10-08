@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, resetDatabase } from "./helpers/database";
 vi.mock("../config/prismaClient", async () => ({ prisma: (await import("./helpers/database")).db }));
 vi.mock("../utils/utils", () => ({ decrypt: (value: string) => `plain:${value}`, encrypt: (value: string) => value }));
-import { buildSystemPrompt, MAX_STEPS, repairHistory, runTurn, toDisplayMessages } from "../ai/agent";
+import { buildSystemPrompt, compactHistory, HISTORY_BUDGET_CHARS, MAX_STEPS, repairHistory, runTurn, toDisplayMessages, withoutAttachments } from "../ai/agent";
 import { attachmentToPart } from "../ai/attachments";
 import { chatCompletion, generateImage, getAiConfig, listImageModels, listTextModels } from "../ai/openrouter";
 import type { ToolContext } from "../ai/tools";
@@ -255,6 +255,62 @@ describe("runTurn", () => {
     expect(messages[0].content).toContain("page #3 « Notes »");
     expect(db.aiMessage.create.mock.calls[0][0].data).toMatchObject({ role: "user", summary: "a.md\nb.png" });
     expect(db.aiMessage.create.mock.calls[1][0].data).toMatchObject({ role: "assistant", data: { role: "assistant", content: "OK" } });
+  });
+
+  it("sends attachments with their turn only, and never stores them", async () => {
+    const image = { type: "image_url" as const, image_url: { url: "data:image/png;base64,AAAA" } };
+    db.aiMessage.findMany.mockResolvedValue([{ data: { role: "user", content: [{ type: "text", text: "Avant" }, image] } }, { data: { role: "assistant", content: "Vu" } }]);
+    fetchMock.mockResolvedValue(stream({ content: "OK" }));
+    await runTurn({ conversationId: 2, page: null, userMessage: { role: "user", content: [{ type: "text", text: "Et ça ?" }, image] }, attachmentNames: ["b.png"], ctx: ctx(), config });
+    const { messages } = JSON.parse(fetchMock.mock.calls[0][1].body);
+    // The earlier image is a note; the current one is sent whole.
+    expect(JSON.stringify(messages[1])).not.toContain("base64");
+    expect(messages[3].content[1]).toEqual(image);
+    expect(JSON.stringify(db.aiMessage.create.mock.calls[0][0].data.data)).not.toContain("base64");
+  });
+});
+
+describe("history sent to the model", () => {
+  it("replaces attachments by a note and shortens inlined files", () => {
+    const message = withoutAttachments({
+      role: "user",
+      content: [
+        { type: "text", text: "Regarde" },
+        { type: "image_url", image_url: { url: "data:image/png;base64,AAAA" } },
+        { type: "file", file: { filename: "r\"apport.pdf", file_data: "data:application/pdf;base64,BBBB" } },
+        { type: "text", text: `<fichier nom="long.txt">\n${"x".repeat(10_000)}\n</fichier>` },
+      ],
+    });
+    const parts = message.content as { type: string; text: string }[];
+    expect(parts.map((part) => part.type)).toEqual(["text", "text", "text", "text"]);
+    expect(parts[1].text).toContain('type="image"');
+    expect(parts[2].text).toContain("nom=\"r'apport.pdf\"");
+    expect(parts[3].text.length).toBeLessThan(4_100);
+    expect(parts[3].text).toMatch(/tronqué\]\n<\/fichier>$/);
+    // Plain messages are untouched, and the notes never show in the chat.
+    expect(withoutAttachments({ role: "user", content: "texte" })).toEqual({ role: "user", content: "texte" });
+    expect(toDisplayMessages([{ id: 1, role: "user", data: message as never, summary: "rapport.pdf", created_at: new Date() }])[0].text).toBe("Regarde");
+  });
+
+  it("shortens earlier tool results and drops the oldest exchanges beyond the budget", () => {
+    const call = (id: string) => ({ id, type: "function" as const, function: { name: "read_page", arguments: "{}" } });
+    const turn = (n: number) => [
+      { role: "user" as const, content: `question ${n}` },
+      { role: "assistant" as const, content: null, tool_calls: [call(`c${n}`)] },
+      { role: "tool" as const, tool_call_id: `c${n}`, content: "y".repeat(50_000) },
+      { role: "assistant" as const, content: `réponse ${n}` },
+    ];
+    const history = [...turn(1), ...turn(2), ...turn(3)];
+    const all = compactHistory(history);
+    expect(all).toHaveLength(12);
+    expect((all[2] as { content: string }).content.length).toBeLessThan(4_100);
+
+    // A budget for about one exchange keeps the last one, starting on its question.
+    const last = compactHistory(history, 5_000);
+    expect(last.map((m) => m.role)).toEqual(["user", "assistant", "tool", "assistant"]);
+    expect(last[0]).toEqual({ role: "user", content: "question 3" });
+    expect(compactHistory(history, 10)).toEqual([]);
+    expect(HISTORY_BUDGET_CHARS).toBeGreaterThan(100_000);
   });
 });
 
