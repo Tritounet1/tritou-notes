@@ -36,7 +36,7 @@ export const Loginpage = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Erreur de connexion");
+        throw new Error(data.message || "Erreur de connexion");
       }
 
       login(data.user);

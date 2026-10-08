@@ -21,7 +21,7 @@ const permissionCheck = (
       }
 
       if (!req.user?.id) {
-        return res.status(401).json({ message: "Authentication required" });
+        return res.status(401).json({ message: "Authentification requise" });
       }
 
       const userPermissions = await prisma.userPermissions.findUnique({
@@ -29,19 +29,19 @@ const permissionCheck = (
       });
 
       if (!userPermissions) {
-        return res.status(403).json({ message: "No permissions configured" });
+        return res.status(403).json({ message: "Aucune permission configurée pour ce compte" });
       }
 
       const granted = (perm: PermissionKey) => userPermissions[perm] === true;
       const hasPermission = mode === "all" ? permissions.every(granted) : permissions.some(granted);
 
       if (!hasPermission) {
-        return res.status(403).json({ message: "Permission denied" });
+        return res.status(403).json({ message: "Permission refusée" });
       }
 
       return next();
     } catch (_error) {
-      return res.status(500).json({ message: "Error checking permissions" });
+      return res.status(500).json({ message: "Erreur lors de la vérification des permissions" });
     }
   };
 };

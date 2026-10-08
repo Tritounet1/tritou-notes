@@ -65,7 +65,7 @@ export const UsersPage = () => {
         }, 2000);
       } else {
         const data = await response.json();
-        setError(data.error || "Erreur lors de l’envoi");
+        setError(data.message || "Erreur lors de l’envoi");
       }
     } catch {
       setError("Erreur lors de l’envoi");

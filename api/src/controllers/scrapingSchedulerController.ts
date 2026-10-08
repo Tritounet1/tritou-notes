@@ -78,7 +78,7 @@ export const getScrapingSchedulerById = async (
       },
     });
     if (!scrapingScheduler) {
-      res.status(404).json({ message: "Scraping Scheduler not found" });
+      res.status(404).json({ message: "Planificateur introuvable" });
       return;
     }
     res.json(scrapingScheduler);
@@ -124,7 +124,7 @@ export const getScrapingSchedulerPreview = async (
       },
     });
     if (!scheduler) {
-      res.status(404).json({ message: "Scheduler not found" });
+      res.status(404).json({ message: "Planificateur introuvable" });
       return;
     }
     const latest = scheduler.InstanceScrapes[0] ?? null;

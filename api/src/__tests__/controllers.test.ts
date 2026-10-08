@@ -216,7 +216,7 @@ describe("invitations", () => {
   ])("refuses an invalid registration %j before touching the invitation", async (body, message) => {
     const ctx = await call(invitations.registerWithInvitation, body);
     expect(ctx.status).toHaveBeenCalledWith(400);
-    expect(ctx.json).toHaveBeenCalledWith({ error: expect.stringContaining(message) });
+    expect(ctx.json).toHaveBeenCalledWith({ message: expect.stringContaining(message) });
     expect(db.invitation.findUnique).not.toHaveBeenCalled();
   });
   it("rejects an email already registered", async () => {

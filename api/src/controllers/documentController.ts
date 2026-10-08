@@ -64,7 +64,7 @@ export const getDocumentById = async (
       },
     });
     if (!document) {
-      res.status(404).json({ message: "Document not found" });
+      res.status(404).json({ message: "Document introuvable" });
       return;
     }
     // Signed-out readers of a public page only see the public parts of its tree.

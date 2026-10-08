@@ -50,7 +50,7 @@ export const getScraperById = async (
       },
     });
     if (!scraper) {
-      res.status(404).json({ message: "Scraper not found" });
+      res.status(404).json({ message: "Scraper introuvable" });
       return;
     }
     res.json(scraper);

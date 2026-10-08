@@ -38,8 +38,8 @@ export const authHandler: RequestHandler = async (
       if (document?.public) return next();
     }
 
-    return res.status(401).json({ message: "Authorization required" });
+    return res.status(401).json({ message: "Authentification requise" });
   } catch {
-    return res.status(401).json({ message: "Authorization required" });
+    return res.status(401).json({ message: "Authentification requise" });
   }
 };

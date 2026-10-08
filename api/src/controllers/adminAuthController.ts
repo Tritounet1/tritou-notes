@@ -18,14 +18,14 @@ export const sendInvitation = async (
     const { email } = req.body ?? {};
 
     if (!validEmail(email)) {
-      res.status(400).json({ error: "Email requis" });
+      res.status(400).json({ message: "Adresse e-mail valide requise" });
       return;
     }
 
     // Verifier si l'email existe deja
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      res.status(400).json({ error: "Cet email est deja utilise" });
+      res.status(400).json({ message: "Cet e-mail est déjà utilisé" });
       return;
     }
 
@@ -74,7 +74,7 @@ export const sendInvitation = async (
       `,
     );
 
-    res.status(201).json({ message: "Invitation envoyee" });
+    res.status(201).json({ message: "Invitation envoyée" });
   } catch (error) {
     next(error);
   }
@@ -92,17 +92,17 @@ export const verifyInvitation = async (
     const invitation = await prisma.invitation.findUnique({ where: { token } });
 
     if (!invitation) {
-      res.status(404).json({ error: "Invitation non trouvee" });
+      res.status(404).json({ message: "Invitation introuvable" });
       return;
     }
 
     if (invitation.used) {
-      res.status(400).json({ error: "Cette invitation a deja ete utilisee" });
+      res.status(400).json({ message: "Cette invitation a déjà été utilisée" });
       return;
     }
 
     if (new Date() > invitation.expires_at) {
-      res.status(400).json({ error: "Cette invitation a expire" });
+      res.status(400).json({ message: "Cette invitation a expiré" });
       return;
     }
 
@@ -122,11 +122,11 @@ export const registerWithInvitation = async (
     const token = req.params.token;
     const { username, password } = req.body ?? {};
     if (!validUsername(username)) {
-      res.status(400).json({ error: "Nom d'utilisateur requis (50 caractères maximum)." });
+      res.status(400).json({ message: "Nom d'utilisateur requis (50 caractères maximum)." });
       return;
     }
     if (!validPassword(password)) {
-      res.status(400).json({ error: PASSWORD_RULE });
+      res.status(400).json({ message: PASSWORD_RULE });
       return;
     }
 
@@ -134,17 +134,17 @@ export const registerWithInvitation = async (
     const invitation = await prisma.invitation.findUnique({ where: { token } });
 
     if (!invitation) {
-      res.status(404).json({ error: "Invitation non trouvee" });
+      res.status(404).json({ message: "Invitation introuvable" });
       return;
     }
 
     if (invitation.used) {
-      res.status(400).json({ error: "Cette invitation a deja ete utilisee" });
+      res.status(400).json({ message: "Cette invitation a déjà été utilisée" });
       return;
     }
 
     if (new Date() > invitation.expires_at) {
-      res.status(400).json({ error: "Cette invitation a expire" });
+      res.status(400).json({ message: "Cette invitation a expiré" });
       return;
     }
 
@@ -153,7 +153,7 @@ export const registerWithInvitation = async (
       where: { email: invitation.email },
     });
     if (existingUser) {
-      res.status(400).json({ error: "Cet email est deja utilise" });
+      res.status(400).json({ message: "Cet e-mail est déjà utilisé" });
       return;
     }
 
@@ -176,7 +176,7 @@ export const registerWithInvitation = async (
       });
     });
     if (!created) {
-      res.status(400).json({ error: "Cette invitation a deja ete utilisee" });
+      res.status(400).json({ message: "Cette invitation a déjà été utilisée" });
       return;
     }
     const { userPermissions, ...user } = created;

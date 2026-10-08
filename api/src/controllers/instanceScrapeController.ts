@@ -54,7 +54,7 @@ export const getInstancesScrapeById = async (
       },
     });
     if (!instanceScrape) {
-      res.status(404).json({ message: "Instance of Scrape not found" });
+      res.status(404).json({ message: "Instance de scrape introuvable" });
       return;
     }
     res.json(instanceScrape);

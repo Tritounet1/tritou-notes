@@ -45,7 +45,7 @@ export const RegisterPage = () => {
           setEmail(data.email);
           setTokenValid(true);
         } else {
-          setError(data.error || "Invitation invalide");
+          setError(data.message || "Invitation invalide");
         }
       } catch {
         setError("Erreur de connexion au serveur");
@@ -98,7 +98,7 @@ export const RegisterPage = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || data.message || "Erreur lors de l'inscription");
+        throw new Error(data.message || "Erreur lors de l'inscription");
       }
 
       login(data.user);

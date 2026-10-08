@@ -63,7 +63,7 @@ export const getUserById = async (
       },
     });
     if (!user) {
-      res.status(404).json({ message: "User not found" });
+      res.status(404).json({ message: "Utilisateur introuvable" });
       return;
     }
     res.json(publicUser(user));

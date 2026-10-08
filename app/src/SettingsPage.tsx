@@ -202,7 +202,7 @@ export const SettingsPage = () => {
         setConfirmPassword("");
       } else {
         const data = await response.json();
-        showFeedback("error", data.error || "Erreur lors du changement de mot de passe");
+        showFeedback("error", data.message || "Erreur lors du changement de mot de passe");
       }
     } catch {
       showFeedback("error", "Erreur lors du changement de mot de passe");

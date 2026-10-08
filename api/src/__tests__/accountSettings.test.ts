@@ -47,7 +47,7 @@ describe("personal password changes", () => {
     expect(mocks.hashPassword).toHaveBeenCalledWith("new-password");
     // The new token version signs out the other sessions; this one gets a fresh cookie.
     expect(mocks.updateUser).toHaveBeenCalledExactlyOnceWith({ where: { id: 7 }, data: { password: "new-hash", tokenVersion: { increment: 1 } } });
-    expect(response.json).toHaveBeenCalledWith({ message: "Mot de passe mis a jour" });
+    expect(response.json).toHaveBeenCalledWith({ message: "Mot de passe mis à jour" });
   });
 
   it("rejects unauthenticated requests", async () => {

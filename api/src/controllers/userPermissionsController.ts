@@ -10,7 +10,7 @@ export const getUserPermissionsByUserId = async (
     const id = parseInt(req.params.id, 10);
 
     if (req.user.role !== "ADMIN") {
-      res.status(403).json({ message: "You don't have access to this route." });
+      res.status(403).json({ message: "Accès réservé aux administrateurs." });
       return;
     }
 
@@ -57,7 +57,7 @@ export const updateUserPermissions = async (
     });
 
     if (user?.role !== "ADMIN") {
-      res.status(403).json({ message: "You don't have access to this route." });
+      res.status(403).json({ message: "Accès réservé aux administrateurs." });
       return;
     }
 

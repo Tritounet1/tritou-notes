@@ -52,7 +52,7 @@ export const AdminAuthPage = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || data.message || "Erreur lors de l'inscription");
+        throw new Error(data.message || "Erreur lors de l'inscription");
       }
 
       // Le cookie est déjà défini par le backend

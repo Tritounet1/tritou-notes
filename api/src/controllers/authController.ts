@@ -16,7 +16,7 @@ const unknownUserHash = () =>
 
 const tooManyAttempts = (res: Response, seconds: number) => {
   res.setHeader("Retry-After", String(seconds));
-  res.status(429).json({ error: `Trop de tentatives. Réessayez dans ${Math.ceil(seconds / 60)} min.` });
+  res.status(429).json({ message: `Trop de tentatives. Réessayez dans ${Math.ceil(seconds / 60)} min.` });
 };
 
 export const login = async (
@@ -30,7 +30,7 @@ export const login = async (
     const byEmail = typeof email === "string" && email.trim() !== "";
     const byUsername = !byEmail && typeof username === "string" && username.trim() !== "";
     if ((!byEmail && !byUsername) || typeof password !== "string" || !password) {
-      res.status(400).json({ error: "Identifiant et mot de passe requis" });
+      res.status(400).json({ message: "Identifiant et mot de passe requis" });
       return;
     }
 
@@ -56,7 +56,7 @@ export const login = async (
       accountFailures.fail(account);
       ipFailures.fail(ip);
       res.status(401).json({
-        error: "Invalid credentials",
+        message: "Identifiants invalides",
       });
       return;
     }
@@ -95,72 +95,6 @@ export const login = async (
   }
 };
 
-/*
-export const register = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const { email, username, password } = req.body;
-    let user;
-    if (email === "") {
-      user = await prisma.user.findFirst({
-        where: { username: username },
-      });
-    } else {
-      user = await prisma.user.findFirst({
-        where: { email: email },
-      });
-    }
-    if (user !== undefined && user !== null) {
-      res.status(401).json({
-        error: "User already exist with this username or email",
-      });
-      return;
-    }
-    const hashedPassword = await hashPassword(password);
-    const newUser = await prisma.user.create({
-      data: {
-        username: username,
-        email: email,
-        password: hashedPassword,
-      },
-    });
-    const userPermissions = await prisma.userPermissions.findFirst({
-      where: {
-        id: newUser.id,
-      },
-    });
-    const jwtToken = createToken(
-      newUser.id.toString(),
-      newUser.username,
-      newUser.email,
-      newUser.role,
-      newUser.tokenVersion,
-    );
-
-    if (!jwtToken) {
-      throw new Error("Erreur lors de la creation du token");
-    }
-
-    setAuthCookie(res, jwtToken);
-
-    res.status(201).json({
-      user: {
-        id: newUser.id,
-        username: newUser.username,
-        email: newUser.email,
-        role: newUser.role,
-        userPermissions: userPermissions,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-*/
-
 export const logout = async (
   req: Request,
   res: Response,
@@ -168,7 +102,7 @@ export const logout = async (
 ) => {
   try {
     clearAuthCookie(res);
-    res.status(200).json({ message: "Deconnexion reussie" });
+    res.status(200).json({ message: "Déconnexion réussie" });
   } catch (error) {
     next(error);
   }
@@ -181,25 +115,25 @@ export const changePassword = async (
 ) => {
   try {
     if (!req.user) {
-      res.status(401).json({ error: "Non authentifie" });
+      res.status(401).json({ message: "Authentification requise" });
       return;
     }
 
     const { currentPassword, newPassword } = req.body ?? {};
     if (typeof currentPassword !== "string" || typeof newPassword !== "string" || !currentPassword || !newPassword) {
-      res.status(400).json({ error: "Mots de passe manquants ou invalides" });
+      res.status(400).json({ message: "Mots de passe manquants ou invalides" });
       return;
     }
 
     if (!validPassword(newPassword)) {
-      res.status(400).json({ error: PASSWORD_RULE });
+      res.status(400).json({ message: PASSWORD_RULE });
       return;
     }
 
     // The target account always comes from the authenticated session, never the body.
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
     if (!user) {
-      res.status(404).json({ error: "Utilisateur introuvable" });
+      res.status(404).json({ message: "Utilisateur introuvable" });
       return;
     }
 
@@ -213,7 +147,7 @@ export const changePassword = async (
     const isValid = await verifyPassword(currentPassword, user.password);
     if (!isValid) {
       accountFailures.fail(account);
-      res.status(401).json({ error: "Mot de passe actuel incorrect" });
+      res.status(401).json({ message: "Mot de passe actuel incorrect" });
       return;
     }
     accountFailures.reset(account);
@@ -227,7 +161,7 @@ export const changePassword = async (
     const jwtToken = createToken(updated.id.toString(), updated.username, updated.email, updated.role, updated.tokenVersion);
     if (jwtToken) setAuthCookie(res, jwtToken);
 
-    res.status(200).json({ message: "Mot de passe mis a jour" });
+    res.status(200).json({ message: "Mot de passe mis à jour" });
   } catch (error) {
     next(error);
   }
@@ -247,7 +181,7 @@ export const logoutEverywhere = async (req: Request, res: Response, next: NextFu
 export const me = async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
-      res.status(401).json({ error: "Non authentifie" });
+      res.status(401).json({ message: "Authentification requise" });
       return;
     }
 
