@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import remarkGfm from "remark-gfm";
@@ -121,6 +121,67 @@ function computeDiff(oldText: string, newText: string): DiffLine[] {
 
   return diff;
 }
+
+// Markdown component map, defined once: a new object on each render would make React
+// unmount and remount every rendered segment on each keystroke.
+const mdComponents = {
+  input: ({ checked }: { checked?: boolean }) => (
+    <span
+      role="checkbox"
+      aria-checked={!!checked}
+      aria-readonly="true"
+      data-checked={checked ? "true" : undefined}
+      className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[6px] ${checked ? "bg-ink text-neon" : "border-[1.5px] border-stone"}`}
+    >
+      {checked && <svg aria-hidden="true" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10" /></svg>}
+    </span>
+  ),
+  h1: ({ children }: { children?: React.ReactNode }) => <h1 className="font-display text-[32px] leading-tight font-bold tracking-[-0.03em] text-ink mt-8 mb-3 first:mt-0">{children}</h1>,
+  h2: ({ children }: { children?: React.ReactNode }) => <h2 className="font-display text-[26px] leading-tight font-bold tracking-[-0.02em] text-ink mt-7 mb-3 first:mt-0">{children}</h2>,
+  h3: ({ children }: { children?: React.ReactNode }) => <h3 className="font-display text-xl font-semibold tracking-[-0.01em] text-ink mt-6 mb-2 first:mt-0">{children}</h3>,
+  p: ({ children }: { children?: React.ReactNode }) => <p className="text-ink-2 mb-4">{children}</p>,
+  ul: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
+    <ul className={`mb-4 text-ink-2 flex flex-col gap-1.5 ${className?.includes("contains-task-list") ? "list-none" : "list-disc pl-6 marker:text-muted"}`}>{children}</ul>
+  ),
+  ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal pl-6 mb-4 text-ink-2 flex flex-col gap-1.5 marker:text-muted marker:font-mono marker:text-sm">{children}</ol>,
+  li: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
+    <li className={className?.includes("task-list-item") ? "flex items-center gap-2.5 has-[[data-checked]]:text-muted has-[[data-checked]]:line-through" : "pl-1"}>{children}</li>
+  ),
+  blockquote: ({ children }: { children?: React.ReactNode }) => (
+    <blockquote className="my-4 rounded-xl bg-paper-soft px-[18px] py-3.5 font-display text-xl leading-[1.4] font-medium text-ink [&_p]:mb-0 [&_p]:text-ink">{children}</blockquote>
+  ),
+  code: ({ className, children }: { className?: string; children?: React.ReactNode }) => {
+    const isBlock = className?.includes("language-");
+    return isBlock ? (
+      <pre className="my-4 overflow-x-auto rounded-[14px] bg-code px-5 py-4 text-code-ink">
+        <code className="font-mono text-[13px] leading-[1.7]">{children}</code>
+      </pre>
+    ) : (
+      <code className="rounded-md bg-chip px-1.5 py-0.5 font-mono text-[0.85em] text-ink">{children}</code>
+    );
+  },
+  pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+    <a href={href} className="text-indigo-ink underline decoration-indigo-soft underline-offset-4 hover:decoration-indigo" target="_blank" rel="noopener noreferrer">{children}</a>
+  ),
+  hr: () => <hr className="my-6 border-line-soft" />,
+  strong: ({ children }: { children?: React.ReactNode }) => <strong className="font-semibold text-ink">{children}</strong>,
+  em: ({ children }: { children?: React.ReactNode }) => <em className="italic">{children}</em>,
+  table: ({ children }: { children?: React.ReactNode }) => (
+    <div className="my-4 overflow-x-auto rounded-2xl border border-line-strong"><table className="w-full border-collapse text-[13px] leading-snug">{children}</table></div>
+  ),
+  th: ({ children }: { children?: React.ReactNode }) => <th className="px-3.5 py-2 text-left text-xs font-medium text-muted">{children}</th>,
+  td: ({ children }: { children?: React.ReactNode }) => <td className="border-t border-line-soft px-3.5 py-2 text-ink-2">{children}</td>,
+};
+
+const remarkPlugins = [remarkGfm];
+
+/** One rendered text segment; skipped by React while its content is unchanged. */
+const MarkdownSegment = memo(({ content }: { content: string }) => (
+  <Markdown remarkPlugins={remarkPlugins} components={mdComponents}>
+    {content}
+  </Markdown>
+));
 
 export const DocumentPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -795,6 +856,9 @@ export const DocumentPage = () => {
     return computeDiff(oldText, newText);
   };
 
+  // Parsed once per text change, not by every part of the render.
+  const segments = useMemo(() => normalizeSegments(parseSegments(text)), [text]);
+
   if (loading) {
     return <p className="py-24 text-center text-muted">Chargement…</p>;
   }
@@ -807,56 +871,6 @@ export const DocumentPage = () => {
   const canModify = isAuthenticated && hasPermission("modifyDocument");
   const canUseAi = isAuthenticated && hasPermission("useAiChatBot");
 
-  // Shared markdown component map (avoids duplication between view modes)
-  const mdComponents = {
-    input: ({ checked }: { checked?: boolean }) => (
-      <span
-        role="checkbox"
-        aria-checked={!!checked}
-        aria-readonly="true"
-        data-checked={checked ? "true" : undefined}
-        className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[6px] ${checked ? "bg-ink text-neon" : "border-[1.5px] border-stone"}`}
-      >
-        {checked && <svg aria-hidden="true" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10" /></svg>}
-      </span>
-    ),
-    h1: ({ children }: { children?: React.ReactNode }) => <h1 className="font-display text-[32px] leading-tight font-bold tracking-[-0.03em] text-ink mt-8 mb-3 first:mt-0">{children}</h1>,
-    h2: ({ children }: { children?: React.ReactNode }) => <h2 className="font-display text-[26px] leading-tight font-bold tracking-[-0.02em] text-ink mt-7 mb-3 first:mt-0">{children}</h2>,
-    h3: ({ children }: { children?: React.ReactNode }) => <h3 className="font-display text-xl font-semibold tracking-[-0.01em] text-ink mt-6 mb-2 first:mt-0">{children}</h3>,
-    p: ({ children }: { children?: React.ReactNode }) => <p className="text-ink-2 mb-4">{children}</p>,
-    ul: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
-      <ul className={`mb-4 text-ink-2 flex flex-col gap-1.5 ${className?.includes("contains-task-list") ? "list-none" : "list-disc pl-6 marker:text-muted"}`}>{children}</ul>
-    ),
-    ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal pl-6 mb-4 text-ink-2 flex flex-col gap-1.5 marker:text-muted marker:font-mono marker:text-sm">{children}</ol>,
-    li: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
-      <li className={className?.includes("task-list-item") ? "flex items-center gap-2.5 has-[[data-checked]]:text-muted has-[[data-checked]]:line-through" : "pl-1"}>{children}</li>
-    ),
-    blockquote: ({ children }: { children?: React.ReactNode }) => (
-      <blockquote className="my-4 rounded-xl bg-paper-soft px-[18px] py-3.5 font-display text-xl leading-[1.4] font-medium text-ink [&_p]:mb-0 [&_p]:text-ink">{children}</blockquote>
-    ),
-    code: ({ className, children }: { className?: string; children?: React.ReactNode }) => {
-      const isBlock = className?.includes("language-");
-      return isBlock ? (
-        <pre className="my-4 overflow-x-auto rounded-[14px] bg-code px-5 py-4 text-code-ink">
-          <code className="font-mono text-[13px] leading-[1.7]">{children}</code>
-        </pre>
-      ) : (
-        <code className="rounded-md bg-chip px-1.5 py-0.5 font-mono text-[0.85em] text-ink">{children}</code>
-      );
-    },
-    pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
-    a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
-      <a href={href} className="text-indigo-ink underline decoration-indigo-soft underline-offset-4 hover:decoration-indigo" target="_blank" rel="noopener noreferrer">{children}</a>
-    ),
-    hr: () => <hr className="my-6 border-line-soft" />,
-    strong: ({ children }: { children?: React.ReactNode }) => <strong className="font-semibold text-ink">{children}</strong>,
-    em: ({ children }: { children?: React.ReactNode }) => <em className="italic">{children}</em>,
-    table: ({ children }: { children?: React.ReactNode }) => (
-      <div className="my-4 overflow-x-auto rounded-2xl border border-line-strong"><table className="w-full border-collapse text-[13px] leading-snug">{children}</table></div>
-    ),
-    th: ({ children }: { children?: React.ReactNode }) => <th className="px-3.5 py-2 text-left text-xs font-medium text-muted">{children}</th>,
-    td: ({ children }: { children?: React.ReactNode }) => <td className="border-t border-line-soft px-3.5 py-2 text-ink-2">{children}</td>,
-  };
 
   const closeIcon = <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6 6 18" /></svg>;
   const sparkle = <path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z" />;
@@ -999,7 +1013,7 @@ export const DocumentPage = () => {
             <div onClick={handleDocumentBackgroundClick} className={`flex min-h-[50vh] flex-col pb-20 text-base leading-[1.7] text-ink-2 ${canModify ? "cursor-text" : ""}`}>
               {(() => {
                 const canEdit = canModify;
-                const segs = normalizeSegments(parseSegments(text));
+                const segs = segments;
 
                 return segs.map((seg, segIndex) => {
                   if (seg.type === "scheduler") {
@@ -1128,9 +1142,7 @@ export const DocumentPage = () => {
                           className={`rounded-md outline-none focus-visible:ring-2 focus-visible:ring-indigo-soft ${canEdit ? "cursor-text" : ""} ${isLastSegment ? "grow" : ""} ${seg.content ? "" : "min-h-[40px]"}`}
                         >
                           {seg.content ? (
-                            <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-                              {seg.content}
-                            </Markdown>
+                            <MarkdownSegment content={seg.content} />
                           ) : null}
                         </div>
                       )}
@@ -1150,7 +1162,7 @@ export const DocumentPage = () => {
 
         {(() => {
           // Text pages show embedded sub-pages as blocks; list the others here.
-          const embedded = new Set(document.type === "TEXT" ? parseSegments(text).flatMap((seg) => (seg.type === "page" ? [seg.id] : [])) : []);
+          const embedded = new Set(document.type === "TEXT" ? segments.flatMap((seg) => (seg.type === "page" ? [seg.id] : [])) : []);
           const loose = (document.children ?? []).filter((child) => !embedded.has(child.id));
           if (!loose.length) return null;
           return (
@@ -1165,7 +1177,7 @@ export const DocumentPage = () => {
         {document.type === "TEXT" && (
           <div
             aria-hidden="true"
-            onClick={canModify ? () => handleStartEditing(normalizeSegments(parseSegments(text)).length - 1, true) : undefined}
+            onClick={canModify ? () => handleStartEditing(segments.length - 1, true) : undefined}
             className={`h-[45vh] ${canModify ? "cursor-text" : ""}`}
           />
         )}
