@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useDialog } from "../hooks/useDialog";
 import { notifyDocumentsChanged } from "../utils/documentEvents";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../api";
@@ -44,6 +45,8 @@ const Highlighted = ({ text, query }: { text: string; query: string }) => {
 
 /** ⌘K quick switcher over documents, scrapers, schedulers and pages. Mounted only while open. */
 export const CommandPalette = ({ onClose }: { onClose: () => void }) => {
+  // Escape, focus trap and focus given back (the search field keeps the arrows and Enter).
+  const dialog = useDialog(onClose);
   const navigate = useNavigate();
   const { isAdmin, hasPermission } = useAuth();
   const [query, setQuery] = useState("");
@@ -135,8 +138,7 @@ export const CommandPalette = ({ onClose }: { onClose: () => void }) => {
   }, [current]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") onClose();
-    else if (e.key === "ArrowDown") {
+    if (e.key === "ArrowDown") {
       e.preventDefault();
       setActive((current + 1) % Math.max(items.length, 1));
     } else if (e.key === "ArrowUp") {
@@ -152,7 +154,7 @@ export const CommandPalette = ({ onClose }: { onClose: () => void }) => {
   let lastGroup = "";
   return (
     <div className="modal-backdrop items-start pt-[12vh]" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="Recherche rapide" className="modal max-w-[620px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div {...dialog} role="dialog" aria-modal="true" aria-label="Recherche rapide" className="modal max-w-[620px] overflow-hidden outline-none" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3 px-[18px] py-4 border-b border-line-soft">
           <svg className="w-[18px] h-[18px] text-muted shrink-0" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />

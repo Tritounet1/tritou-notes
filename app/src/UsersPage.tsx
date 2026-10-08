@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Dialog } from "./components/Dialog";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "./api";
 import { useAuth } from "./hooks/useAuth";
@@ -149,8 +150,7 @@ export const UsersPage = () => {
       </div>
 
       {showInviteModal && (
-        <div className="modal-backdrop">
-          <div className="modal max-w-md" role="dialog" aria-modal="true" aria-labelledby="invite-title">
+        <Dialog onClose={() => setShowInviteModal(false)} className="modal max-w-md" labelledBy="invite-title">
             <form onSubmit={handleInvite} className="p-6 flex flex-col gap-4">
               <h3 id="invite-title" className="section-title">
                 Inviter un utilisateur
@@ -194,8 +194,7 @@ export const UsersPage = () => {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

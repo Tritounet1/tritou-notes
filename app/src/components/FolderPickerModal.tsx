@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDialog } from "../hooks/useDialog";
 import { folderPaths, isInFolder, type FolderRow } from "../utils/folders";
 
 interface FolderPickerModalProps {
@@ -12,6 +13,7 @@ interface FolderPickerModalProps {
 }
 
 export const FolderPickerModal = ({ title, folders, excludeId, currentId, onPick, onClose }: FolderPickerModalProps) => {
+  const dialog = useDialog(onClose);
   const [query, setQuery] = useState("");
   const paths = folderPaths(folders);
   const q = query.trim().toLowerCase();
@@ -36,14 +38,13 @@ export const FolderPickerModal = ({ title, folders, excludeId, currentId, onPick
 
   return (
     <div className="modal-backdrop items-start pt-[12vh]" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={title} className="modal flex max-h-[70vh] max-w-md flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div {...dialog} role="dialog" aria-modal="true" aria-label={title} className="modal flex max-h-[70vh] max-w-md flex-col overflow-hidden outline-none" onClick={(e) => e.stopPropagation()}>
         <div className="flex flex-col gap-3 border-b border-line-soft p-4">
           <h2 className="font-display text-xl font-bold tracking-tight">{title}</h2>
           <input
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && onClose()}
             placeholder="Chercher un dossier…"
             aria-label="Chercher un dossier"
             className="input"

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Dialog } from "./components/Dialog";
 import { apiFetch } from "./api";
 import { ScraperTemplateRenderer } from "./components/ScraperTemplateRenderer";
 import type { TemplateBlock } from "./types/scraper";
@@ -285,14 +286,7 @@ export const InstancesScrapePage = () => {
       </p>
 
       {expanded && (
-        <div className="modal-backdrop" onClick={() => setExpandedId(null)}>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Détail de l’instance"
-            className="modal max-w-3xl max-h-[85vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <Dialog onClose={() => setExpandedId(null)} className="modal max-w-3xl max-h-[85vh] flex flex-col" label="Détail de l’instance" closeOnBackdrop>
             <div className="px-6 pt-6 pb-4 flex items-start justify-between gap-4 border-b border-line-soft">
               <div className="flex flex-col gap-2 min-w-0">
                 <span className="self-start">
@@ -346,8 +340,7 @@ export const InstancesScrapePage = () => {
                 <p className="text-sm text-muted italic">Aucune réponse disponible</p>
               )}
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

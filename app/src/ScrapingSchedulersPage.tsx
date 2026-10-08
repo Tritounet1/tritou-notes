@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Dialog } from "./components/Dialog";
 import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "./api";
 import { useAuth } from "./hooks/useAuth";
@@ -280,14 +281,7 @@ export const ScrapingSchedulersPage = () => {
       )}
 
       {showModal && (
-        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="new-scheduler-title"
-            className="modal max-w-md"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <Dialog onClose={() => setShowModal(false)} className="modal max-w-md" labelledBy="new-scheduler-title" closeOnBackdrop>
             <div className="px-6 pt-5 pb-3 flex items-center justify-between">
               <h2 id="new-scheduler-title" className="section-title">
                 Nouveau planificateur
@@ -333,8 +327,7 @@ export const ScrapingSchedulersPage = () => {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

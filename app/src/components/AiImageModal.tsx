@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDialog } from "../hooks/useDialog";
 import { apiFetch } from "../api";
 import type { DocumentImageBlock } from "../utils/documentImages";
 
@@ -12,6 +13,7 @@ interface AiImageModalProps {
 export const AiImageModal = ({ documentId, onInsert, onClose }: AiImageModalProps) => {
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
+  const dialog = useDialog(() => !busy && onClose());
   const [error, setError] = useState("");
 
   const generate = async () => {
@@ -32,7 +34,7 @@ export const AiImageModal = ({ documentId, onInsert, onClose }: AiImageModalProp
 
   return (
     <div className="modal-backdrop" onClick={() => !busy && onClose()}>
-      <div role="dialog" aria-modal="true" aria-labelledby="ai-image-title" className="modal flex max-w-lg flex-col gap-4 p-6" onClick={(e) => e.stopPropagation()}>
+      <div {...dialog} role="dialog" aria-modal="true" aria-labelledby="ai-image-title" className="modal flex max-w-lg flex-col gap-4 p-6 outline-none" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3">
           <span aria-hidden="true" className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo text-white">
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
@@ -51,7 +53,6 @@ export const AiImageModal = ({ documentId, onInsert, onClose }: AiImageModalProp
             disabled={busy}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Escape" && !busy) onClose();
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void generate();
             }}
             placeholder="Un renard roux qui lit un carnet sous un lampadaire, style illustration à l’encre…"

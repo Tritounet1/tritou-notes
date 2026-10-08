@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useDialog } from "../hooks/useDialog";
 import { apiFetch } from "../api";
 import { docTypeStyles } from "../utils/docTypes";
 import { folderPaths, type FolderRow } from "../utils/folders";
@@ -61,6 +62,7 @@ export const MovePageModal = ({ documentId, currentParentId, currentFolderId, on
   const [folders, setFolders] = useState<FolderRow[]>([]);
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
+  const dialog = useDialog(() => !saving && onClose());
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -124,14 +126,13 @@ export const MovePageModal = ({ documentId, currentParentId, currentFolderId, on
 
   return (
     <div className="modal-backdrop items-start pt-[12vh]" onClick={() => !saving && onClose()}>
-      <div role="dialog" aria-modal="true" aria-labelledby="move-page-title" className="modal flex max-h-[70vh] max-w-lg flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div {...dialog} role="dialog" aria-modal="true" aria-labelledby="move-page-title" className="modal flex max-h-[70vh] max-w-lg flex-col overflow-hidden outline-none" onClick={(e) => e.stopPropagation()}>
         <div className="flex flex-col gap-3 border-b border-line-soft p-4">
           <h2 id="move-page-title" className="font-display text-xl font-bold tracking-tight">Déplacer la page</h2>
           <input
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && onClose()}
             placeholder="Chercher un dossier ou une page…"
             aria-label="Chercher une destination"
             className="input"

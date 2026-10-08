@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Dialog } from "./components/Dialog";
 import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "./api";
 import { useAuth } from "./hooks/useAuth";
@@ -279,8 +280,7 @@ export const ScrapersPage = () => {
 
       {/* Modal de création */}
       {showModal && (
-        <div className="modal-backdrop">
-          <div className="modal max-w-md">
+        <Dialog onClose={() => setShowModal(false)} className="modal max-w-md" label="Nouveau scraper">
             <div className="px-6 pt-5 pb-4 border-b border-line-soft flex items-center justify-between">
               <h2 className="section-title">Nouveau scraper</h2>
               <button
@@ -339,8 +339,7 @@ export const ScrapersPage = () => {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Dialog } from "./components/Dialog";
 import Markdown from "react-markdown";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import remarkGfm from "remark-gfm";
@@ -1147,7 +1148,9 @@ export const DocumentPage = () => {
                               handleStartEditing(segIndex, true);
                             }
                           } : undefined}
-                          aria-label={canEdit ? "Modifier le texte du document" : undefined}
+                          // A group, not a button: the rendered text may contain links.
+                          role={canEdit ? "group" : undefined}
+                          aria-label={canEdit ? "Texte du document (Entrée pour le modifier)" : undefined}
                           className={`rounded-md outline-none focus-visible:ring-2 focus-visible:ring-indigo-soft ${canEdit ? "cursor-text" : ""} ${isLastSegment ? "grow" : ""} ${seg.content ? "" : "min-h-[40px]"}`}
                         >
                           {seg.content ? (
@@ -1206,8 +1209,7 @@ export const DocumentPage = () => {
 
       {/* Scheduler picker modal */}
       {showSchedulerModal && (
-        <div className="modal-backdrop">
-          <div role="dialog" aria-modal="true" aria-labelledby="scheduler-modal-title" className="modal max-w-md p-6">
+        <Dialog onClose={() => setShowSchedulerModal(false)} className="modal max-w-md p-6" labelledBy="scheduler-modal-title">
             <div className="mb-4 flex items-center justify-between">
               <h2 id="scheduler-modal-title" className="section-title">Lier un planificateur</h2>
               <button type="button" onClick={() => setShowSchedulerModal(false)} aria-label="Fermer" className="icon-btn">
@@ -1255,14 +1257,12 @@ export const DocumentPage = () => {
                 Annuler
               </button>
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
 
       {/* Scrape Modal */}
       {showScrapeModal && (
-        <div className="modal-backdrop">
-          <div role="dialog" aria-modal="true" aria-labelledby="scrape-modal-title" className="modal max-w-md p-6">
+        <Dialog onClose={() => setShowScrapeModal(false)} className="modal max-w-md p-6" labelledBy="scrape-modal-title">
             <div className="mb-4 flex items-center justify-between">
               <h2 id="scrape-modal-title" className="section-title">Scraper une URL</h2>
               <button type="button" onClick={() => setShowScrapeModal(false)} aria-label="Fermer" className="icon-btn">
@@ -1300,13 +1300,11 @@ export const DocumentPage = () => {
                 Scraper
               </button>
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
 
       {showHistory && (
-        <div className="modal-backdrop">
-          <div role="dialog" aria-modal="true" aria-labelledby="history-modal-title" className="modal flex max-h-[85vh] max-w-4xl flex-col overflow-hidden">
+        <Dialog onClose={() => setShowHistory(false)} className="modal flex max-h-[85vh] max-w-4xl flex-col overflow-hidden" labelledBy="history-modal-title">
             <div className="flex items-center justify-between border-b border-line-soft px-6 py-4">
               <h2 id="history-modal-title" className="section-title">Historique des modifications</h2>
               <button type="button" onClick={() => setShowHistory(false)} aria-label="Fermer" className="icon-btn">
@@ -1426,8 +1424,7 @@ export const DocumentPage = () => {
                 </div>
               </div>
             )}
-          </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );
