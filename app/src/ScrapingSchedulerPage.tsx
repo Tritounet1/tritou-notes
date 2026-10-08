@@ -84,6 +84,8 @@ export const ScrapingSchedulerPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // A refused save (e.g. activating without a cron) is shown without leaving the page.
+  const [saveError, setSaveError] = useState("");
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -133,9 +135,16 @@ export const ScrapingSchedulerPage = () => {
         if (response.ok) {
           const data = await response.json();
           setScheduler(data);
+          setStatus(data.status);
+          setSaveError("");
+        } else {
+          const data = await response.json().catch(() => ({}));
+          setSaveError(data.message || "La sauvegarde a échoué.");
+          // The switch shows the stored state again.
+          if (updates.status) setStatus(updates.status === "ACTIVATE" ? "DESACTIVATE" : "ACTIVATE");
         }
-      } catch (err) {
-        console.error(err);
+      } catch {
+        setSaveError("La sauvegarde a échoué (connexion ?).");
       } finally {
         setSaving(false);
       }
@@ -165,8 +174,8 @@ export const ScrapingSchedulerPage = () => {
       title: field === "title" ? value : title,
       description: field === "description" ? value : description,
       cron_expression: field === "cron_expression" ? value : cronExpression,
-      status:
-        field === "status" ? (value as ScrapingScheduler["status"]) : status,
+      // Only the switch sends a status: RUNNING / ERROR are run states the API refuses as input.
+      ...(field === "status" && { status: value as ScrapingScheduler["status"] }),
     });
   };
 
@@ -301,6 +310,7 @@ export const ScrapingSchedulerPage = () => {
             <p className="text-[15px] text-ink-2 min-h-5 line-clamp-2">
               {saving ? "Sauvegarde…" : description}
             </p>
+            {saveError && <p role="alert" className="text-sm text-danger-ink">{saveError}</p>}
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button

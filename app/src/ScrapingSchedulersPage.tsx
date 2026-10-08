@@ -100,6 +100,7 @@ export const ScrapingSchedulersPage = () => {
   const [newDescription, setNewDescription] = useState("");
   const [error, setError] = useState("");
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [toggleError, setToggleError] = useState("");
 
   useEffect(() => {
     fetchSchedulers();
@@ -166,9 +167,13 @@ export const ScrapingSchedulersPage = () => {
       if (response.ok) {
         const updated = await response.json();
         setSchedulers((list) => list.map((s) => (s.id === scheduler.id ? { ...s, ...updated } : s)));
+        setToggleError("");
+      } else {
+        const data = await response.json().catch(() => ({}));
+        setToggleError(`${scheduler.title || "Planificateur"} : ${data.message || "modification refusée."}`);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
+      setToggleError("La modification a échoué (connexion ?).");
     } finally {
       setTogglingId(null);
     }
@@ -192,6 +197,7 @@ export const ScrapingSchedulersPage = () => {
           )}
         </div>
       </header>
+      {toggleError && <p role="alert" className="text-sm text-danger-ink">{toggleError}</p>}
 
       {loading ? (
         <p className="py-24 text-center text-muted">Chargement…</p>

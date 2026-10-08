@@ -170,24 +170,31 @@ const scrapeInstance = async (instanceId: number, schedulerId: number | null) =>
 const runScheduler = async (schedulerId: number) => {
   console.log("Start scheduled scraping for scheduler: ", schedulerId);
   try {
-    await prisma.scrapingScheduler.update({
-      where: { id: schedulerId },
+    // Deactivated meanwhile (its job fired anyway): nothing to run.
+    const started = await prisma.scrapingScheduler.updateMany({
+      where: { id: schedulerId, status: { not: "DESACTIVATE" } },
       data: { status: "RUNNING", last_run_at: new Date() },
     });
+    if (started.count === 0) return;
 
     const instances = await prisma.instanceScrape.findMany({ where: { scrapingSchedulerId: schedulerId } });
     console.log(`Found ${instances.length} instances for scheduler ${schedulerId}`);
 
+    let failures = 0;
     for (const instance of instances) {
       // A failed URL is recorded on its instance; the others still run.
-      await scrapeInstance(instance.id, schedulerId).catch((error) => console.log(`Error scraping instance ${instance.id}: `, errorMessage(error)));
+      await scrapeInstance(instance.id, schedulerId).catch((error) => {
+        failures += 1;
+        console.log(`Error scraping instance ${instance.id}: `, errorMessage(error));
+      });
     }
 
     const scheduler = await prisma.scrapingScheduler.findUnique({ where: { id: schedulerId } });
-    await prisma.scrapingScheduler.update({
-      where: { id: schedulerId },
+    // Only a scheduler still RUNNING gets its run result: one deactivated during the run stays so.
+    await prisma.scrapingScheduler.updateMany({
+      where: { id: schedulerId, status: "RUNNING" },
       data: {
-        status: "ACTIVATE",
+        status: failures > 0 ? "ERROR" : "ACTIVATE",
         update_at: new Date(),
         next_run_at: scheduler?.cron_expression ? cronParser.parse(scheduler.cron_expression).next().toDate() : null,
       },
@@ -195,7 +202,7 @@ const runScheduler = async (schedulerId: number) => {
     console.log("Finish scheduled scraping for scheduler: ", schedulerId);
   } catch (error) {
     await prisma.scrapingScheduler
-      .update({ where: { id: schedulerId }, data: { status: "ERROR", update_at: new Date() } })
+      .updateMany({ where: { id: schedulerId, status: "RUNNING" }, data: { status: "ERROR", update_at: new Date() } })
       .catch((recordError) => console.error(`Could not mark scheduler ${schedulerId} as failed:`, recordError));
     throw error;
   }

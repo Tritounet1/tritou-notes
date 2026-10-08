@@ -115,12 +115,20 @@ describe("scraping worker", () => {
     expect(db.instanceScrape.update).not.toHaveBeenCalled();
   });
   it("runs a scheduler, preserves previous results, and sets the next run", async () => {
+    db.scrapingScheduler.updateMany.mockResolvedValue({ count: 1 });
     db.instanceScrape.findMany.mockResolvedValue([instance]);
     db.instanceScrape.findFirst.mockResolvedValue({ ...instance, response: { title: "Old" } });
     await run({ schedulerId: 3 });
-    expect(db.scrapingScheduler.update).toHaveBeenCalledWith({ where: { id: 3 }, data: { status: "RUNNING", last_run_at: expect.any(Date) } });
+    expect(db.scrapingScheduler.updateMany).toHaveBeenCalledWith({ where: { id: 3, status: { not: "DESACTIVATE" } }, data: { status: "RUNNING", last_run_at: expect.any(Date) } });
     expect(db.instanceScrapeHistory.create).toHaveBeenCalledWith({ data: expect.objectContaining({ scrapingSchedulerId: 3 }) });
-    expect(db.scrapingScheduler.update).toHaveBeenLastCalledWith({ where: { id: 3 }, data: { status: "ACTIVATE", update_at: expect.any(Date), next_run_at: expect.any(Date) } });
+    // Conditional: a scheduler deactivated during the run is left deactivated.
+    expect(db.scrapingScheduler.updateMany).toHaveBeenLastCalledWith({ where: { id: 3, status: "RUNNING" }, data: { status: "ACTIVATE", update_at: expect.any(Date), next_run_at: expect.any(Date) } });
+  });
+  it("skips the run of a scheduler deactivated before its job fired", async () => {
+    db.scrapingScheduler.updateMany.mockResolvedValue({ count: 0 });
+    await run({ schedulerId: 3 });
+    expect(db.instanceScrape.findMany).not.toHaveBeenCalled();
+    expect(db.scrapingScheduler.updateMany).toHaveBeenCalledOnce();
   });
   it("continues with other instances when one scrape fails", async () => {
     db.instanceScrape.findMany.mockResolvedValue([instance, { ...instance, id: 13 }]);
@@ -128,19 +136,21 @@ describe("scraping worker", () => {
     await run({ schedulerId: 3 });
     expect(db.instanceScrapeHistory.create).toHaveBeenCalledWith({ data: expect.objectContaining({ status: "ERROR", scrapingSchedulerId: 3 }) });
     expect(db.instanceScrape.update).toHaveBeenCalledWith({ where: { id: 13 }, data: expect.objectContaining({ status: "FINISHED" }) });
+    // One failed URL shows on the scheduler.
+    expect(db.scrapingScheduler.updateMany).toHaveBeenLastCalledWith({ where: { id: 3, status: "RUNNING" }, data: expect.objectContaining({ status: "ERROR" }) });
   });
   it("allows an empty scheduler without a cron expression", async () => {
     db.scrapingScheduler.findUnique.mockResolvedValue(null);
     await run({ schedulerId: 3 });
-    expect(db.scrapingScheduler.update).toHaveBeenLastCalledWith({ where: { id: 3 }, data: { status: "ACTIVATE", update_at: expect.any(Date), next_run_at: null } });
+    expect(db.scrapingScheduler.updateMany).toHaveBeenLastCalledWith({ where: { id: 3, status: "RUNNING" }, data: { status: "ACTIVATE", update_at: expect.any(Date), next_run_at: null } });
   });
   it("marks a scheduler ERROR on a database failure", async () => {
     db.instanceScrape.findMany.mockRejectedValue(new Error("offline"));
     await expect(run({ schedulerId: 3 })).rejects.toThrow("offline");
-    expect(db.scrapingScheduler.update).toHaveBeenLastCalledWith({ where: { id: 3 }, data: { status: "ERROR", update_at: expect.any(Date) } });
+    expect(db.scrapingScheduler.updateMany).toHaveBeenLastCalledWith({ where: { id: 3, status: "RUNNING" }, data: { status: "ERROR", update_at: expect.any(Date) } });
 
     vi.spyOn(console, "error").mockImplementation(() => {});
-    db.scrapingScheduler.update.mockRejectedValue(new Error("offline"));
+    db.scrapingScheduler.updateMany.mockResolvedValueOnce({ count: 1 }).mockRejectedValue(new Error("offline"));
     await expect(run({ schedulerId: 3 })).rejects.toThrow("offline");
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining("scheduler 3"), expect.any(Error));
   });

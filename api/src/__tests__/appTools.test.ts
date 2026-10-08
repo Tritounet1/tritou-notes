@@ -68,7 +68,18 @@ describe("scheduler service fixes", () => {
     queue.getRepeatableJobs.mockResolvedValue([{ name: "scheduler-2", key: "old-key" }]);
     await updateScheduler(2, 7, { cron_expression: "0 8 * * *" });
     expect(queue.removeRepeatableByKey).toHaveBeenCalledWith("old-key");
-    expect(queue.add).toHaveBeenCalledWith("scheduler-2", { schedulerId: 2 }, { repeat: { pattern: "0 8 * * *" }, jobId: "scheduler-2" });
+    // The stored start date goes to BullMQ (which ignores it once in the past).
+    expect(queue.add).toHaveBeenCalledWith("scheduler-2", { schedulerId: 2 }, { repeat: { pattern: "0 8 * * *", startDate: new Date(0) }, jobId: "scheduler-2" });
+  });
+
+  it("only accepts configuration statuses, and a cron to activate", async () => {
+    db.scrapingScheduler.findFirst.mockResolvedValue({ id: 4, status: "DESACTIVATE", cron_expression: null });
+    await expect(updateScheduler(4, 7, { status: "RUNNING" as never })).rejects.toMatchObject({ status: 400, message: expect.stringContaining("gérés par le worker") });
+    await expect(updateScheduler(4, 7, { status: "ACTIVATE" })).rejects.toMatchObject({ status: 400, message: expect.stringContaining("cron est nécessaire") });
+    // Clearing the cron of an active scheduler is refused too.
+    db.scrapingScheduler.findFirst.mockResolvedValue({ id: 4, status: "ERROR", cron_expression: "0 * * * *" });
+    await expect(updateScheduler(4, 7, { cron_expression: null })).rejects.toMatchObject({ status: 400 });
+    expect(db.scrapingScheduler.update).not.toHaveBeenCalled();
   });
 
   it("stops the job of a scheduler deactivated while in ERROR", async () => {

@@ -19,7 +19,8 @@ export const assertValidCron = (cron: string) => {
 };
 
 const schedule = async (id: number, cron: string, startAt: Date | null) => {
-  await scrapeQueue.add(jobName(id), { schedulerId: id }, { repeat: { pattern: cron }, jobId: jobName(id) });
+  // A start date in the future delays the first run (BullMQ ignores past ones).
+  await scrapeQueue.add(jobName(id), { schedulerId: id }, { repeat: { pattern: cron, ...(startAt && { startDate: startAt }) }, jobId: jobName(id) });
   await prisma.scrapingScheduler.update({
     where: { id },
     data: { start_at: startAt || new Date(), next_run_at: cronParser.parse(cron).next().toDate() },
@@ -34,7 +35,8 @@ const unschedule = async (id: number) => {
 export interface SchedulerChanges {
   title?: string;
   description?: string | null;
-  status?: "ACTIVATE" | "DESACTIVATE" | "RUNNING" | "ERROR";
+  /** Configuration only: RUNNING and ERROR are run states set by the worker. */
+  status?: "ACTIVATE" | "DESACTIVATE";
   cron_expression?: string | null;
 }
 
@@ -47,7 +49,13 @@ export const updateScheduler = async (id: number, userId: number, changes: Sched
   if (!previous) throw notFound("Le planificateur n'existe pas");
   const author = await prisma.user.findFirst({ where: { id: userId } });
   if (!author) throw new Error("Utilisateur introuvable");
+  if (changes.status !== undefined && changes.status !== "ACTIVATE" && changes.status !== "DESACTIVATE") {
+    throw httpError("`status` doit valoir ACTIVATE ou DESACTIVATE (RUNNING et ERROR sont gérés par le worker).");
+  }
   if (changes.cron_expression) assertValidCron(changes.cron_expression);
+  const nextStatus = changes.status ?? previous.status;
+  const nextCron = changes.cron_expression === undefined ? previous.cron_expression : changes.cron_expression;
+  if (isScheduled(nextStatus) && !nextCron) throw httpError("Un cron est nécessaire pour activer le planificateur.");
 
   const scheduler = await prisma.scrapingScheduler.update({
     where: { id },
