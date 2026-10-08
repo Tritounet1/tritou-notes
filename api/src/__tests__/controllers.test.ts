@@ -200,6 +200,21 @@ describe("invitations", () => {
     expect((await call(invitations.sendInvitation)).status).toHaveBeenCalledWith(400);
     expect(mocks.email).not.toHaveBeenCalled();
   });
+  it("rejects a malformed email", async () => {
+    expect((await call(invitations.sendInvitation, { email: "not-an-email" })).status).toHaveBeenCalledWith(400);
+    expect(db.invitation.create).not.toHaveBeenCalled();
+  });
+  it.each([
+    [{ username: "", password: "password-long" }, "Nom d'utilisateur"],
+    [{ username: "x".repeat(51), password: "password-long" }, "Nom d'utilisateur"],
+    [{ username: "new", password: "short" }, "8 caractères"],
+    [{ username: "new", password: ["password-long"] }, "8 caractères"],
+  ])("refuses an invalid registration %j before touching the invitation", async (body, message) => {
+    const ctx = await call(invitations.registerWithInvitation, body);
+    expect(ctx.status).toHaveBeenCalledWith(400);
+    expect(ctx.json).toHaveBeenCalledWith({ error: expect.stringContaining(message) });
+    expect(db.invitation.findUnique).not.toHaveBeenCalled();
+  });
   it("rejects an email already registered", async () => {
     expect((await call(invitations.sendInvitation, { email: user.email })).status).toHaveBeenCalledWith(400);
     expect(db.invitation.create).not.toHaveBeenCalled();
@@ -538,7 +553,7 @@ for (const module of modules) {
       const failure = new Error("Dependency unavailable");
       for (const model of Object.values(db)) for (const mock of Object.values(model)) mock.mockRejectedValue(failure);
       for (const mock of [mocks.email, mocks.hash, mocks.response, mocks.models, mocks.upload]) mock.mockRejectedValue(failure);
-      const ctx = await call(handler, { password: "password-long", currentPassword: "old", newPassword: "password-long", email: "new@example.com", url: "https://example.com" });
+      const ctx = await call(handler, { username: "new", password: "password-long", currentPassword: "old", newPassword: "password-long", email: "new@example.com", url: "https://example.com" });
       // Logout has no database dependency; exercise a cookie write failure instead.
       if (name === "logout") {
         ctx.cookie.mockImplementation(() => { throw failure; });

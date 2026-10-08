@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
 import { hashPassword, verifyPassword } from "../utils/bcryptUtils";
 import { clearAuthCookie, setAuthCookie } from "../utils/cookieUtils";
+import { PASSWORD_RULE, validPassword } from "../utils/credentials";
 import { accountFailures, ipFailures } from "../utils/failureLimiter";
 import { createToken } from "../utils/jwtUtils";
 
@@ -190,8 +191,8 @@ export const changePassword = async (
       return;
     }
 
-    if (newPassword.length < 8 || Buffer.byteLength(newPassword, "utf8") > 72) {
-      res.status(400).json({ error: "Le nouveau mot de passe doit contenir au moins 8 caractères et au maximum 72 octets." });
+    if (!validPassword(newPassword)) {
+      res.status(400).json({ error: PASSWORD_RULE });
       return;
     }
 

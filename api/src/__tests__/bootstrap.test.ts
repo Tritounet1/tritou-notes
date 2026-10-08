@@ -52,12 +52,25 @@ describe("first administrator setup", () => {
   it("forwards account creation errors", async () => {
     db.user.count.mockResolvedValue(0);
     db.user.create.mockRejectedValue(new Error("Database unavailable"));
-    await expect(dispatch(await bootstrap(), "POST", "/bootstrap-code", { body: { password: "password" } })).rejects.toThrow("Database unavailable");
+    await expect(dispatch(await bootstrap(), "POST", "/bootstrap-code", { body: { email: user.email, username: "admin", password: "password" } })).rejects.toThrow("Database unavailable");
   });
   it("does not set a cookie if signing fails", async () => {
     db.user.count.mockResolvedValue(0);
     mocks.token.mockReturnValue(undefined);
-    await expect(dispatch(await bootstrap(), "POST", "/bootstrap-code", { body: { password: "password" } })).rejects.toThrow("creation du token");
+    await expect(dispatch(await bootstrap(), "POST", "/bootstrap-code", { body: { email: user.email, username: "admin", password: "password" } })).rejects.toThrow("creation du token");
+  });
+  it.each([
+    [{ email: "not-an-email", username: "admin", password: "password-long" }, "E-mail valide"],
+    [{ email: "a@b.co", username: "  ", password: "password-long" }, "E-mail valide"],
+    [{ email: "a@b.co", username: "admin", password: "short" }, "8 caractères"],
+    [{ email: "a@b.co", username: "admin", password: "é".repeat(37) }, "72 octets"],
+    [{}, "E-mail valide"],
+  ])("refuses an invalid first administrator %j", async (body, message) => {
+    db.user.count.mockResolvedValue(0);
+    const ctx = await dispatch(await bootstrap(), "POST", "/bootstrap-code", { body });
+    expect(ctx.status).toHaveBeenCalledWith(400);
+    expect(ctx.json).toHaveBeenCalledWith({ message: expect.stringContaining(message) });
+    expect(db.user.create).not.toHaveBeenCalled();
   });
 });
 

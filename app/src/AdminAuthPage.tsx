@@ -31,8 +31,9 @@ export const AdminAuthPage = () => {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Le mot de passe doit contenir au moins 6 caractères");
+    // Same rule as the API (bcrypt ignores what lies beyond 72 bytes).
+    if (password.length < 8 || new TextEncoder().encode(password).length > 72) {
+      setError("Le mot de passe doit contenir au moins 8 caractères et au maximum 72 octets.");
       return;
     }
 
@@ -51,7 +52,7 @@ export const AdminAuthPage = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Erreur lors de l'inscription");
+        throw new Error(data.error || data.message || "Erreur lors de l'inscription");
       }
 
       // Le cookie est déjà défini par le backend
@@ -131,7 +132,7 @@ export const AdminAuthPage = () => {
             onChange={(e) => setPassword(e.target.value)}
             required
             className="input min-h-[46px] text-[15px]"
-            placeholder="Minimum 6 caractères"
+            placeholder="Minimum 8 caractères"
           />
         </label>
 

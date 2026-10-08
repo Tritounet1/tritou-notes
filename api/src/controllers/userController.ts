@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
 import { hashPassword } from "../utils/bcryptUtils";
+import { validPassword } from "../utils/credentials";
 
 const publicUser = <T extends { password: string; tokenVersion?: number }>(user: T) => {
   const { password: _password, tokenVersion: _tokenVersion, ...safeUser } = user;
@@ -9,8 +10,6 @@ const publicUser = <T extends { password: string; tokenVersion?: number }>(user:
   return safeUser;
 };
 
-const validPassword = (password: unknown): password is string =>
-  typeof password === "string" && password.length >= 8 && Buffer.byteLength(password, "utf8") <= 72;
 
 export const createUser = async (
   req: Request,

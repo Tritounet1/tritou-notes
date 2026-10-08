@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import config from "../config/config";
 import { sendEmail } from "../config/mailClient";
 import { prisma } from "../config/prismaClient";
+import { PASSWORD_RULE, validEmail, validPassword, validUsername } from "../utils/credentials";
 import { hashPassword } from "../utils/bcryptUtils";
 import { setAuthCookie } from "../utils/cookieUtils";
 import { createToken } from "../utils/jwtUtils";
@@ -14,9 +15,9 @@ export const sendInvitation = async (
   next: NextFunction,
 ) => {
   try {
-    const { email } = req.body;
+    const { email } = req.body ?? {};
 
-    if (!email) {
+    if (!validEmail(email)) {
       res.status(400).json({ error: "Email requis" });
       return;
     }
@@ -119,7 +120,15 @@ export const registerWithInvitation = async (
 ) => {
   try {
     const token = req.params.token;
-    const { username, password } = req.body;
+    const { username, password } = req.body ?? {};
+    if (!validUsername(username)) {
+      res.status(400).json({ error: "Nom d'utilisateur requis (50 caractères maximum)." });
+      return;
+    }
+    if (!validPassword(password)) {
+      res.status(400).json({ error: PASSWORD_RULE });
+      return;
+    }
 
     // Verifier l'invitation
     const invitation = await prisma.invitation.findUnique({ where: { token } });
@@ -158,7 +167,7 @@ export const registerWithInvitation = async (
       return tx.user.create({
         data: {
           email: invitation.email,
-          username,
+          username: username.trim(),
           password: hashedPassword,
           role: "USER",
           userPermissions: { create: { createDocument: true, modifyDocument: true, deleteDocument: true } },

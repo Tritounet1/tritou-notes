@@ -9,6 +9,7 @@ import {
 import { adminMiddleware } from "../middlewares/adminMiddleware";
 import { authHandler } from "../middlewares/authMiddleware";
 import { hashPassword } from "../utils/bcryptUtils";
+import { PASSWORD_RULE, validEmail, validPassword, validUsername } from "../utils/credentials";
 import { setAuthCookie } from "../utils/cookieUtils";
 import { createToken } from "../utils/jwtUtils";
 import { makeid } from "../utils/utils";
@@ -38,14 +39,22 @@ const initFirstAdmin = async () => {
           res.status(409).json({ message: "Un administrateur existe déjà" });
           return;
         }
-        const { email, username, password } = req.body;
+        const { email, username, password } = req.body ?? {};
+        if (!validEmail(email) || !validUsername(username)) {
+          res.status(400).json({ message: "E-mail valide et nom d'utilisateur requis." });
+          return;
+        }
+        if (!validPassword(password)) {
+          res.status(400).json({ message: PASSWORD_RULE });
+          return;
+        }
         const hashedPassword = await hashPassword(password);
 
         // Account and permissions in one statement.
         const { userPermissions, ...user } = await prisma.user.create({
           data: {
             email,
-            username,
+            username: username.trim(),
             password: hashedPassword,
             role: "ADMIN",
             userPermissions: {

@@ -111,7 +111,7 @@ it("rejects unauthenticated invitation senders", async () => {
 });
 it.each(["GET", "POST"])("keeps invitation %s validation public", async method => {
   db.invitation.findUnique.mockResolvedValue(null);
-  expect((await dispatch(invitations, method, "/invitation/token", { user: undefined })).status).toHaveBeenCalledWith(404);
+  expect((await dispatch(invitations, method, "/invitation/token", { user: undefined, body: { username: "new", password: "password-long" } })).status).toHaveBeenCalledWith(404);
 });
 it.each([{ router: documents, url: "/" }, { router: documents, url: "/12" }, { router: histories, url: "/12" }, { router: instanceHistories, url: "/" }, { router: instanceHistories, url: "/12" }])("serves authenticated read routes %#", async ({ router, url }) => {
   expect((await dispatch(router, "GET", url, { user: regular })).json).toHaveBeenCalledOnce();
