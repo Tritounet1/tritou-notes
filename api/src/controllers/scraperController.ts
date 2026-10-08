@@ -14,7 +14,8 @@ export const createScraper = async (
     const scraper = await prisma.scraper.create({
       data: {
         name: name,
-        description: description,
+        // null clears the description (the column is not nullable).
+        description: description === null ? "" : description,
       },
     });
     res.status(201).json(scraper);
@@ -92,8 +93,8 @@ export const updateScraper = async (
       },
       data: {
         name: name,
-        description: description,
-        code: code,
+        description: description === null ? "" : description,
+        code: code === null ? "" : code,
         browser: browser,
         base_url: base_url,
         status: status,

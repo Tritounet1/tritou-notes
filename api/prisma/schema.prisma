@@ -55,6 +55,8 @@ model Document {
 
   @@index([parentId])
   @@index([folderId])
+  @@index([authorId])
+  @@index([lastEditorId])
 }
 
 // Folders only organise pages; deleting one moves its content up a level (see folderController).
@@ -110,13 +112,14 @@ model DocumentHistory {
   authorId   Int?
 
   @@index([documentId, created_at])
+  @@index([authorId])
 }
 
 model Scraper {
   id               Int              @id @default(autoincrement())
   name             String
-  description      String?          @default("")
-  code             String?          @default("")
+  description      String           @default("")
+  code             String           @default("")
   browser          Boolean          @default(false)
   base_url         String[]
   status           ScraperStatus    @default(DISABLE)
@@ -138,6 +141,9 @@ model InstanceScrape {
   instanceScrapeHistories InstanceScrapeHistory[]
   scraper                 Scraper?                @relation(fields: [scraperId], references: [id])
   scraperId               Int?
+
+  @@index([scrapingSchedulerId])
+  @@index([scraperId])
 }
 
 model InstanceScrapeHistory {
@@ -150,6 +156,9 @@ model InstanceScrapeHistory {
   instanceScrapeId    Int
   scrapingScheduler   ScrapingScheduler?   @relation(fields: [scrapingSchedulerId], references: [id])
   scrapingSchedulerId Int?
+
+  @@index([instanceScrapeId, created_at])
+  @@index([scrapingSchedulerId])
 }
 
 // AI chat thread, attached to a document or global (documentId = null).
@@ -223,6 +232,8 @@ model Invitation {
   used       Boolean  @default(false)
   expires_at DateTime
   created_at DateTime @default(now())
+
+  @@index([email])
 }
 
 model Settings {
