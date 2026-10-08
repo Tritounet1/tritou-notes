@@ -234,6 +234,14 @@ describe("real HTTP + PostgreSQL + Redis", () => {
     expect(response.data.user.role).toBe("USER");
     expect((await request("/api/admin-auth/invitation/integration-invitation", "POST", { username: "invited", password: "invited-password" }, "")).status).toBe(400);
   });
+  it("lets only one of two simultaneous registrations use an invitation", async () => {
+    await prisma.invitation.create({ data: { email: "race@test.example", token: "race-invitation", expires_at: new Date(Date.now() + 10000) } });
+    const register = (username: string) => request("/api/admin-auth/invitation/race-invitation", "POST", { username, password: "race-password" }, "");
+    const statuses = (await Promise.all([register("first"), register("second")])).map(response => response.status);
+    expect(statuses.filter(status => status === 201)).toHaveLength(1);
+    expect(statuses.find(status => status !== 201)).toBeGreaterThanOrEqual(400);
+    expect(await prisma.user.count({ where: { email: "race@test.example" } })).toBe(1);
+  });
   it("lets BullMQ consume and complete a job against real Redis", async () => {
     const connection = { host: "127.0.0.1", port: 56379 };
     const testQueue = new Queue("integration-consumption", { connection });

@@ -6,9 +6,8 @@ import { prisma } from "./prismaClient";
 type ConfigOptions = SMTPTransport.Options | null;
 
 const getSmtpOptions = async (): Promise<ConfigOptions> => {
-  const settings = await prisma.settings.findFirst({
-    where: { id: 1 },
-  });
+  // The settings row is a singleton (see app.ts), whatever its id.
+  const settings = await prisma.settings.findFirst();
 
   if (!settings) {
     return null;

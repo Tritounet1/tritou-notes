@@ -15,6 +15,20 @@ services:
       interval: 1s
       timeout: 3s
       retries: 30
+  # Catches the emails sent by the integration tests (SMTP on 51025, API on 58025).
+  mail:
+    image: axllent/mailpit:v1.27
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    ports:
+      - "127.0.0.1:51025:1025"
+      - "127.0.0.1:58025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
   redis:
     image: redis:7-alpine
     ports:
