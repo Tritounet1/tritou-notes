@@ -1,5 +1,6 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "./components/Dialog";
+import { HistoryDialog } from "./components/HistoryDialog";
 import Markdown from "react-markdown";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import remarkGfm from "remark-gfm";
@@ -11,12 +12,12 @@ import { insertImageBlocks, serializeDocumentImage, type DocumentImageBlock } fr
 import { apiFetch } from "./api";
 import { slashCommands } from "./commands";
 import { SchedulerBlock } from "./components/SchedulerBlock";
-import { SubPageBlock, type SubPage } from "./components/SubPageBlock";
+import { SubPageBlock } from "./components/SubPageBlock";
 import { MovePageModal, type PageLocation } from "./components/MovePageModal";
 import { SpreadsheetEditor } from "./components/SpreadsheetEditor";
 import { TodoEditor } from "./components/TodoEditor";
 import { useAuth } from "./hooks/useAuth";
-import { useDebouncedAction } from "./hooks/useDebounce";
+import { useDocumentPersistence } from "./hooks/useDocumentPersistence";
 import { jsonToMarkdownTable, templateToMarkdown } from "./utils/jsonToMarkdown";
 import { docTypeStyles } from "./utils/docTypes";
 import { notifyDocumentsChanged } from "./utils/documentEvents";
@@ -27,38 +28,6 @@ import { WebLinkBlock } from "./components/WebLinkBlock";
 import { insertPastedWebLink, webUrlOnLine, serializeWebLink, type WebLink } from "./utils/webLinks";
 import { codeValue, convertStandaloneLinks, keepBlocksOnOwnLine, normalizeSegments, parseSegments, segmentGlobalOffset, segmentsToText, updateCodeSegment, type Segment } from "./utils/documentSegments";
 import { useConfirm } from "./hooks/useConfirm";
-
-interface Document {
-  id: number;
-  title: string;
-  text: string | null;
-  public: boolean;
-  last_update: string;
-  authorId: number | null;
-  type: "TEXT" | "EXCEL" | "TODO";
-  parentId: number | null;
-  folderId: number | null;
-  /** Folder path of the page's top-level ancestor, root first (GET only). */
-  folders?: { id: number; name: string }[];
-  /** Parent chain, root first (only on GET /api/documents/:id). */
-  ancestors?: { id: number; title: string }[];
-  children?: SubPage[];
-}
-
-interface HistoryEntry {
-  id: number;
-  title: string;
-  text: string;
-  public: boolean;
-  created_at: string;
-  documentId: number;
-  authorId: number | null;
-}
-
-interface DiffLine {
-  type: "added" | "removed" | "unchanged";
-  content: string;
-}
 
 const docTypeIcons = {
   TEXT: <><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></>,
@@ -72,56 +41,6 @@ const commandGlyphs: Record<string, string> = {
   divider: "—", code: "{}", quote: "“", list: "•", checkbox: "[ ]",
 };
 
-function computeDiff(oldText: string, newText: string): DiffLine[] {
-  const oldLines = oldText.split("\n");
-  const newLines = newText.split("\n");
-  const diff: DiffLine[] = [];
-
-  let oldIndex = 0;
-  let newIndex = 0;
-
-  while (oldIndex < oldLines.length || newIndex < newLines.length) {
-    const oldLine = oldLines[oldIndex];
-    const newLine = newLines[newIndex];
-
-    if (oldIndex >= oldLines.length) {
-      diff.push({ type: "added", content: newLine });
-      newIndex++;
-    } else if (newIndex >= newLines.length) {
-      diff.push({ type: "removed", content: oldLine });
-      oldIndex++;
-    } else if (oldLine === newLine) {
-      diff.push({ type: "unchanged", content: oldLine });
-      oldIndex++;
-      newIndex++;
-    } else {
-      const oldInNew = newLines.indexOf(oldLine, newIndex);
-      const newInOld = oldLines.indexOf(newLine, oldIndex);
-
-      if (oldInNew === -1 && newInOld === -1) {
-        diff.push({ type: "removed", content: oldLine });
-        diff.push({ type: "added", content: newLine });
-        oldIndex++;
-        newIndex++;
-      } else if (
-        oldInNew !== -1 &&
-        (newInOld === -1 || oldInNew - newIndex <= newInOld - oldIndex)
-      ) {
-        while (newIndex < oldInNew) {
-          diff.push({ type: "added", content: newLines[newIndex] });
-          newIndex++;
-        }
-      } else {
-        while (oldIndex < newInOld) {
-          diff.push({ type: "removed", content: oldLines[oldIndex] });
-          oldIndex++;
-        }
-      }
-    }
-  }
-
-  return diff;
-}
 
 // Markdown component map, defined once: a new object on each render would make React
 // unmount and remount every rendered segment on each keystroke.
@@ -189,31 +108,21 @@ export const DocumentPage = () => {
   const navigate = useNavigate();
   const [confirm, confirmDialog] = useConfirm();
   const { isAuthenticated, hasPermission } = useAuth();
-  const [document, setDocument] = useState<Document | null>(null);
-  const [title, setTitle] = useState("");
-  const [text, setText] = useState("");
+  const {
+    document, setDocument, title, setTitle, text, setText, isPublic, latestRef,
+    loading, error, saving, loadedVersion, conflict, actionError, setActionError,
+    saveDocument, debouncedSave,
+    handleTogglePublic, handleExternalChange, reloadSavedVersion, keepMyVersion,
+  } = useDocumentPersistence(id);
   const [focusCodeIndex, setFocusCodeIndex] = useState<number | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const imageInsertRef = useRef({ start: 0, end: 0, source: "" });
   const [pendingLinkId, setPendingLinkId] = useState<string | null>(null);
-  const [isPublic, setIsPublic] = useState(false);
-  // Latest title / text / visibility, for async work (a /scrape) that ends after more edits.
-  const latestRef = useRef({ title: "", text: "", isPublic: false });
-  useEffect(() => {
-    latestRef.current = { title, text, isPublic };
-  }, [title, text, isPublic]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
 
   const [showMoveModal, setShowMoveModal] = useState(false);
 
   const [showHistory, setShowHistory] = useState(false);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState(false);
-  const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
 
   const [editingSegmentIndex, setEditingSegmentIndex] = useState<number | null>(null);
   const textareaRefs = useRef<Map<number, HTMLTextAreaElement | null>>(new Map());
@@ -234,11 +143,6 @@ export const DocumentPage = () => {
 
   const [showAiChat, setShowAiChat] = useState(false);
   const [showAiImageModal, setShowAiImageModal] = useState(false);
-  // Bumped when the assistant edits this page to refetch it.
-  const [reloadKey, setReloadKey] = useState(0);
-  // Bumped after each fetch: the to-do / spreadsheet editors only read their data on mount,
-  // so they are remounted once the fresh content is in state.
-  const [loadedVersion, setLoadedVersion] = useState(0);
 
   // Scrape modal state
   const [showScrapeModal, setShowScrapeModal] = useState(false);
@@ -256,55 +160,7 @@ export const DocumentPage = () => {
   const [scrapeError, setScrapeError] = useState("");
   const scrapeInsertPosRef = useRef<number>(0);
 
-  useEffect(() => {
-    const fetchDocument = async () => {
-      try {
-        const response = await apiFetch(`/api/documents/${id}`);
-        if (!response.ok) {
-          throw new Error("Document non trouvé");
-        }
-        const data = await response.json();
-        setDocument(data);
-        versionRef.current = data.last_update;
-        conflictRef.current = false;
-        setConflict(false);
-        savedTitleRef.current = data.title;
-        setTitle(data.title || "");
-        setText(data.text || "");
-        setLoadedVersion((n) => n + 1);
-        setIsPublic(data.public || false);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Erreur");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDocument();
-  }, [id, reloadKey]);
-
-  const fetchHistory = async () => {
-    setHistoryLoading(true);
-    setHistoryError(false);
-    try {
-      const response = await apiFetch(`/api/document-histories/${id}`);
-      if (!response.ok) throw new Error(`history ${response.status}`);
-      const data = await response.json();
-      setHistory(data);
-      if (data.length > 0) {
-        setSelectedVersion(data.length - 1);
-      }
-    } catch {
-      setHistoryError(true);
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
-
-  const handleOpenHistory = () => {
-    setShowHistory(true);
-    fetchHistory();
-  };
+  const handleOpenHistory = () => setShowHistory(true);
 
   // Auto-resize active segment textarea
   useEffect(() => {
@@ -317,67 +173,6 @@ export const DocumentPage = () => {
     }
   }, [text, editingSegmentIndex]);
 
-
-  const savedTitleRef = useRef<string | null>(null);
-  // `last_update` the editor content is based on, sent with each save: the API refuses the
-  // save (409) if the page changed meanwhile (assistant, other tab, other user).
-  const versionRef = useRef<string | null>(null);
-  // Saves run one after the other, so each one is based on the version the previous one returned.
-  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
-  // While in conflict, autosaves stop and the user chooses which version to keep.
-  const conflictRef = useRef(false);
-  const [conflict, setConflict] = useState(false);
-  // Failed actions (save, sub-page, deletion) show a banner; the editor stays mounted with the text.
-  const [actionError, setActionError] = useState<{ message: string; retrySave: boolean } | null>(null);
-
-  const saveDocument = useCallback(
-    (newTitle: string, newText: string, newIsPublic: boolean, overwrite = false) => {
-      const run = async () => {
-        if (conflictRef.current && !overwrite) return;
-        setSaving(true);
-        try {
-          const response = await apiFetch(`/api/documents/${id}`, {
-            method: "PUT",
-            body: JSON.stringify({
-              title: newTitle,
-              text: newText,
-              is_public: newIsPublic,
-              ...(!overwrite && versionRef.current && { expectedLastUpdate: versionRef.current }),
-            }),
-          });
-          if (response.status === 409) {
-            conflictRef.current = true;
-            setConflict(true);
-            return;
-          }
-          if (!response.ok) {
-            throw new Error("Erreur lors de la sauvegarde");
-          }
-          const data = await response.json();
-          versionRef.current = data.last_update;
-          conflictRef.current = false;
-          setConflict(false);
-          // PUT returns the bare row: keep the breadcrumb and sub-pages loaded by GET.
-          setDocument((previous) => (previous ? { ...previous, ...data } : data));
-          setActionError(null);
-          if (newTitle !== savedTitleRef.current) {
-            savedTitleRef.current = newTitle;
-            notifyDocumentsChanged();
-          }
-        } catch {
-          setActionError({ message: "L’enregistrement a échoué : vos modifications sont conservées ici, mais pas encore enregistrées.", retrySave: true });
-        } finally {
-          setSaving(false);
-        }
-      };
-      const queued = saveQueueRef.current.then(run);
-      saveQueueRef.current = queued;
-      return queued;
-    },
-    [id],
-  );
-
-  const { run: debouncedSave, flush: flushSave, cancel: cancelSave } = useDebouncedAction(saveDocument, 1000);
 
   const handleTitleChange = (newTitle: string) => {
     setTitle(newTitle);
@@ -788,32 +583,6 @@ export const DocumentPage = () => {
     }
   };
 
-  const handleTogglePublic = async () => {
-    const newIsPublic = !isPublic;
-    setIsPublic(newIsPublic);
-    // A pending autosave still carries the old visibility: this save replaces it.
-    cancelSave();
-    await saveDocument(title, text, newIsPublic);
-  };
-
-  /** The assistant changed this page: save local edits first, then reload unless they conflict. */
-  const handleExternalChange = () => {
-    flushSave();
-    void saveQueueRef.current.then(() => {
-      if (!conflictRef.current) setReloadKey((n) => n + 1);
-    });
-  };
-
-  const reloadSavedVersion = () => {
-    cancelSave();
-    void saveQueueRef.current.then(() => setReloadKey((n) => n + 1));
-  };
-
-  const keepMyVersion = () => {
-    cancelSave();
-    void saveDocument(title, text, isPublic, true);
-  };
-
   const handleDelete = async () => {
     const subPages = document?.children?.length ?? 0;
     const ok = await confirm({
@@ -840,18 +609,6 @@ export const DocumentPage = () => {
     } catch (err) {
       setActionError({ message: err instanceof Error ? err.message : "Erreur lors de la suppression", retrySave: false });
     }
-  };
-
-  const getDiff = () => {
-    if (selectedVersion === null || history.length === 0) return [];
-
-    const current = history[selectedVersion];
-    const previous = selectedVersion > 0 ? history[selectedVersion - 1] : null;
-
-    const oldText = previous?.text || "";
-    const newText = current.text || "";
-
-    return computeDiff(oldText, newText);
   };
 
   // Parsed once per text change, not by every part of the render.
@@ -1303,129 +1060,7 @@ export const DocumentPage = () => {
         </Dialog>
       )}
 
-      {showHistory && (
-        <Dialog onClose={() => setShowHistory(false)} className="modal flex max-h-[85vh] max-w-4xl flex-col overflow-hidden" labelledBy="history-modal-title">
-            <div className="flex items-center justify-between border-b border-line-soft px-6 py-4">
-              <h2 id="history-modal-title" className="section-title">Historique des modifications</h2>
-              <button type="button" onClick={() => setShowHistory(false)} aria-label="Fermer" className="icon-btn">
-                {closeIcon}
-              </button>
-            </div>
-
-            {historyLoading ? (
-              <p className="p-8 text-center text-muted">Chargement…</p>
-            ) : historyError ? (
-              <p role="alert" className="p-8 text-center text-danger-ink">
-                Impossible de charger l’historique.{" "}
-                <button type="button" onClick={() => void fetchHistory()} className="cursor-pointer underline">Réessayer</button>
-              </p>
-            ) : history.length === 0 ? (
-              <p className="p-8 text-center text-muted">Aucun historique disponible</p>
-            ) : (
-              <div className="flex flex-1 flex-col overflow-hidden sm:flex-row">
-                <div className="max-h-48 shrink-0 overflow-y-auto border-b border-line-soft bg-paper-warm p-2 sm:max-h-none sm:w-64 sm:border-r sm:border-b-0">
-                  {history.map((entry, index) => (
-                    <button
-                      key={entry.id}
-                      type="button"
-                      onClick={() => setSelectedVersion(index)}
-                      aria-pressed={selectedVersion === index}
-                      className={`w-full cursor-pointer rounded-[10px] px-3 py-2.5 text-left transition ${
-                        selectedVersion === index ? "bg-indigo-tint" : "hover:bg-chip"
-                      }`}
-                    >
-                      <span className="block truncate text-sm font-medium text-ink">{entry.title}</span>
-                      <span className="mt-0.5 block font-mono text-xs text-muted">
-                        {new Date(entry.created_at).toLocaleString("fr-FR")}
-                      </span>
-                      {index === 0 && (
-                        <span className="text-xs text-muted">Version initiale</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4">
-                  {selectedVersion !== null && history[selectedVersion] && (
-                    <div>
-                      <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
-                        <span className="text-muted">
-                          {selectedVersion > 0
-                            ? "Changements depuis la version précédente"
-                            : "Version initiale"}
-                        </span>
-                        {history[selectedVersion].public !==
-                          (selectedVersion > 0
-                            ? history[selectedVersion - 1]?.public
-                            : false) && (
-                          <span
-                            className={`pill ${
-                              history[selectedVersion].public
-                                ? "bg-neon-tint text-neon-ink"
-                                : "bg-chip text-ink-2"
-                            }`}
-                          >
-                            {history[selectedVersion].public
-                              ? "Rendu public"
-                              : "Rendu privé"}
-                          </span>
-                        )}
-                      </div>
-
-                      {history[selectedVersion].title !==
-                        (selectedVersion > 0
-                          ? history[selectedVersion - 1]?.title
-                          : "") && (
-                        <div className="mb-4 rounded-xl bg-paper-soft p-3">
-                          <p className="eyebrow mb-1">Titre</p>
-                          {selectedVersion > 0 &&
-                            history[selectedVersion - 1]?.title && (
-                              <p className="text-sm text-danger-ink line-through">
-                                {history[selectedVersion - 1].title}
-                              </p>
-                            )}
-                          <p className="text-sm text-neon-ink">
-                            {history[selectedVersion].title}
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="overflow-x-auto rounded-[14px] bg-code px-4 py-3 font-mono text-[13px] leading-[1.7]">
-                        {getDiff().length === 0 ? (
-                          <p className="text-code-faint">
-                            Aucune modification du contenu
-                          </p>
-                        ) : (
-                          getDiff().map((line, index) => (
-                            <div
-                              key={index}
-                              className={`${
-                                line.type === "added"
-                                  ? "bg-neon/10 text-neon"
-                                  : line.type === "removed"
-                                    ? "bg-danger/15 text-danger-on-dark"
-                                    : "text-code-faint"
-                              } -mx-2 whitespace-pre-wrap px-2`}
-                            >
-                              <span className="mr-2 select-none">
-                                {line.type === "added"
-                                  ? "+"
-                                  : line.type === "removed"
-                                    ? "-"
-                                    : " "}
-                              </span>
-                              {line.content || " "}
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-        </Dialog>
-      )}
+      {showHistory && id && <HistoryDialog documentId={id} onClose={() => setShowHistory(false)} />}
     </div>
   );
 };
