@@ -68,9 +68,10 @@ services:
       dockerfile: docker/worker/Dockerfile
     # No api/.env here: the worker runs untrusted scraper code and only needs the
     # database and Redis, not the JWT / encryption / AI secrets.
-    # It runs as `node` with no capabilities (Chromium uses --no-sandbox).
+    # It runs as `node` with no capabilities. Chromium's own sandbox needs user namespaces:
+    # seccomp-chromium.json is Docker's default profile plus clone/unshare/setns/chroot.
     cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
+    security_opt: ["no-new-privileges:true", "seccomp=./docker/worker/seccomp-chromium.json"]
     healthcheck:
       test: ["CMD", "node", "-e", "process.exit(Date.now() - require('fs').statSync('/tmp/worker-heartbeat').mtimeMs < 90000 ? 0 : 1)"]
       interval: 30s

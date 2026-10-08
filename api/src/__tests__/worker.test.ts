@@ -192,3 +192,42 @@ describe("worker startup", () => {
     expect(console.error).toHaveBeenCalledWith("Could not recover interrupted jobs:", expect.any(Error));
   });
 });
+
+describe("Chromium sandbox", () => {
+  const restart = async (mode?: string) => {
+    if (mode) vi.stubEnv("CHROMIUM_SANDBOX", mode);
+    vi.resetModules();
+    await import("../worker");
+    await vi.waitFor(() => expect(mocks.run).toHaveBeenCalled());
+  };
+  const browser = () => ({ newPage: async () => mocks.page, close: mocks.close, process: () => ({ kill: mocks.kill }) });
+  const sandboxFlags = (call: number) => (mocks.launch.mock.calls[call][0] as { args: string[] }).args.includes("--no-sandbox") ? "off" : "on";
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("uses the sandbox, and falls back once with a warning when it cannot start", async () => {
+    await restart();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mocks.launch.mockReset().mockRejectedValueOnce(new Error("No usable sandbox")).mockResolvedValue(browser());
+    await run({ id: 12 });
+    expect([sandboxFlags(0), sandboxFlags(1)]).toEqual(["on", "off"]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("WITHOUT it"), expect.any(Error));
+    // Later scrapes go straight to the fallback.
+    await run({ id: 12 });
+    expect(sandboxFlags(2)).toBe("off");
+    expect(mocks.launch).toHaveBeenCalledTimes(3);
+  });
+
+  it("refuses to scrape without the sandbox when it is required", async () => {
+    await restart("required");
+    mocks.launch.mockReset().mockRejectedValue(new Error("No usable sandbox"));
+    await expect(run({ id: 12 })).rejects.toThrow("No usable sandbox");
+    expect(mocks.launch).toHaveBeenCalledOnce();
+    expect(sandboxFlags(0)).toBe("on");
+  });
+
+  it("never uses it when turned off", async () => {
+    await restart("off");
+    await run({ id: 12 });
+    expect(sandboxFlags(0)).toBe("off");
+  });
+});

@@ -29,14 +29,39 @@ const NAVIGATION_TIMEOUT_MS = 45_000;
 // Time left for client-side rendering after the network settles (0 in tests).
 const SETTLE_MS = Number(process.env.SCRAPER_SETTLE_MS ?? 3000);
 
+// Chromium's own sandbox (user namespaces) confines a compromised renderer. In Docker it needs
+// the seccomp profile docker/worker/seccomp-chromium.json. CHROMIUM_SANDBOX: "auto" (default)
+// falls back to --no-sandbox with a warning when it cannot start, "required" refuses to, "off"
+// never uses it.
+const SANDBOX_MODE = process.env.CHROMIUM_SANDBOX ?? "auto";
+let sandboxed = SANDBOX_MODE !== "off";
+
+const launchBrowser = async (): Promise<Browser> => {
+  const launch = (sandbox: boolean) =>
+    puppeteer.launch({
+      headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: ["--start-maximized", ...(sandbox ? [] : ["--no-sandbox", "--disable-setuid-sandbox"])],
+    });
+  if (!sandboxed) return launch(false);
+  try {
+    return await launch(true);
+  } catch (error) {
+    if (SANDBOX_MODE === "required") throw error;
+    console.warn(
+      "WARNING: Chromium cannot start with its sandbox (missing seccomp profile docker/worker/seccomp-chromium.json?). " +
+        "Scraping continues WITHOUT it; set CHROMIUM_SANDBOX=required to refuse.",
+      error,
+    );
+    sandboxed = false;
+    return launch(false);
+  }
+};
+
 const scrapeWithBrowser = async (url: string, code: string) => {
   let browser: Browser | undefined;
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: ["--start-maximized", "--no-sandbox", "--disable-setuid-sandbox"],
-    });
+    browser = await launchBrowser();
 
     const page = await browser.newPage();
     // Only public http(s) addresses, for the page itself, its redirects and sub-resources.

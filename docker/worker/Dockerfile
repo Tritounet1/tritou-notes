@@ -7,9 +7,13 @@ RUN npm ci --legacy-peer-deps
 COPY api .
 RUN npx prisma generate && npm run build
 
-# Runtime: production dependencies and Alpine's Chromium, run as the unprivileged `node` user.
-FROM node:24-alpine
-RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
+# Runtime: production dependencies and Debian's Chromium, run as the unprivileged `node` user.
+# Debian (glibc), not Alpine: Chromium's own seccomp policy kills renderers on musl's syscalls,
+# so its sandbox only works here (see docker/worker/seccomp-chromium.json).
+FROM node:24-bookworm-slim
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends chromium fonts-freefont-ttf ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /api
 ENV PUPPETEER_SKIP_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \

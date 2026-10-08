@@ -119,6 +119,7 @@ VITE_API_URL=https://api.example.com docker compose up -d --build
 - On startup the API container applies pending migrations from `api/prisma/migrations` (`npm run migrate`). A database created earlier with `prisma db push` is detected and baselined automatically on `0_init`. To change the schema: `npm --prefix api run migrate:dev -- --name <change>`, review the SQL, commit it.
 - Behind nginx, keep response buffering off for the API so assistant replies stream (the API already sends `X-Accel-Buffering: no`).
 - Images use Node 24 and run as the unprivileged `node` user; the worker also drops every Linux capability. The API and MCP containers start as root only to hand the `document-images` volume to `node`.
+- Chromium keeps its own sandbox: the worker image is Debian-based and Compose applies `docker/worker/seccomp-chromium.json` (Docker's default profile plus the syscalls Chromium needs for user namespaces). If your platform runs the worker without that profile, it logs a warning and scrapes without the sandbox; set `CHROMIUM_SANDBOX=required` to refuse instead.
 - PostgreSQL, Redis and the MCP server are published on `127.0.0.1` only: reach them through the reverse proxy (or the Docker network).
 - Session cookies are `Secure` and `SameSite=Strict` when `FRONTEND_URL` is https, and last as long as the session (2 days). Changing a password signs out every other session.
 
