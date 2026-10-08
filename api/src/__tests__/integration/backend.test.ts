@@ -258,7 +258,7 @@ describe("real HTTP + PostgreSQL + Redis", () => {
     const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
     const { StreamableHTTPClientTransport } = await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
     const { createMcpApp } = await import("../../mcp/http");
-    const created = await request("/api/settings/mcp-token", "POST");
+    const created = await request("/api/mcp-tokens", "POST", { name: "Intégration" });
     expect(created.status).toBe(201);
     const mcp = createMcpApp().listen(0, "127.0.0.1");
     await once(mcp, "listening");

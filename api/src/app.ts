@@ -17,6 +17,7 @@ import instanceScrapeRoutes from "./routes/instanceScrapeRoutes";
 import scraperRoutes from "./routes/scraperRoutes";
 import scrapingSchedulerRoutes from "./routes/scrapingSchedulerRoutes";
 import settingsRoutes from "./routes/settingsRoutes";
+import mcpTokenRoutes from "./routes/mcpTokenRoutes";
 import linkPreviewRoutes from "./routes/linkPreviewRoutes";
 import userPermissionsRoutes from "./routes/userPermissionsRoutes";
 import userRoutes from "./routes/userRoutes";
@@ -71,6 +72,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/scraping-schedulers", scrapingSchedulerRoutes);
 app.use("/api/instance-scrape-histories", instanceScrapeHistoryRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/mcp-tokens", mcpTokenRoutes);
 app.use("/api/link-preview", linkPreviewRoutes);
 
 // Global error handler

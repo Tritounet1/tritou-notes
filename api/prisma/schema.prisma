@@ -26,7 +26,7 @@ model User {
   documentHistories DocumentHistory[]
   conversations     Conversation[]
   userPermissions   UserPermissions?
-  mcpTokenSettings  Settings[]
+  mcpTokens         McpToken[]
 }
 
 model Document {
@@ -246,12 +246,22 @@ model Settings {
   smtpPassword    String?
   smtpHost        String?
   smtpPort        Int?
-  // SHA-256 of the MCP server's bearer token; the token itself is shown once and never stored.
-  mcpTokenHash      String?
-  mcpTokenCreatedAt DateTime?
-  // The MCP server acts as this user (the admin who generated the token), with their permissions.
-  mcpTokenUser      User?     @relation(fields: [mcpTokenUserId], references: [id], onDelete: SetNull)
-  mcpTokenUserId    Int?
+}
+
+// Personal MCP tokens: the MCP server acts as their user, with that user's permissions.
+model McpToken {
+  id           Int       @id @default(autoincrement())
+  name         String
+  // SHA-256 of the token; the token itself is shown once and never stored.
+  hash         String    @unique
+  // Read-only tokens only get the tools that read (list_*, read_*, search_pages, wait_for_instance).
+  readOnly     Boolean   @default(false)
+  created_at   DateTime  @default(now())
+  last_used_at DateTime?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       Int
+
+  @@index([userId])
 }
 
 // Files are stored locally by the Express API; removing a document deletes its metadata.

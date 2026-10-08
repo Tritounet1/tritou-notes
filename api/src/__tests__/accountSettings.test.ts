@@ -93,12 +93,6 @@ describe("administrative configuration stays private", () => {
     expect(mocks.updateSettings).not.toHaveBeenCalled();
   });
 
-  it.each(["POST", "DELETE"])("denies a regular user %s on the MCP token", async method => {
-    const response = await dispatch(settingsRoutes, method, "/mcp-token", {}, user);
-    expect(response.status).toHaveBeenCalledWith(403);
-    expect(mocks.createMcpToken).not.toHaveBeenCalled();
-    expect(mocks.deleteMcpToken).not.toHaveBeenCalled();
-  });
 
   it.each(["GET", "PUT"])("preserves administrator %s access", async method => {
     const response = await dispatch(settingsRoutes, method, method === "GET" ? "/" : "/1", {}, { ...user, role: "ADMIN" });

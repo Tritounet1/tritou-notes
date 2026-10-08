@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch } from "../api";
 import { useConfirm } from "../hooks/useConfirm";
 
-interface McpSettingsProps {
-  tokenSet: boolean;
-  createdAt: string | null;
+interface McpToken {
+  id: number;
+  name: string;
+  readOnly: boolean;
+  created_at: string;
+  last_used_at: string | null;
 }
 
 type Client = "code-cli" | "code-json" | "desktop";
@@ -52,38 +55,44 @@ const CopyButton = ({ value, label }: { value: string; label: string }) => {
   );
 };
 
-/** Paramètres › MCP: generate / regenerate / revoke the MCP server token and show client configs. */
-export const McpSettings = ({ tokenSet: initialSet, createdAt: initialCreatedAt }: McpSettingsProps) => {
+const formatDate = (value: string) => new Date(value).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" });
+
+/**
+ * Paramètres › MCP: the user's personal MCP tokens (create, revoke) and client configurations.
+ * The MCP server acts as the token's user, with their permissions; read-only tokens only read.
+ */
+export const McpSettings = () => {
   const [confirm, confirmDialog] = useConfirm();
-  const [tokenSet, setTokenSet] = useState(initialSet);
-  const [createdAt, setCreatedAt] = useState(initialCreatedAt);
-  // Plain token, only known right after generation.
+  const [tokens, setTokens] = useState<McpToken[] | null>(null);
+  const [name, setName] = useState("");
+  const [readOnly, setReadOnly] = useState(false);
+  // Plain token, only known right after its creation.
   const [token, setToken] = useState<string | null>(null);
   const [url, setUrl] = useState(defaultMcpUrl);
   const [client, setClient] = useState<Client>("code-cli");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const generate = async () => {
-    if (
-      tokenSet &&
-      !(await confirm({
-        title: "Régénérer le token MCP ?",
-        message: "L’ancien token cessera immédiatement de fonctionner : il faudra mettre à jour la configuration de tous les clients MCP.",
-        confirmLabel: "Régénérer",
-      }))
-    ) {
-      return;
-    }
+  useEffect(() => {
+    apiFetch("/api/mcp-tokens")
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error())))
+      .then(setTokens)
+      .catch(() => setError("Impossible de charger vos jetons MCP."));
+  }, []);
+
+  const create = async (event: React.FormEvent) => {
+    event.preventDefault();
     setBusy(true);
     setError("");
     try {
-      const res = await apiFetch("/api/settings/mcp-token", { method: "POST" });
-      if (!res.ok) throw new Error("Impossible de générer le token");
+      const res = await apiFetch("/api/mcp-tokens", { method: "POST", body: JSON.stringify({ name, readOnly }) });
       const data = await res.json();
-      setToken(data.token);
-      setCreatedAt(data.createdAt);
-      setTokenSet(true);
+      if (!res.ok) throw new Error(data.message || "Impossible de créer le jeton");
+      const { token: plain, ...created } = data;
+      setToken(plain);
+      setTokens((list) => [created, ...(list ?? [])]);
+      setName("");
+      setReadOnly(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur");
     } finally {
@@ -91,24 +100,14 @@ export const McpSettings = ({ tokenSet: initialSet, createdAt: initialCreatedAt 
     }
   };
 
-  const revoke = async () => {
-    if (
-      !(await confirm({
-        title: "Révoquer le token MCP ?",
-        message: "Plus aucun client ne pourra se connecter au serveur MCP tant qu’un nouveau token n’aura pas été généré.",
-        confirmLabel: "Révoquer",
-      }))
-    ) {
-      return;
-    }
+  const revoke = async (target: McpToken) => {
+    if (!(await confirm({ title: `Révoquer « ${target.name} » ?`, message: "Les clients MCP qui l’utilisent ne pourront plus se connecter.", confirmLabel: "Révoquer" }))) return;
     setBusy(true);
     setError("");
     try {
-      const res = await apiFetch("/api/settings/mcp-token", { method: "DELETE" });
-      if (!res.ok) throw new Error("Impossible de révoquer le token");
-      setToken(null);
-      setTokenSet(false);
-      setCreatedAt(null);
+      const res = await apiFetch(`/api/mcp-tokens/${target.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Impossible de révoquer le jeton");
+      setTokens((list) => (list ?? []).filter((t) => t.id !== target.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur");
     } finally {
@@ -130,42 +129,57 @@ export const McpSettings = ({ tokenSet: initialSet, createdAt: initialCreatedAt 
         <div className="flex flex-col gap-1">
           <b className="text-[15px] text-ink">Serveur MCP</b>
           <span className="text-sm text-ink-2">
-            Permet à Claude (Code ou Desktop) de lire et modifier les pages, scrapers et planificateurs. Le token donne un accès complet aux données : gardez-le secret.
+            Permet à Claude (Code ou Desktop) de travailler dans l’app avec vos permissions. Un jeton par appareil ou par usage ; « lecture seule » ne donne que les outils qui lisent. Gardez vos jetons secrets.
           </span>
         </div>
       </div>
 
       {error && <p role="alert" className="rounded-[10px] bg-danger-tint px-4 py-3 text-sm text-danger-ink">{error}</p>}
 
-      <div className="card p-4 flex flex-wrap items-center gap-3">
-        <span className={`w-2.5 h-2.5 rounded-full ${tokenSet ? "bg-neon-dot" : "bg-muted"}`} />
-        <div className="flex-1 min-w-[200px] flex flex-col">
-          <span className="text-sm font-semibold text-ink">{tokenSet ? "Token actif" : "Aucun token"}</span>
-          <span className="text-[13px] text-muted">
-            {tokenSet && createdAt
-              ? `Généré le ${new Date(createdAt).toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" })}`
-              : "Le serveur MCP refuse toutes les connexions tant qu’aucun token n’est généré."}
-          </span>
-        </div>
-        {tokenSet && (
-          <button type="button" onClick={revoke} disabled={busy} className="btn-danger">
-            Révoquer
-          </button>
-        )}
-        <button type="button" onClick={generate} disabled={busy} className={tokenSet ? "btn-secondary" : "btn-primary"}>
-          {tokenSet ? "Régénérer" : "Générer un token"}
-        </button>
-      </div>
+      <form onSubmit={create} className="card p-4 flex flex-wrap items-end gap-3">
+        <label className="label flex-1 min-w-[200px]">
+          Nom du jeton
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Claude Code, portable" maxLength={80} className="input" />
+        </label>
+        <label className="flex items-center gap-2 text-sm text-ink-2 pb-2.5">
+          <input type="checkbox" checked={readOnly} onChange={(e) => setReadOnly(e.target.checked)} />
+          Lecture seule
+        </label>
+        <button type="submit" disabled={busy || !name.trim()} className="btn-primary">Créer un jeton</button>
+      </form>
 
       {token && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 rounded-[14px] bg-ink pl-4 pr-2 py-2">
             <code className="flex-1 min-w-0 truncate font-mono text-[13px] text-neon">{token}</code>
-            <CopyButton value={token} label="Copier le token" />
+            <CopyButton value={token} label="Copier le jeton" />
           </div>
           <p className="text-[13px] text-coral-ink">Copiez-le maintenant : il ne sera plus jamais affiché.</p>
         </div>
       )}
+
+      <div className="flex flex-col gap-2">
+        {tokens === null ? (
+          <p className="text-sm text-muted">Chargement…</p>
+        ) : tokens.length === 0 ? (
+          <p className="text-sm text-muted">Aucun jeton : le serveur MCP refuse les connexions tant que vous n’en créez pas.</p>
+        ) : (
+          tokens.map((t) => (
+            <div key={t.id} className="card p-4 flex flex-wrap items-center gap-3">
+              <span className={`w-2.5 h-2.5 rounded-full ${t.last_used_at ? "bg-neon-dot" : "bg-muted"}`} />
+              <div className="flex-1 min-w-[200px] flex flex-col">
+                <span className="text-sm font-semibold text-ink">
+                  {t.name} {t.readOnly && <span className="pill ml-1">lecture seule</span>}
+                </span>
+                <span className="text-[13px] text-muted">
+                  Créé le {formatDate(t.created_at)} · {t.last_used_at ? `utilisé le ${formatDate(t.last_used_at)}` : "jamais utilisé"}
+                </span>
+              </div>
+              <button type="button" onClick={() => void revoke(t)} disabled={busy} className="btn-danger">Révoquer</button>
+            </div>
+          ))
+        )}
+      </div>
 
       <div className="flex flex-col gap-3 pt-2 border-t border-line-soft">
         <h2 className="section-title text-lg">Connecter un client</h2>
@@ -191,7 +205,7 @@ export const McpSettings = ({ tokenSet: initialSet, createdAt: initialCreatedAt 
         </div>
         {!token && (
           <p className="text-[13px] text-muted">
-            Remplacez <code className="font-mono text-ink">VOTRE_TOKEN</code> par le token copié lors de sa génération{tokenSet ? ", ou régénérez-en un" : ""}.
+            Remplacez <code className="font-mono text-ink">VOTRE_TOKEN</code> par un jeton copié lors de sa création.
           </p>
         )}
       </div>

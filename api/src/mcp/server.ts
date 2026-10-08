@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { prisma } from "../config/prismaClient";
@@ -7,31 +6,39 @@ import { runTool, toolDefinitions, type ToolContext } from "../ai/tools";
 import { hashMcpToken } from "../utils/mcpToken";
 
 // The MCP server exposes the assistant's own tools: same validation, services, page history
-// and permissions as the in-app assistant. It acts as the admin who generated the token.
+// and permissions as the in-app assistant. It acts as the user of the personal token it was
+// given (Paramètres › MCP); a read-only token only gets the tools that read.
 
 export const MCP_INSTRUCTIONS = ["Tritou Notes : pages Markdown, tableurs, to-do et scraping web planifié.", ...WORKSPACE_GUIDE].join("\n");
 
-const sameDigest = (a: Buffer, b: Buffer) => a.length === b.length && crypto.timingSafeEqual(a, b);
+/** Tools that change nothing: the only ones a read-only token can list and call. */
+export const READ_ONLY_TOOLS = new Set([
+  "list_folders", "list_users", "list_pages", "search_pages", "read_page",
+  "list_scrapers", "read_scraper", "list_schedulers", "read_scheduler",
+  "list_instances", "read_instance", "wait_for_instance",
+]);
 
-/** The user the token acts as, or null when no token is configured or its user is gone. */
-const tokenUser = async () => {
-  const settings = await prisma.settings.findFirst({ select: { mcpTokenHash: true, mcpTokenUserId: true } });
-  if (!settings?.mcpTokenHash || !settings.mcpTokenUserId) return null;
-  const user = await prisma.user.findUnique({ where: { id: settings.mcpTokenUserId } });
-  return user ? { user, hash: settings.mcpTokenHash } : null;
-};
+export interface McpIdentity {
+  userId: number;
+  readOnly: boolean;
+}
 
-/** Checks a bearer header against the token generated in Settings › MCP (fail closed). */
-export const authorize = async (header: string | undefined): Promise<number | null> => {
-  const token = header?.startsWith("Bearer ") ? header.slice("Bearer ".length).trim() : "";
+/** The identity of a personal token, or null (unknown or revoked token). */
+const identityOf = async (token: string): Promise<McpIdentity | null> => {
   if (!token) return null;
-  const owner = await tokenUser();
-  if (!owner) return null;
-  return sameDigest(Buffer.from(hashMcpToken(token), "hex"), Buffer.from(owner.hash, "hex")) ? owner.user.id : null;
+  // The token has 256 random bits: looking its hash up directly is safe.
+  const found = await prisma.mcpToken.findUnique({ where: { hash: hashMcpToken(token) } });
+  if (!found) return null;
+  void prisma.mcpToken.update({ where: { id: found.id }, data: { last_used_at: new Date() } }).catch(() => {});
+  return { userId: found.userId, readOnly: found.readOnly };
 };
 
-/** For stdio (local process, no header): acts as the token's user, if a token exists. */
-export const stdioUser = async () => (await tokenUser())?.user.id ?? null;
+/** Checks a bearer header against the personal tokens (fail closed). */
+export const authorize = async (header: string | undefined) =>
+  identityOf(header?.startsWith("Bearer ") ? header.slice("Bearer ".length).trim() : "");
+
+/** For stdio (local process, no header): the token is read from MCP_TOKEN. */
+export const stdioIdentity = () => identityOf(process.env.MCP_TOKEN?.trim() ?? "");
 
 /** Role and permissions are read again for every call, like authMiddleware does. */
 const toolContext = async (userId: number): Promise<ToolContext> => {
@@ -45,14 +52,20 @@ const toolContext = async (userId: number): Promise<ToolContext> => {
   };
 };
 
-export const buildServer = (userId: number) => {
-  const server = new Server({ name: "tritou-notes", version: "2.0.0" }, { capabilities: { tools: {} }, instructions: MCP_INSTRUCTIONS });
+export const buildServer = ({ userId, readOnly }: McpIdentity) => {
+  const server = new Server({ name: "tritou-notes", version: "2.1.0" }, { capabilities: { tools: {} }, instructions: MCP_INSTRUCTIONS });
+  const allowed = (name: string) => !readOnly || READ_ONLY_TOOLS.has(name);
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: toolDefinitions.map(({ function: { name, description, parameters } }) => ({ name, description, inputSchema: parameters as { type: "object" } })),
+    tools: toolDefinitions
+      .filter(({ function: { name } }) => allowed(name))
+      .map(({ function: { name, description, parameters } }) => ({ name, description, inputSchema: parameters as { type: "object" } })),
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
+    if (!allowed(params.name)) {
+      return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Jeton en lecture seule : cet outil modifie des données." }) }], isError: true };
+    }
     const result = await runTool(params.name, JSON.stringify(params.arguments ?? {}), await toolContext(userId));
     return { content: [{ type: "text" as const, text: JSON.stringify(result.output, null, 2) }], isError: !result.ok };
   });

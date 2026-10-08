@@ -8,16 +8,16 @@ import { db, resetDatabase, user } from "./helpers/database";
 vi.mock("../config/prismaClient", async () => ({ prisma: (await import("./helpers/database")).db }));
 vi.mock("../config/queue", () => ({ scrapeQueue: { add: vi.fn(), upsertJobScheduler: vi.fn(), removeJobScheduler: vi.fn() } }));
 import { createMcpApp } from "../mcp/http";
-import { authorize, buildServer, MCP_INSTRUCTIONS, stdioUser } from "../mcp/server";
+import { authorize, buildServer, MCP_INSTRUCTIONS, READ_ONLY_TOOLS, stdioIdentity } from "../mcp/server";
 import { hashMcpToken } from "../utils/mcpToken";
 
 const TOKEN = "tritou_mcp_test";
 const withToken = (overrides: Record<string, unknown> = {}) =>
-  db.settings.findFirst.mockResolvedValue({ mcpTokenHash: hashMcpToken(TOKEN), mcpTokenUserId: 7, ...overrides });
+  db.mcpToken.findUnique.mockImplementation(async ({ where: { hash } }) => (hash === hashMcpToken(TOKEN) ? { id: 3, userId: 7, readOnly: false, ...overrides } : null));
 
-const connect = async (userId = 7) => {
+const connect = async (identity = { userId: 7, readOnly: false }) => {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await buildServer(userId).connect(serverTransport);
+  await buildServer(identity).connect(serverTransport);
   const client = new Client({ name: "test", version: "1" });
   await client.connect(clientTransport);
   return client;
@@ -30,34 +30,28 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("authorize", () => {
-  it("returns the token's user for the right bearer token", async () => {
-    withToken();
-    expect(await authorize(`Bearer ${TOKEN}`)).toBe(7);
-    expect(db.user.findUnique).toHaveBeenCalledWith({ where: { id: 7 } });
+  it("returns the identity of a personal token and records its use", async () => {
+    withToken({ readOnly: true });
+    expect(await authorize(`Bearer ${TOKEN}`)).toEqual({ userId: 7, readOnly: true });
+    expect(db.mcpToken.findUnique).toHaveBeenCalledWith({ where: { hash: hashMcpToken(TOKEN) } });
+    expect(db.mcpToken.update).toHaveBeenCalledWith({ where: { id: 3 }, data: { last_used_at: expect.any(Date) } });
   });
 
   it("fails closed", async () => {
     withToken();
     expect(await authorize(undefined)).toBeNull();
     expect(await authorize("Basic abc")).toBeNull();
-    expect(await authorize("Bearer wrong")).toBeNull();
-    withToken({ mcpTokenHash: null });
-    expect(await authorize(`Bearer ${TOKEN}`)).toBeNull();
-    // Token generated before it was tied to a user: regenerate it.
-    withToken({ mcpTokenUserId: null });
-    expect(await authorize(`Bearer ${TOKEN}`)).toBeNull();
-    withToken();
-    db.user.findUnique.mockResolvedValue(null);
-    expect(await authorize(`Bearer ${TOKEN}`)).toBeNull();
-    db.settings.findFirst.mockResolvedValue(null);
-    expect(await authorize(`Bearer ${TOKEN}`)).toBeNull();
+    expect(await authorize("Bearer ")).toBeNull();
+    expect(await authorize("Bearer revoked-or-unknown")).toBeNull();
   });
 
-  it("gives stdio the token's user", async () => {
+  it("reads the stdio token from MCP_TOKEN", async () => {
     withToken();
-    expect(await stdioUser()).toBe(7);
-    db.settings.findFirst.mockResolvedValue(null);
-    expect(await stdioUser()).toBeNull();
+    vi.stubEnv("MCP_TOKEN", TOKEN);
+    expect(await stdioIdentity()).toEqual({ userId: 7, readOnly: false });
+    vi.stubEnv("MCP_TOKEN", "");
+    expect(await stdioIdentity()).toBeNull();
+    vi.unstubAllEnvs();
   });
 });
 
@@ -84,6 +78,19 @@ describe("MCP server", () => {
     const listed = await client.callTool({ name: "list_scrapers" });
     expect(listed.isError).toBe(false);
     expect(JSON.parse((listed.content as { text: string }[])[0].text)).toEqual([{ id: 1, name: "Shop" }]);
+    await client.close();
+  });
+
+  it("gives a read-only token only the tools that read", async () => {
+    const client = await connect({ userId: 7, readOnly: true });
+    const names = (await client.listTools()).tools.map((t) => t.name);
+    expect(new Set(names)).toEqual(READ_ONLY_TOOLS);
+    const refused = await client.callTool({ name: "delete_page", arguments: { id: 1 } });
+    expect(refused.isError).toBe(true);
+    expect(JSON.stringify(refused.content)).toContain("lecture seule");
+    expect(db.document.delete).not.toHaveBeenCalled();
+    db.document.findMany.mockResolvedValue([]);
+    expect((await client.callTool({ name: "list_pages", arguments: {} })).isError).toBe(false);
     await client.close();
   });
 
@@ -131,7 +138,7 @@ describe("MCP over HTTP", () => {
   });
 
   it("reports internal failures as 500", async () => {
-    db.settings.findFirst.mockRejectedValue(new Error("db down"));
+    db.mcpToken.findUnique.mockRejectedValue(new Error("db down"));
     const base = await start();
     expect((await rpc(base, `Bearer ${TOKEN}`)).status).toBe(500);
   });

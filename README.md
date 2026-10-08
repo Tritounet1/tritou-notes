@@ -127,9 +127,9 @@ VITE_API_URL=https://api.example.com docker compose up -d --build
 
 ### MCP server
 
-The MCP server (`api/src/mcp.ts`) gives Claude the in-app assistant's tools: pages, folders, to-dos, spreadsheets, scrapers, schedulers and instances, with the same validation, page history and permissions. It acts as the admin who generated its token.
+The MCP server (`api/src/mcp.ts`) gives Claude the in-app assistant's tools: pages, folders, to-dos, spreadsheets, scrapers, schedulers and instances, with the same validation, page history and permissions. It acts as the user whose personal token it receives.
 
-- **Token**: generate it in **Settings › MCP** (shown once, only its SHA-256 is stored). The page also shows ready-to-copy Claude Code and Claude Desktop configurations. Regenerating replaces it, revoking cuts access. A token generated before the MCP server moved into the API is not tied to a user and must be regenerated.
+- **Tokens**: every user creates personal tokens in **Settings › MCP**, one per device or use, optionally *read-only* (only the tools that read). A token is shown once; only its SHA-256 is stored. The page lists your tokens with their last use, revokes them, and shows ready-to-copy Claude Code and Claude Desktop configurations.
 - **HTTP** (production): `MCP_HTTP_PORT=3001 npm --prefix api run start:mcp`, or the `mcp` Compose service. Proxy `/mcp` on the app's domain with buffering off; `/mcp/health` answers without a token.
 
   ```nginx
@@ -141,7 +141,7 @@ The MCP server (`api/src/mcp.ts`) gives Claude the in-app assistant's tools: pag
   }
   ```
 
-- **stdio** (local): `node api/dist/mcp.js` with the API's `.env`; it acts as the token's user, so generate a token first.
+- **stdio** (local): `MCP_TOKEN=<personal token> node api/dist/mcp.js` with the API's `.env`.
 
 ## Repository structure
 

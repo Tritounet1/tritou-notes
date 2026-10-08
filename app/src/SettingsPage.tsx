@@ -58,8 +58,6 @@ interface Settings {
   smtpPasswordSet: boolean;
   smtpHost: string | null;
   smtpPort: number | null;
-  mcpTokenSet: boolean;
-  mcpTokenCreatedAt: string | null;
 }
 
 export const SettingsPage = () => {
@@ -67,7 +65,6 @@ export const SettingsPage = () => {
   const [confirm, confirmDialog] = useConfirm();
   const [tab, setTab] = useState<"account" | "ai" | "mail" | "mcp">("account");
   const [ai, setAi] = useState({ keySet: false, textModel: null as string | null, imageModel: null as string | null });
-  const [mcp, setMcp] = useState({ tokenSet: false, createdAt: null as string | null });
   const [settingsId, setSettingsId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -111,7 +108,6 @@ export const SettingsPage = () => {
             setSmtpPort(s.smtpPort?.toString() || "587");
             setSmtpUser(s.smtpUser || "");
             setSmtpPasswordSet(s.smtpPasswordSet);
-            setMcp({ tokenSet: s.mcpTokenSet, createdAt: s.mcpTokenCreatedAt });
           }
         }
       } catch (err) {
@@ -234,9 +230,10 @@ export const SettingsPage = () => {
       ? [
           ["ai", "Intelligence artificielle"],
           ["mail", "E-mail (SMTP)"],
-          ["mcp", "MCP"],
         ]
       : []),
+    // Personal tokens: every user can connect Claude with their own permissions.
+    ["mcp", "MCP"],
   ] as ["account" | "ai" | "mail" | "mcp", string][];
 
   const initials = (user?.username ?? "?").slice(0, 2).toUpperCase();
@@ -414,7 +411,7 @@ export const SettingsPage = () => {
             </section>
           )}
 
-          {isAdmin && tab === "mcp" && <McpSettings tokenSet={mcp.tokenSet} createdAt={mcp.createdAt} />}
+          {tab === "mcp" && <McpSettings />}
         </div>
       </div>
     </div>

@@ -1,7 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prismaClient";
 import { decrypt, encrypt } from "../utils/utils";
-import { generateMcpToken, hashMcpToken } from "../utils/mcpToken";
 
 /** Plain value of an encrypted setting, or null if it cannot be read (e.g. ENCRYPTION_KEY changed). */
 const readable = (value: unknown) => {
@@ -13,21 +12,19 @@ const readable = (value: unknown) => {
   }
 };
 
-// Never send secrets to the browser (MCP token hash, OpenRouter key, SMTP password): expose
-// whether they are set instead. The SMTP host and user are shown decrypted so the form can
+// Never send secrets to the browser (OpenRouter key, SMTP password): expose whether they are
+// set instead. The SMTP host and user are shown decrypted so the form can
 // display and send them back as plain text.
 const toPublicSettings = ({
-  mcpTokenHash,
   openrouterApiKey,
   smtpPassword,
   smtpHost,
   smtpUser,
   ...settings
-}: { mcpTokenHash: string | null; openrouterApiKey?: string | null; smtpPassword?: string | null; smtpHost?: string | null; smtpUser?: string | null; [key: string]: unknown }) => ({
+}: { openrouterApiKey?: string | null; smtpPassword?: string | null; smtpHost?: string | null; smtpUser?: string | null; [key: string]: unknown }) => ({
   ...settings,
   smtpHost: readable(smtpHost),
   smtpUser: readable(smtpUser),
-  mcpTokenSet: Boolean(mcpTokenHash),
   openrouterApiKeySet: Boolean(openrouterApiKey),
   smtpPasswordSet: Boolean(smtpPassword),
 });
@@ -70,43 +67,6 @@ export const updateSettings = async (
       data,
     });
     res.json(toPublicSettings(settings));
-  } catch (error) {
-    next(error);
-  }
-};
-
-/** Creates or replaces the MCP bearer token. The plain token is only in this response. */
-export const createMcpToken = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const settings = await prisma.settings.findFirstOrThrow({ select: { id: true } });
-    const token = generateMcpToken();
-    const updated = await prisma.settings.update({
-      where: { id: settings.id },
-      data: { mcpTokenHash: hashMcpToken(token), mcpTokenCreatedAt: new Date(), mcpTokenUserId: req.user.id },
-    });
-    res.status(201).json({ token, createdAt: updated.mcpTokenCreatedAt });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/** Revokes the MCP token: the MCP server then rejects every request. */
-export const deleteMcpToken = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const settings = await prisma.settings.findFirstOrThrow({ select: { id: true } });
-    await prisma.settings.update({
-      where: { id: settings.id },
-      data: { mcpTokenHash: null, mcpTokenCreatedAt: null, mcpTokenUserId: null },
-    });
-    res.json({ success: true });
   } catch (error) {
     next(error);
   }

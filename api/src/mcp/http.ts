@@ -15,12 +15,12 @@ export const createMcpApp = () => {
 
   app.all("/mcp", async (req, res) => {
     try {
-      const userId = await authorize(req.headers.authorization);
-      if (userId === null) {
-        res.status(401).json({ error: "Unauthorized — generate a token in Tritou Notes › Paramètres › MCP" });
+      const identity = await authorize(req.headers.authorization);
+      if (identity === null) {
+        res.status(401).json({ error: "Unauthorized — create a personal token in Tritou Notes › Paramètres › MCP" });
         return;
       }
-      const server = buildServer(userId);
+      const server = buildServer(identity);
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
       res.on("close", () => {
         void transport.close();

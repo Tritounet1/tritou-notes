@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ listen: vi.fn(), connect: vi.fn(), stdioUser: vi.fn(), buildServer: vi.fn(), transport: vi.fn() }));
+const mocks = vi.hoisted(() => ({ listen: vi.fn(), connect: vi.fn(), stdioIdentity: vi.fn(), buildServer: vi.fn(), transport: vi.fn() }));
 vi.mock("dotenv", () => ({ default: { config: vi.fn() } }));
 vi.mock("../mcp/http", () => ({ createMcpApp: () => ({ listen: mocks.listen }) }));
-vi.mock("../mcp/server", () => ({ buildServer: mocks.buildServer, stdioUser: mocks.stdioUser }));
+vi.mock("../mcp/server", () => ({ buildServer: mocks.buildServer, stdioIdentity: mocks.stdioIdentity }));
 vi.mock("@modelcontextprotocol/sdk/server/stdio.js", () => ({ StdioServerTransport: mocks.transport }));
 
 const start = async () => {
@@ -32,24 +32,24 @@ describe("MCP entry point", () => {
 
   it("serves stdio as the token's user otherwise", async () => {
     vi.stubEnv("MCP_HTTP_PORT", "");
-    mocks.stdioUser.mockResolvedValue(7);
+    mocks.stdioIdentity.mockResolvedValue({ userId: 7, readOnly: false });
     await start();
     await vi.waitFor(() => expect(mocks.connect).toHaveBeenCalled());
-    expect(mocks.buildServer).toHaveBeenCalledWith(7);
+    expect(mocks.buildServer).toHaveBeenCalledWith({ userId: 7, readOnly: false });
   });
 
   it("exits when no token exists for stdio", async () => {
     vi.stubEnv("MCP_HTTP_PORT", "");
-    mocks.stdioUser.mockResolvedValue(null);
+    mocks.stdioIdentity.mockResolvedValue(null);
     const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
     await start();
     await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(1));
-    expect(process.stderr.write).toHaveBeenCalledWith(expect.stringContaining("No MCP token"));
+    expect(process.stderr.write).toHaveBeenCalledWith(expect.stringContaining("Set MCP_TOKEN"));
   });
 
   it("reports non-Error failures too", async () => {
     vi.stubEnv("MCP_HTTP_PORT", "");
-    mocks.stdioUser.mockRejectedValue("boom");
+    mocks.stdioIdentity.mockRejectedValue("boom");
     const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
     await start();
     await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(1));

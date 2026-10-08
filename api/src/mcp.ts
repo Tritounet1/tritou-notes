@@ -3,7 +3,7 @@ dotenv.config();
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createMcpApp } from "./mcp/http";
-import { buildServer, stdioUser } from "./mcp/server";
+import { buildServer, stdioIdentity } from "./mcp/server";
 import { assertConfig } from "./config/validateConfig";
 
 assertConfig("mcp", {});
@@ -16,9 +16,9 @@ const start = async () => {
     createMcpApp().listen(port, () => process.stderr.write(`Tritou Notes MCP — HTTP on port ${port}\n`));
     return;
   }
-  const userId = await stdioUser();
-  if (userId === null) throw new Error("No MCP token: generate one in Tritou Notes › Paramètres › MCP (stdio acts as its user).");
-  await buildServer(userId).connect(new StdioServerTransport());
+  const identity = await stdioIdentity();
+  if (identity === null) throw new Error("Set MCP_TOKEN to a personal token from Tritou Notes › Paramètres › MCP (stdio acts as its user).");
+  await buildServer(identity).connect(new StdioServerTransport());
   process.stderr.write("Tritou Notes MCP — stdio\n");
 };
 
