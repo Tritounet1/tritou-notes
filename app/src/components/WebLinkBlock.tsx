@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../api";
+import { useAuth } from "../hooks/useAuth";
 import { isWebUrl, youtubeVideo, type LinkMode, type WebLink } from "../utils/webLinks";
 
 interface WebLinkBlockProps {
@@ -22,6 +23,11 @@ export function WebLinkBlock({ data, readOnly, initialOpen, onChange, onDelete }
   const [previewError, setPreviewError] = useState("");
   const [playing, setPlaying] = useState(false);
   const [failedImage, setFailedImage] = useState<string | null>(null);
+  // Anonymous readers of a public page load nothing from the third-party site (which would
+  // reveal their IP address) until they ask for it.
+  const { isAuthenticated } = useAuth();
+  const [thirdPartyAllowed, setThirdPartyAllowed] = useState(false);
+  const showThirdParty = isAuthenticated || thirdPartyAllowed;
   const root = useRef<HTMLDivElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
@@ -100,7 +106,7 @@ export function WebLinkBlock({ data, readOnly, initialOpen, onChange, onDelete }
         <a href={data.url} target="_blank" rel="noopener noreferrer" className="break-all text-indigo-ink underline decoration-indigo-soft underline-offset-4 hover:decoration-indigo">{data.url}</a>
       ) : data.mode === "preview" ? (
         <a href={data.url} target="_blank" rel="noopener noreferrer" className="flex gap-3.5 rounded-2xl border border-line-strong bg-paper p-3.5 leading-[1.4] text-ink no-underline transition hover:border-indigo-soft hover:bg-paper-warm">
-          {image && failedImage !== image
+          {showThirdParty && image && failedImage !== image
             ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedImage(image)} className="h-[72px] w-24 shrink-0 rounded-[10px] object-cover sm:h-24 sm:w-36" />
             : <span aria-hidden="true" className="cover-stripes h-[72px] w-24 shrink-0 rounded-[10px]" />}
           <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
@@ -116,8 +122,13 @@ export function WebLinkBlock({ data, readOnly, initialOpen, onChange, onDelete }
         <div className="overflow-hidden rounded-2xl border border-line-strong bg-paper-soft">
           {video && !playing ? (
             <button type="button" onClick={() => setPlaying(true)} aria-label="Lire la vidéo YouTube" className="relative block aspect-video w-full cursor-pointer overflow-hidden bg-ink">
-              {image && failedImage !== image && <img src={image} alt={data.title || "Aperçu de la vidéo YouTube"} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedImage(image)} className="h-full w-full object-cover" />}
+              {showThirdParty && image && failedImage !== image && <img src={image} alt={data.title || "Aperçu de la vidéo YouTube"} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedImage(image)} className="h-full w-full object-cover" />}
               <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-ink/10"><span className="flex h-14 w-20 items-center justify-center rounded-2xl bg-ink text-neon shadow-lg"><svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg></span></span>
+            </button>
+          ) : !video && !showThirdParty ? (
+            <button type="button" onClick={() => setThirdPartyAllowed(true)} className="flex h-[200px] w-full cursor-pointer flex-col items-center justify-center gap-1 text-sm text-ink-2 hover:bg-chip">
+              <span className="font-medium">Afficher la page intégrée</span>
+              <span className="text-xs text-muted">Le contenu est chargé depuis {host}.</span>
             </button>
           ) : (
             <iframe src={video?.embed || data.url} title={data.title || `Page intégrée : ${host}`} className={video ? "aspect-video min-h-[200px] w-full" : "h-[420px] w-full"} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" sandbox={video ? "allow-scripts allow-same-origin allow-presentation" : "allow-scripts allow-forms allow-popups allow-presentation"} allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowFullScreen />

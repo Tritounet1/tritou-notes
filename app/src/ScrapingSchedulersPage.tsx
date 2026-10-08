@@ -38,7 +38,7 @@ const TodayTimeline = ({ schedulers }: { schedulers: ScrapingScheduler[] }) => {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-display text-xl font-bold">Aujourd’hui</h2>
         {next && (
-          <span className="font-mono text-xs text-[#bdbab2]">
+          <span className="font-mono text-xs text-stone">
             prochaine exécution dans <span className="text-neon">{formatDelay(next - now)}</span>
           </span>
         )}
@@ -52,14 +52,14 @@ const TodayTimeline = ({ schedulers }: { schedulers: ScrapingScheduler[] }) => {
               .filter((t) => t >= dayStart && t < dayStart + DAY_MS);
             return (
               <div key={s.id} className="flex items-center gap-3">
-                <Link to={`/scraping-scheduler/${s.id}`} className="w-[140px] flex-none text-[13px] text-[#e6e4de] truncate hover:text-neon">
+                <Link to={`/scraping-scheduler/${s.id}`} className="w-[140px] flex-none text-[13px] text-code-ink truncate hover:text-neon">
                   {s.title}
                 </Link>
-                <div className="flex-1 h-[22px] relative rounded-md bg-[#2a2925]">
+                <div className="flex-1 h-[22px] relative rounded-md bg-night">
                   {ticks.map((t) => {
                     const past = t <= now;
                     const color = off
-                      ? "bg-[#55534d]"
+                      ? "bg-umber"
                       : past
                         ? s.status === "ERROR" ? "bg-danger" : "bg-neon-dot"
                         : s.status === "RUNNING" ? "bg-indigo" : "bg-neon";
@@ -67,7 +67,7 @@ const TodayTimeline = ({ schedulers }: { schedulers: ScrapingScheduler[] }) => {
                       <span
                         key={t}
                         title={new Date(t).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                        className={`absolute top-1 bottom-1 w-2 -ml-1 rounded-[3px] ${color} ${past ? "" : "ring-1 ring-white/50 ring-offset-1 ring-offset-[#2a2925]"}`}
+                        className={`absolute top-1 bottom-1 w-2 -ml-1 rounded-[3px] ${color} ${past ? "" : "ring-1 ring-white/50 ring-offset-1 ring-offset-night"}`}
                         style={{ left: pct(t) }}
                       />
                     );
@@ -77,7 +77,7 @@ const TodayTimeline = ({ schedulers }: { schedulers: ScrapingScheduler[] }) => {
               </div>
             );
           })}
-          <div className="flex gap-3 font-mono text-[10px] text-[#9c9a94]" aria-hidden="true">
+          <div className="flex gap-3 font-mono text-[10px] text-code-faint" aria-hidden="true">
             <span className="w-[140px] flex-none" />
             <div className="flex-1 flex justify-between">
               <span>00</span><span>06</span><span>12</span><span>18</span><span>24</span>
@@ -258,7 +258,7 @@ export const ScrapingSchedulersPage = () => {
                     disabled={togglingId === scheduler.id}
                     onClick={() => toggleStatus(scheduler)}
                     className={`relative z-10 flex-none w-[46px] h-7 rounded-full p-[3px] flex transition cursor-pointer disabled:opacity-60 ${
-                      scheduler.status !== "DESACTIVATE" ? "bg-indigo justify-end" : "bg-[#dad6ce] justify-start"
+                      scheduler.status !== "DESACTIVATE" ? "bg-indigo justify-end" : "bg-stone-soft justify-start"
                     }`}
                   >
                     <span className="w-[22px] h-[22px] rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.25)]" />

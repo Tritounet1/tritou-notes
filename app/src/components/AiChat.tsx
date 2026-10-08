@@ -142,7 +142,7 @@ const md = {
   ),
   code: ({ className, children }: { className?: string; children?: ReactNode }) =>
     className?.includes("language-") ? (
-      <pre className="my-2 overflow-x-auto rounded-[10px] bg-code px-3 py-2.5 text-[12px] leading-relaxed text-[#e6e4de]"><code className="font-mono">{children}</code></pre>
+      <pre className="my-2 overflow-x-auto rounded-[10px] bg-code px-3 py-2.5 text-[12px] leading-relaxed text-code-ink"><code className="font-mono">{children}</code></pre>
     ) : (
       <code className="rounded bg-chip px-1 py-0.5 font-mono text-[0.85em] text-ink">{children}</code>
     ),
@@ -462,7 +462,7 @@ export const AiChat = ({ documentId, variant, onClose, onDocumentsChanged }: AiC
               <span className="flex items-center gap-2 text-[13px] text-muted">
                 <span aria-hidden="true" className="flex gap-[3px]">
                   <span className="h-[5px] w-[5px] animate-pulse rounded-full bg-indigo" />
-                  <span className="h-[5px] w-[5px] animate-pulse rounded-full bg-[#8e84fa] [animation-delay:150ms]" />
+                  <span className="h-[5px] w-[5px] animate-pulse rounded-full bg-indigo-light [animation-delay:150ms]" />
                   <span className="h-[5px] w-[5px] animate-pulse rounded-full bg-indigo-soft [animation-delay:300ms]" />
                 </span>
                 {live?.tool ? `${TOOL_LABELS[live.tool] ?? live.tool}…` : "Réflexion…"}

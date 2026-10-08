@@ -141,7 +141,7 @@ export const InstancesScrapePage = () => {
         onSubmit={handleCreate}
         className="cover-ink rounded-2xl p-2 flex flex-wrap gap-2"
       >
-        <label className="flex-[999_1_280px] flex items-center gap-2.5 min-h-11 px-3.5 rounded-[11px] bg-[#2a2925] text-[#bdbab2]">
+        <label className="flex-[999_1_280px] flex items-center gap-2.5 min-h-11 px-3.5 rounded-[11px] bg-night text-stone">
           <Icon d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1 1M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1-1" />
           <span className="sr-only">URL à scraper</span>
           <input
@@ -149,7 +149,7 @@ export const InstancesScrapePage = () => {
             value={newUrl}
             onChange={(e) => setNewUrl(e.target.value)}
             placeholder="https://example.com/page-to-scrape"
-            className="flex-1 min-w-0 bg-transparent border-0 outline-none font-mono text-[13px] text-white placeholder:text-[#8a877f]"
+            className="flex-1 min-w-0 bg-transparent border-0 outline-none font-mono text-[13px] text-white placeholder:text-taupe"
             required
           />
         </label>
@@ -161,7 +161,7 @@ export const InstancesScrapePage = () => {
 
       <div className="flex flex-wrap gap-1.5 text-[13px]">
         <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-ink text-white">
-          Toutes <span className="font-mono text-[11px] text-[#bdbab2]">{instances.length}</span>
+          Toutes <span className="font-mono text-[11px] text-stone">{instances.length}</span>
         </span>
         <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-indigo-tint text-indigo-ink">
           <span className="w-1.5 h-1.5 rounded-full bg-indigo" />
@@ -339,7 +339,7 @@ export const InstancesScrapePage = () => {
                   template={expanded.scraper!.display_template!}
                 />
               ) : expanded.response ? (
-                <pre className="m-0 px-3.5 py-3 rounded-xl bg-code text-[#e6e4de] font-mono text-[11.5px] leading-relaxed overflow-x-auto">
+                <pre className="m-0 px-3.5 py-3 rounded-xl bg-code text-code-ink font-mono text-[11.5px] leading-relaxed overflow-x-auto">
                   {JSON.stringify(expanded.response, null, 2)}
                 </pre>
               ) : (

@@ -222,7 +222,7 @@ export const ScrapersPage = () => {
                   )}
                 </div>
                 {preview && (
-                  <pre className="mx-3 px-3.5 py-3 rounded-[10px] bg-code text-[#e6e4de] font-mono text-[11.5px] leading-relaxed overflow-hidden whitespace-pre">
+                  <pre className="mx-3 px-3.5 py-3 rounded-[10px] bg-code text-code-ink font-mono text-[11.5px] leading-relaxed overflow-hidden whitespace-pre">
                     {preview}
                   </pre>
                 )}
@@ -255,7 +255,7 @@ export const ScrapersPage = () => {
             <button
               type="button"
               onClick={() => setShowModal(true)}
-              className="min-h-[220px] rounded-2xl border-[1.5px] border-dashed border-[#cfcbc2] bg-paper-warm text-ink-2 flex flex-col items-center justify-center gap-2.5 hover:border-muted hover:bg-paper-soft transition cursor-pointer"
+              className="min-h-[220px] rounded-2xl border-[1.5px] border-dashed border-stone-line bg-paper-warm text-ink-2 flex flex-col items-center justify-center gap-2.5 hover:border-muted hover:bg-paper-soft transition cursor-pointer"
             >
               <span className="w-10 h-10 rounded-full bg-paper border border-line-strong flex items-center justify-center">
                 <Icon className="w-[18px] h-[18px]" d="M12 5v14M5 12h14" />

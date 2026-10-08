@@ -124,7 +124,7 @@ export const Navigation = ({ onSearch }: { onSearch: () => void }) => {
         <button
           type="button"
           onClick={createPage}
-          className="flex items-center justify-center gap-2 min-h-10 rounded-[10px] border-[1.5px] border-dashed border-[#cfcbc2] text-sm font-medium text-ink-2 hover:border-muted hover:text-ink transition cursor-pointer"
+          className="flex items-center justify-center gap-2 min-h-10 rounded-[10px] border-[1.5px] border-dashed border-stone-line text-sm font-medium text-ink-2 hover:border-muted hover:text-ink transition cursor-pointer"
         >
           <Icon d={icons.plus} className="w-4 h-4" />
           Nouvelle page

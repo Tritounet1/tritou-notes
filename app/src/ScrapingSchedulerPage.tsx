@@ -311,7 +311,7 @@ export const ScrapingSchedulerPage = () => {
               onClick={() => handleFieldChange("status", isOn ? "DESACTIVATE" : "ACTIVATE")}
               className="inline-flex items-center gap-2.5 text-sm text-ink-2 cursor-pointer"
             >
-              <span className={`relative w-10 h-6 rounded-full transition ${isOn ? "bg-indigo" : "bg-[#dad6ce]"}`}>
+              <span className={`relative w-10 h-6 rounded-full transition ${isOn ? "bg-indigo" : "bg-stone-soft"}`}>
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${isOn ? "translate-x-4" : ""}`} />
               </span>
               {isOn ? "Activé" : "Désactivé"}
@@ -520,7 +520,7 @@ export const ScrapingSchedulerPage = () => {
                           <span className="font-mono text-xs text-muted">{formatDate(history.created_at)}</span>
                           <InstancePill status={history.status} />
                         </div>
-                        <pre className="m-0 px-3.5 py-3 rounded-xl bg-code text-[#e6e4de] font-mono text-[11.5px] leading-relaxed overflow-x-auto">
+                        <pre className="m-0 px-3.5 py-3 rounded-xl bg-code text-code-ink font-mono text-[11.5px] leading-relaxed overflow-x-auto">
                           {JSON.stringify(history.response, null, 2)}
                         </pre>
                       </li>

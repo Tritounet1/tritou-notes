@@ -815,7 +815,7 @@ export const DocumentPage = () => {
         aria-checked={!!checked}
         aria-readonly="true"
         data-checked={checked ? "true" : undefined}
-        className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[6px] ${checked ? "bg-ink text-neon" : "border-[1.5px] border-[#bdb9b0]"}`}
+        className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[6px] ${checked ? "bg-ink text-neon" : "border-[1.5px] border-stone"}`}
       >
         {checked && <svg aria-hidden="true" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10" /></svg>}
       </span>
@@ -837,7 +837,7 @@ export const DocumentPage = () => {
     code: ({ className, children }: { className?: string; children?: React.ReactNode }) => {
       const isBlock = className?.includes("language-");
       return isBlock ? (
-        <pre className="my-4 overflow-x-auto rounded-[14px] bg-code px-5 py-4 text-[#e6e4de]">
+        <pre className="my-4 overflow-x-auto rounded-[14px] bg-code px-5 py-4 text-code-ink">
           <code className="font-mono text-[13px] leading-[1.7]">{children}</code>
         </pre>
       ) : (
@@ -1364,7 +1364,7 @@ export const DocumentPage = () => {
 
                       <div className="overflow-x-auto rounded-[14px] bg-code px-4 py-3 font-mono text-[13px] leading-[1.7]">
                         {getDiff().length === 0 ? (
-                          <p className="text-[#9c9a94]">
+                          <p className="text-code-faint">
                             Aucune modification du contenu
                           </p>
                         ) : (
@@ -1375,8 +1375,8 @@ export const DocumentPage = () => {
                                 line.type === "added"
                                   ? "bg-neon/10 text-neon"
                                   : line.type === "removed"
-                                    ? "bg-danger/15 text-[#ff9c87]"
-                                    : "text-[#9c9a94]"
+                                    ? "bg-danger/15 text-danger-on-dark"
+                                    : "text-code-faint"
                               } -mx-2 whitespace-pre-wrap px-2`}
                             >
                               <span className="mr-2 select-none">

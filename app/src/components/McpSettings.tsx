@@ -43,7 +43,7 @@ const CopyButton = ({ value, label }: { value: string; label: string }) => {
           setTimeout(() => setCopied(false), 1500);
         });
       }}
-      className="icon-btn h-8 w-8 shrink-0 text-[#bdbab2] hover:bg-white/10 hover:text-white"
+      className="icon-btn h-8 w-8 shrink-0 text-stone hover:bg-white/10 hover:text-white"
     >
       <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
         {copied ? <path d="m5 12 5 5 9-10" /> : <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></>}
@@ -181,13 +181,13 @@ export const McpSettings = ({ tokenSet: initialSet, createdAt: initialCreatedAt 
           ))}
         </div>
         <div className="rounded-[14px] bg-code overflow-hidden">
-          <div className="flex items-center justify-between pl-4 pr-2 py-1.5 border-b border-[#2e2e2e]">
-            <span className="font-mono text-xs text-[#9c9a94]">
+          <div className="flex items-center justify-between pl-4 pr-2 py-1.5 border-b border-code-line">
+            <span className="font-mono text-xs text-code-faint">
               {client === "code-cli" ? "terminal" : client === "code-json" ? ".mcp.json (racine du projet)" : "claude_desktop_config.json"}
             </span>
             <CopyButton value={config} label="Copier la configuration" />
           </div>
-          <pre className="m-0 px-4 py-3.5 font-mono text-[12.5px] leading-relaxed text-[#e6e4de] overflow-x-auto">{config}</pre>
+          <pre className="m-0 px-4 py-3.5 font-mono text-[12.5px] leading-relaxed text-code-ink overflow-x-auto">{config}</pre>
         </div>
         {!token && (
           <p className="text-[13px] text-muted">

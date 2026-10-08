@@ -61,7 +61,7 @@ export const SchedulerBlock = ({ schedulerId, onDelete }: SchedulerBlockProps) =
         </span>
         <span className="flex items-center gap-2">
           {preview?.last_run_at && (
-            <span className="font-mono text-[11px] text-[#bdbab2]">
+            <span className="font-mono text-[11px] text-stone">
               live · {new Date(preview.last_run_at).toLocaleString("fr-FR")}
             </span>
           )}
@@ -71,7 +71,7 @@ export const SchedulerBlock = ({ schedulerId, onDelete }: SchedulerBlockProps) =
               onClick={onDelete}
               aria-label="Supprimer ce bloc planificateur"
               title="Supprimer ce bloc planificateur"
-              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-[#bdbab2] transition hover:bg-white/10 hover:text-white"
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-stone transition hover:bg-white/10 hover:text-white"
             >
               <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
             </button>

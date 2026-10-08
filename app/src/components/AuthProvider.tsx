@@ -2,15 +2,8 @@ import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { apiFetch } from "../api";
 import { AuthContext, type PermissionKey, type User } from "../context/AuthContext";
 
-function getInitialUser(): User | null {
-  if (typeof window === "undefined") return null;
-  const storedUser = localStorage.getItem("user");
-  if (!storedUser) return null;
-  return JSON.parse(storedUser);
-}
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(getInitialUser);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Verifier l'authentification au chargement

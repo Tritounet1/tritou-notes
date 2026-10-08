@@ -280,7 +280,7 @@ export const TodoEditor = ({ data, onChange, readOnly = false }: TodoEditorProps
                         className={`flex-shrink-0 w-[18px] h-[18px] mt-[3px] rounded-[6px] flex items-center justify-center transition ${
                           todo.completed
                             ? "bg-ink text-neon"
-                            : "border-[1.5px] border-[#bdb9b0] hover:border-ink"
+                            : "border-[1.5px] border-stone hover:border-ink"
                         } ${readOnly ? "cursor-default" : "cursor-pointer"}`}
                       >
                         {todo.completed && (

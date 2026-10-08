@@ -38,6 +38,23 @@
   --color-danger-tint: #fde7e2;
 
   --color-code: #202020;
+
+  /* Dark surfaces (code editor, panels) and neutral greys used across pages. */
+  --color-code-ink: #e6e4de;
+  --color-code-muted: #a8a59e;
+  --color-code-faint: #9c9a94;
+  --color-code-raised: #2a2a2a;
+  --color-code-line: #2e2e2e;
+  --color-code-line-strong: #3a3a3a;
+  --color-code-edge: #4a4a4a;
+  --color-stone: #bdbab2;
+  --color-stone-soft: #dad6ce;
+  --color-stone-line: #cfcbc2;
+  --color-taupe: #8a877f;
+  --color-umber: #55534d;
+  --color-night: #2a2925;
+  --color-danger-on-dark: #ff9c87;
+  --color-indigo-light: #8e84fa;
 }
 
 /* A utility so the btn-* variants below can @apply it. */

@@ -80,8 +80,8 @@ export function CodeBlock({ value, language, readOnly = false, autoFocus, onFocu
 
   return (
     <section className="document-code-block relative my-4 rounded-[14px] bg-code" aria-label="Bloc de code">
-      <div className="flex items-center justify-between gap-2 border-b border-[#2e2e2e] py-2 pr-3 pl-4">
-        <label className="flex items-center gap-2 font-mono text-xs text-[#9c9a94]">
+      <div className="flex items-center justify-between gap-2 border-b border-code-line py-2 pr-3 pl-4">
+        <label className="flex items-center gap-2 font-mono text-xs text-code-faint">
           Langage
           <span className="relative flex items-center">
             <select
@@ -89,7 +89,7 @@ export function CodeBlock({ value, language, readOnly = false, autoFocus, onFocu
               value={selected}
               disabled={readOnly}
               onChange={event => onChange?.(value, event.target.value)}
-              className="max-w-44 appearance-none rounded-md border border-[#3a3a3a] bg-[#2a2a2a] py-[3px] pr-6 pl-1.5 text-[#e6e4de] outline-none transition hover:border-[#4a4a4a] focus-visible:border-indigo disabled:cursor-default disabled:opacity-100"
+              className="max-w-44 appearance-none rounded-md border border-code-line-strong bg-code-raised py-[3px] pr-6 pl-1.5 text-code-ink outline-none transition hover:border-code-edge focus-visible:border-indigo disabled:cursor-default disabled:opacity-100"
             >
               {!options.some(([id]) => id === selected) && <option value={selected}>{language}</option>}
               {options.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
@@ -97,12 +97,12 @@ export function CodeBlock({ value, language, readOnly = false, autoFocus, onFocu
             <svg aria-hidden="true" className="pointer-events-none absolute right-1.5 h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
           </span>
         </label>
-        <div className="flex items-center gap-0.5 text-[#9c9a94]">
+        <div className="flex items-center gap-0.5 text-code-faint">
           <button
             type="button"
             onClick={() => void copy()}
             title={copyStatus === "copied" ? "Copié !" : "Copier"}
-            className="flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-[7px] transition hover:bg-white/10 hover:text-[#e6e4de] focus-visible:outline-1 focus-visible:outline-[#9c9a94]"
+            className="flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-[7px] transition hover:bg-white/10 hover:text-code-ink focus-visible:outline-1 focus-visible:outline-code-faint"
             aria-label={copyStatus === "copied" ? "Code copié" : "Copier tout le code"}
           >
             {copyStatus === "copied" ? (
@@ -113,11 +113,11 @@ export function CodeBlock({ value, language, readOnly = false, autoFocus, onFocu
           </button>
           {onDelete && (
             <details className="relative">
-              <summary aria-label="Options du bloc de code" title="Options" className="flex h-[30px] w-[30px] cursor-pointer list-none items-center justify-center rounded-[7px] transition hover:bg-white/10 hover:text-[#e6e4de] focus-visible:outline-1 focus-visible:outline-[#9c9a94] [&::-webkit-details-marker]:hidden">
+              <summary aria-label="Options du bloc de code" title="Options" className="flex h-[30px] w-[30px] cursor-pointer list-none items-center justify-center rounded-[7px] transition hover:bg-white/10 hover:text-code-ink focus-visible:outline-1 focus-visible:outline-code-faint [&::-webkit-details-marker]:hidden">
                 <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
               </summary>
-              <div className="absolute right-0 top-9 z-20 w-48 rounded-[10px] border border-[#3a3a3a] bg-[#2a2a2a] p-1 shadow-xl">
-                <button type="button" onClick={onDelete} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-xs text-[#ff9c87] hover:bg-white/5">Supprimer le bloc</button>
+              <div className="absolute right-0 top-9 z-20 w-48 rounded-[10px] border border-code-line-strong bg-code-raised p-1 shadow-xl">
+                <button type="button" onClick={onDelete} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-xs text-danger-on-dark hover:bg-white/5">Supprimer le bloc</button>
               </div>
             </details>
           )}

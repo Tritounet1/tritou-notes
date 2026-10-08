@@ -53,7 +53,7 @@ const Toggle = ({
     aria-label={label}
     onClick={onClick}
     className={`relative shrink-0 w-10 h-6 rounded-full transition-colors cursor-pointer ${
-      on ? "bg-indigo" : "bg-[#dad6ce]"
+      on ? "bg-indigo" : "bg-stone-soft"
     }`}
   >
     <span
@@ -310,13 +310,13 @@ export const ScraperPage = () => {
         <div className="fixed inset-0 z-50 bg-code flex">
           <div className="flex-1 flex flex-col min-w-0">
             <div className="flex items-center justify-between px-4 py-2 border-b border-white/10">
-              <span className="text-sm text-[#e6e4de] font-medium truncate">
+              <span className="text-sm text-code-ink font-medium truncate">
                 Code — <span className="font-mono">{name}</span>
               </span>
               <button
                 type="button"
                 onClick={() => setIsFullscreen(false)}
-                className="icon-btn text-[#a8a59e] hover:text-white hover:bg-white/10"
+                className="icon-btn text-code-muted hover:text-white hover:bg-white/10"
                 aria-label="Quitter le plein écran"
                 title="Quitter le plein écran"
               >
@@ -343,10 +343,10 @@ export const ScraperPage = () => {
           {/* Documentation panel */}
           <div className="hidden md:flex w-80 border-l border-white/10 flex-col">
             <div className="px-4 py-2.5 border-b border-white/10">
-              <span className="eyebrow text-[#a8a59e]">Documentation</span>
+              <span className="eyebrow text-code-muted">Documentation</span>
             </div>
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-              <p className="text-xs text-[#a8a59e]">
+              <p className="text-xs text-code-muted">
                 Le code s’exécute de façon synchrone avec <code className="font-mono text-neon">$</code> (Cheerio, HTML de la page) et doit assigner{" "}
                 <code className="font-mono text-neon">result</code>. Ctrl+Espace pour l’autocomplétion.
               </p>
@@ -355,10 +355,10 @@ export const ScraperPage = () => {
                   <code className="text-sm font-mono text-neon">
                     {cmd.syntax}
                   </code>
-                  <p className="text-sm text-[#a8a59e] mt-1">
+                  <p className="text-sm text-code-muted mt-1">
                     {cmd.description}
                   </p>
-                  <code className="text-xs font-mono bg-black/30 px-2 py-1 rounded-md text-[#e6e4de] mt-1.5 block">
+                  <code className="text-xs font-mono bg-black/30 px-2 py-1 rounded-md text-code-ink mt-1.5 block">
                     {cmd.example}
                   </code>
                 </div>
@@ -524,11 +524,11 @@ export const ScraperPage = () => {
           <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-white/10">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-neon" />
-              <span className="font-mono text-xs text-[#e6e4de]">
+              <span className="font-mono text-xs text-code-ink">
                 scraper.js
               </span>
               {!isAdmin && (
-                <span className="text-xs text-[#a8a59e]" title="Le code s’exécute sur le serveur : seuls les administrateurs peuvent le modifier.">
+                <span className="text-xs text-code-muted" title="Le code s’exécute sur le serveur : seuls les administrateurs peuvent le modifier.">
                   · lecture seule (admins uniquement)
                 </span>
               )}
@@ -536,7 +536,7 @@ export const ScraperPage = () => {
             <button
               type="button"
               onClick={() => setIsFullscreen(true)}
-              className="icon-btn w-8 h-8 text-[#a8a59e] hover:text-white hover:bg-white/10"
+              className="icon-btn w-8 h-8 text-code-muted hover:text-white hover:bg-white/10"
               aria-label="Plein écran"
               title="Plein écran"
             >

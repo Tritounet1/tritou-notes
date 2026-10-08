@@ -221,7 +221,7 @@ export const UserPage = () => {
                         aria-checked={on}
                         onClick={() => handlePermissionChange(perm.key, !on)}
                         className={`relative flex-none w-10 h-[22px] rounded-full transition-colors cursor-pointer ${
-                          on ? "bg-indigo" : "bg-[#dad6ce]"
+                          on ? "bg-indigo" : "bg-stone-soft"
                         }`}
                       >
                         <span
