@@ -180,7 +180,7 @@ describe("scheduler tools", () => {
     expect(db.scrapingScheduler.create).toHaveBeenCalledWith({ data: { title: "Veille", description: "prix", InstanceScrapes: { create: [{ url: "https://a.example/x" }] } } });
     expect(db.instanceScrape.create).not.toHaveBeenCalled();
     expect(db.scrapingScheduler.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { title: undefined, description: undefined, status: "ACTIVATE", cron_expression: "0 0 * * *" } });
-    expect(queue.upsertJobScheduler).toHaveBeenCalledWith("scheduler-1", { pattern: "0 0 * * *" }, { name: "scheduler-1", data: { schedulerId: 1 } });
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith("scheduler-1", { pattern: "0 0 * * *", tz: "UTC" }, { name: "scheduler-1", data: { schedulerId: 1 } });
   });
 
   it("rolls the scheduler back when scheduling fails", async () => {
@@ -230,7 +230,7 @@ describe("scheduler tools", () => {
     db.scrapingScheduler.findFirst.mockResolvedValue(withCron);
     db.scrapingScheduler.update.mockResolvedValue({ ...withCron, status: "ACTIVATE" });
     expect(await run("update_scheduler", { id: 1, status: "ACTIVATE" })).toMatchObject({ ok: true, summary: "Planificateur modifié : « Veille » (statut)", output: { status: "ACTIVATE", cron_expression: "0 * * * *" } });
-    expect(queue.upsertJobScheduler).toHaveBeenCalledWith("scheduler-1", { pattern: "0 * * * *" }, { name: "scheduler-1", data: { schedulerId: 1 } });
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith("scheduler-1", { pattern: "0 * * * *", tz: "UTC" }, { name: "scheduler-1", data: { schedulerId: 1 } });
 
     expect(await run("update_scheduler", { id: 1, status: "RUNNING" })).toMatchObject({ ok: false, summary: expect.stringContaining("ACTIVATE ou DESACTIVATE") });
     // Clearing the cron while activating is refused, even though one is stored.
@@ -246,7 +246,7 @@ describe("scheduler tools", () => {
     expect(await run("update_scheduler", { id: 1, cron_expression: "*/5 * * * *" })).toMatchObject({ ok: false, summary: expect.stringContaining("Redis down") });
     expect(db.scrapingScheduler.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { status: "ACTIVATE", cron_expression: "0 * * * *", next_run_at: active.next_run_at } });
     // The previous job is scheduled again.
-    expect(queue.upsertJobScheduler).toHaveBeenLastCalledWith("scheduler-1", { pattern: "0 * * * *" }, { name: "scheduler-1", data: { schedulerId: 1 } });
+    expect(queue.upsertJobScheduler).toHaveBeenLastCalledWith("scheduler-1", { pattern: "0 * * * *", tz: "UTC" }, { name: "scheduler-1", data: { schedulerId: 1 } });
   });
 
   it("clears the cron and edits title/description", async () => {

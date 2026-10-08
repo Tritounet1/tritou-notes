@@ -1,4 +1,4 @@
-import cronParser from "cron-parser";
+import { parseCron } from "./cronSchedule";
 
 // Extra data for the dashboard "En direct" panel and the schedulers' 24 h timeline.
 export const RECENT_RUNS = 14;
@@ -24,11 +24,11 @@ export const recentRuns = (
     .slice(0, RECENT_RUNS)
     .reverse();
 
-/** Cron occurrences within ±24 h of `now` (server time zone, like the worker). */
+/** Cron occurrences within ±24 h of `now` (in SCHEDULER_TIMEZONE, like the worker and BullMQ). */
 export const cronRunsAround = (cron: string | null, now: Date): string[] => {
   if (!cron) return [];
   try {
-    const interval = cronParser.parse(cron, {
+    const interval = parseCron(cron, {
       currentDate: new Date(now.getTime() - TIMELINE_HOURS * 3_600_000),
       endDate: new Date(now.getTime() + TIMELINE_HOURS * 3_600_000),
     });

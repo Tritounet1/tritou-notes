@@ -1,5 +1,4 @@
 import { Worker } from "bullmq";
-import cronParser from "cron-parser";
 import dotenv from "dotenv";
 import { writeFileSync } from "node:fs";
 dotenv.config();
@@ -11,6 +10,7 @@ import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import config from "./config/config";
 import { prisma } from "./config/prismaClient";
 import { assertConfig } from "./config/validateConfig";
+import { nextCronRun } from "./utils/cronSchedule";
 import type { Prisma } from "./generated/prisma/client";
 import { guardPageRequests } from "./scraping/networkGuard";
 import { runScraperCode, ScraperTimeoutError } from "./scraping/sandbox";
@@ -26,6 +26,9 @@ const sleep = (ms: number): Promise<void> => {
 };
 
 const NAVIGATION_TIMEOUT_MS = 45_000;
+/** Whole scrape of one URL (launch, navigation, settle, code): past it, Chromium is killed. */
+const SCRAPE_DEADLINE_MS = Number(process.env.SCRAPE_DEADLINE_MS ?? 120_000);
+const RENDERER_HEAP_MB = 512;
 // Time left for client-side rendering after the network settles (0 in tests).
 const SETTLE_MS = Number(process.env.SCRAPER_SETTLE_MS ?? 3000);
 
@@ -41,7 +44,8 @@ const launchBrowser = async (): Promise<Browser> => {
     puppeteer.launch({
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: ["--start-maximized", ...(sandbox ? [] : ["--no-sandbox", "--disable-setuid-sandbox"])],
+      // Renderer heap capped: a scraper building a huge result crashes its tab, not the worker.
+      args: ["--start-maximized", `--js-flags=--max-old-space-size=${RENDERER_HEAP_MB}`, ...(sandbox ? [] : ["--no-sandbox", "--disable-setuid-sandbox"])],
     });
   if (!sandboxed) return launch(false);
   try {
@@ -58,43 +62,63 @@ const launchBrowser = async (): Promise<Browser> => {
   }
 };
 
-const scrapeWithBrowser = async (url: string, code: string) => {
+/**
+ * Loads `url` in Chromium and runs the scraper code on it. Without `renderJs` (the scraper's
+ * "browser" option off) the page's own JavaScript is disabled: the code sees the HTML as served,
+ * faster, with the same sandbox and network guard. The whole scrape is bounded in time.
+ */
+const scrapeWithBrowser = async (url: string, code: string, renderJs: boolean) => {
   let browser: Browser | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Scrape interrompu : plus de ${SCRAPE_DEADLINE_MS / 1000} s.`)), SCRAPE_DEADLINE_MS);
+  });
   try {
-    browser = await launchBrowser();
-
-    const page = await browser.newPage();
-    // Only public http(s) addresses, for the page itself, its redirects and sub-resources.
-    await guardPageRequests(page);
-
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    );
-
-    await page.setViewport({ width: 1920, height: 1080 });
-
-    await page.setExtraHTTPHeaders({
-      "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
-    });
-
-    await page.goto(url, { waitUntil: "networkidle2", timeout: NAVIGATION_TIMEOUT_MS });
-    await sleep(SETTLE_MS);
-
-    // The scraper code runs in the page's isolated world, never in this Node process.
-    const result = await runScraperCode(page, code);
-
-    return {
-      url: url,
-      ...(result as Prisma.InputJsonObject | null),
-    };
+    return await Promise.race([scrapePage(url, code, renderJs, (launched) => (browser = launched)), deadline]);
   } catch (error) {
-    // A scraper stuck in a loop blocks its renderer: kill Chromium instead of waiting for it.
-    if (error instanceof ScraperTimeoutError) browser?.process()?.kill("SIGKILL");
+    // A scraper stuck in a loop, or a scrape past its deadline: kill Chromium instead of waiting.
+    if (error instanceof ScraperTimeoutError || error instanceof Error && error.message.startsWith("Scrape interrompu")) browser?.process()?.kill("SIGKILL");
     // Keep the real cause: it is stored as the instance's error.
     throw error;
   } finally {
+    clearTimeout(timer);
     await browser?.close().catch(() => {});
   }
+};
+
+const scrapePage = async (url: string, code: string, renderJs: boolean, onLaunch: (browser: Browser) => void) => {
+  const browser = await launchBrowser();
+  onLaunch(browser);
+
+  const page = await browser.newPage();
+  // Only public http(s) addresses, for the page itself, its redirects and sub-resources.
+  await guardPageRequests(page);
+
+  await page.setUserAgent(
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  );
+
+  await page.setViewport({ width: 1920, height: 1080 });
+
+  await page.setExtraHTTPHeaders({
+    "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+  });
+
+  if (renderJs) {
+    await page.goto(url, { waitUntil: "networkidle2", timeout: NAVIGATION_TIMEOUT_MS });
+    await sleep(SETTLE_MS);
+  } else {
+    await page.setJavaScriptEnabled(false);
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT_MS });
+  }
+
+  // The scraper code runs in the page's isolated world, never in this Node process.
+  const result = await runScraperCode(page, code);
+
+  return {
+    url: url,
+    ...(result as Prisma.InputJsonObject | null),
+  };
 };
 
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -145,15 +169,18 @@ const scrapeInstance = async (instanceId: number, schedulerId: number | null) =>
   console.log("Start scraping for instance: ", instance.id);
 
   try {
-    const scraper = await prisma.scraper.findFirst({
-      where: { base_url: { has: new URL(instance.url).origin }, status: "ACTIVE" },
-    });
+    // The scraper chosen when the URL was added (run_scrape) if it still applies, else the
+    // oldest active scraper covering the site: never an arbitrary one.
+    const covering = { base_url: { has: new URL(instance.url).origin }, status: "ACTIVE" as const };
+    const scraper =
+      (instance.scraperId ? await prisma.scraper.findFirst({ where: { id: instance.scraperId, ...covering } }) : null) ??
+      (await prisma.scraper.findFirst({ where: covering, orderBy: { id: "asc" } }));
     if (!scraper) throw new Error("Aucun scraper actif ne couvre ce site.");
 
     await prisma.instanceScrape.update({ where: { id: instanceId }, data: { scraperId: scraper.id } });
     if (!scraper.code) throw new Error("Le scraper n’a pas de code.");
 
-    const response = await scrapeWithBrowser(instance.url, scraper.code);
+    const response = await scrapeWithBrowser(instance.url, scraper.code, scraper.browser);
 
     await archiveResult(instance, schedulerId);
     await prisma.instanceScrape.update({
@@ -196,7 +223,7 @@ const runScheduler = async (schedulerId: number) => {
       data: {
         status: failures > 0 ? "ERROR" : "ACTIVATE",
         update_at: new Date(),
-        next_run_at: scheduler?.cron_expression ? cronParser.parse(scheduler.cron_expression).next().toDate() : null,
+        next_run_at: scheduler?.cron_expression ? nextCronRun(scheduler.cron_expression) : null,
       },
     });
     console.log("Finish scheduled scraping for scheduler: ", schedulerId);

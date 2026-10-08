@@ -484,7 +484,7 @@ describe("scraping resources", () => {
     db.scrapingScheduler.findFirst.mockResolvedValue({ status: "DESACTIVATE" });
     db.scrapingScheduler.update.mockResolvedValue({ id: 12, status: "ACTIVATE", cron_expression: "0 * * * *" });
     await call(schedulers.updateScrapingScheduler, { status: "ACTIVATE", cron_expression: "0 * * * *" });
-    expect(mocks.jobs).toHaveBeenCalledWith("scheduler-12", { pattern: "0 * * * *" }, { name: "scheduler-12", data: { schedulerId: 12 } });
+    expect(mocks.jobs).toHaveBeenCalledWith("scheduler-12", { pattern: "0 * * * *", tz: "UTC" }, { name: "scheduler-12", data: { schedulerId: 12 } });
     expect(db.scrapingScheduler.update).toHaveBeenLastCalledWith({ where: { id: 12 }, data: { start_at: expect.any(Date), next_run_at: expect.any(Date) } });
   });
   it("deactivates a scheduler and removes its job scheduler", async () => {

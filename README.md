@@ -102,6 +102,8 @@ In **Settings › Intelligence artificielle**, paste an [OpenRouter API key](htt
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD` | Redis for the scraping queue (default `127.0.0.1:6379`) |
 | `IMAGE_STORAGE_PATH` | Where uploaded and generated document images are stored (default `./uploads/images`) |
 | `PORT`, `NODE_ENV` | API port (default `3000`) and environment |
+| `SCHEDULER_TIMEZONE` | Time zone of scheduler crons, e.g. `Europe/Paris` (default `UTC`) |
+| `SCRAPE_DEADLINE_MS` | Longest scrape of one URL before Chromium is killed (default `120000`) |
 | `ADMIN_BOOTSTRAP_CODE` | Optional, 32+ characters: code of the first-administrator link, which is then not written to the logs |
 
 The app reads `VITE_API_URL` at build time (default `http://localhost:3000`).

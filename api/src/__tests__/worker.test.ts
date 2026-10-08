@@ -3,8 +3,9 @@ import { db, resetDatabase } from "./helpers/database";
 vi.mock("../config/prismaClient", async () => ({ prisma: (await import("./helpers/database")).db }));
 const mocks = vi.hoisted(() => {
   process.env.SCRAPER_SETTLE_MS = "0";
+  process.env.SCRAPE_DEADLINE_MS = "1000";
   process.env.WORKER_HEARTBEAT_FILE = `${process.env.TMPDIR ?? "/tmp"}/tritou-worker-heartbeat-test`;
-  return { process: undefined as undefined | ((job: { name: string; data: { id?: number; schedulerId?: number } }) => Promise<void>), run: vi.fn(), launch: vi.fn(), close: vi.fn(), kill: vi.fn(), guard: vi.fn(), runCode: vi.fn(), html: "<h1>Price</h1>", page: { setUserAgent: vi.fn(), setViewport: vi.fn(), setExtraHTTPHeaders: vi.fn(), goto: vi.fn() } };
+  return { process: undefined as undefined | ((job: { name: string; data: { id?: number; schedulerId?: number } }) => Promise<void>), run: vi.fn(), launch: vi.fn(), close: vi.fn(), kill: vi.fn(), guard: vi.fn(), runCode: vi.fn(), html: "<h1>Price</h1>", page: { setUserAgent: vi.fn(), setViewport: vi.fn(), setExtraHTTPHeaders: vi.fn(), setJavaScriptEnabled: vi.fn(), goto: vi.fn() } };
 });
 vi.mock("dotenv", () => ({ default: { config: vi.fn() } }));
 vi.mock("ioredis", () => ({ default: class {} }));
@@ -40,7 +41,7 @@ beforeEach(() => {
   mocks.html = "<h1>Price</h1>";
   mocks.close.mockReset().mockResolvedValue(undefined);
   db.instanceScrape.findFirst.mockResolvedValue(instance);
-  db.scraper.findFirst.mockResolvedValue({ id: 4, code: 'result = { title: $("h1").text() }' });
+  db.scraper.findFirst.mockResolvedValue({ id: 4, code: 'result = { title: $("h1").text() }', browser: true });
   db.scrapingScheduler.findUnique.mockResolvedValue({ cron_expression: "0 * * * *" });
 });
 afterEach(() => vi.restoreAllMocks());
@@ -48,7 +49,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("scraping worker", () => {
   it("executes scraper code, persists extracted data and closes Chromium", async () => {
     await run({ id: 12 });
-    expect(db.scraper.findFirst).toHaveBeenCalledWith({ where: { base_url: { has: "https://example.com" }, status: "ACTIVE" } });
+    expect(db.scraper.findFirst).toHaveBeenCalledWith({ where: { base_url: { has: "https://example.com" }, status: "ACTIVE" }, orderBy: { id: "asc" } });
     expect(db.instanceScrape.update).toHaveBeenCalledWith({ where: { id: 12 }, data: { status: "WORKING", last_update: expect.any(Date) } });
     expect(db.instanceScrape.update).toHaveBeenLastCalledWith({ where: { id: 12 }, data: { status: "FINISHED", last_update: expect.any(Date), response: { url: instance.url, title: "Price" } } });
     expect(mocks.close).toHaveBeenCalledOnce();
@@ -58,6 +59,27 @@ describe("scraping worker", () => {
     expect(mocks.guard.mock.invocationCallOrder[0]).toBeLessThan(mocks.page.goto.mock.invocationCallOrder[0]);
     expect(mocks.page.goto).toHaveBeenCalledWith(instance.url, { waitUntil: "networkidle2", timeout: 45_000 });
     expect(mocks.runCode).toHaveBeenCalledWith(mocks.page, 'result = { title: $("h1").text() }');
+  });
+  it("prefers the scraper chosen for the URL, else the oldest active one covering the site", async () => {
+    db.instanceScrape.findFirst.mockResolvedValue({ ...instance, scraperId: 9 });
+    db.scraper.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 4, code: "result = {}", browser: true });
+    await run({ id: 12 });
+    expect(db.scraper.findFirst.mock.calls[0][0]).toEqual({ where: { id: 9, base_url: { has: "https://example.com" }, status: "ACTIVE" } });
+    expect(db.scraper.findFirst.mock.calls[1][0]).toEqual({ where: { base_url: { has: "https://example.com" }, status: "ACTIVE" }, orderBy: { id: "asc" } });
+  });
+  it("reads the page as served, without its JavaScript, when the scraper does not need a browser", async () => {
+    db.scraper.findFirst.mockResolvedValue({ id: 4, code: 'result = { title: $("h1").text() }', browser: false });
+    await run({ id: 12 });
+    expect(mocks.page.setJavaScriptEnabled).toHaveBeenCalledWith(false);
+    expect(mocks.page.goto).toHaveBeenCalledWith(instance.url, { waitUntil: "domcontentloaded", timeout: 45_000 });
+    expect(db.instanceScrape.update).toHaveBeenLastCalledWith({ where: { id: 12 }, data: expect.objectContaining({ status: "FINISHED" }) });
+  });
+  it("caps the renderer heap, and kills Chromium past the scrape deadline", async () => {
+    mocks.page.goto.mockReturnValue(new Promise(() => {}));
+    await expect(run({ id: 12 })).rejects.toThrow("Scrape interrompu");
+    expect(mocks.kill).toHaveBeenCalledWith("SIGKILL");
+    expect(mocks.close).toHaveBeenCalledOnce();
+    expect((mocks.launch.mock.calls[0][0] as { args: string[] }).args).toContain("--js-flags=--max-old-space-size=512");
   });
   it("kills Chromium when the scraper code times out and stores the real cause", async () => {
     const { ScraperTimeoutError } = await import("../scraping/sandbox");

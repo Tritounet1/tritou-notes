@@ -96,7 +96,7 @@ const scraperFields = {
   description: { type: "string" },
   base_url: { type: "array", items: { type: "string" }, description: "Sites gérés, ex. [\"https://www.amazon.fr\"] (seule l’origine compte)" },
   code: { type: "string", description: "Code du scraper (voir le format dans la description de l’outil)" },
-  browser: { type: "boolean", description: "Navigateur Puppeteer (true) ou HTTP simple (false)" },
+  browser: { type: "boolean", description: "true : exécute le JavaScript de la page avant le scraping (pages dynamiques) ; false : HTML tel que servi, plus rapide" },
   display_template: {
     type: "array",
     items: {

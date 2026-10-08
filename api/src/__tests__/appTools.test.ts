@@ -44,7 +44,7 @@ describe("schedulers", () => {
 
     const result = await run("update_scheduler", { id: 1, description: "Prix Apple Watch", cron_expression: "0 0 * * *", status: "ACTIVATE" });
     expect(result).toMatchObject({ ok: true, summary: "Planificateur modifié : « Test » (description, cron, statut)" });
-    expect(queue.upsertJobScheduler).toHaveBeenCalledWith("scheduler-1", { pattern: "0 0 * * *" }, { name: "scheduler-1", data: { schedulerId: 1 } });
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith("scheduler-1", { pattern: "0 0 * * *", tz: "UTC" }, { name: "scheduler-1", data: { schedulerId: 1 } });
   });
 
   it("refuses an invalid cron and activation without cron", async () => {
@@ -69,7 +69,7 @@ describe("scheduler service fixes", () => {
     await updateScheduler(2, 7, { cron_expression: "0 8 * * *" });
     expect(queue.removeJobScheduler).toHaveBeenCalledWith("scheduler-2");
     // The stored start date goes to BullMQ (which ignores it once in the past).
-    expect(queue.upsertJobScheduler).toHaveBeenCalledWith("scheduler-2", { pattern: "0 8 * * *", startDate: new Date(0) }, { name: "scheduler-2", data: { schedulerId: 2 } });
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith("scheduler-2", { pattern: "0 8 * * *", tz: "UTC", startDate: new Date(0) }, { name: "scheduler-2", data: { schedulerId: 2 } });
   });
 
   it("only accepts configuration statuses, and a cron to activate", async () => {
@@ -94,7 +94,7 @@ describe("scheduler service fixes", () => {
     expect(await migrateLegacySchedulerJobs()).toBe(2);
     expect(queue.removeJobScheduler.mock.calls.map(([key]) => key)).toEqual(["hash-1", "hash-2"]);
     expect(queue.upsertJobScheduler).toHaveBeenCalledOnce();
-    expect(queue.upsertJobScheduler).toHaveBeenCalledWith("scheduler-1", { pattern: "0 * * * *" }, { name: "scheduler-1", data: { schedulerId: 1 } });
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith("scheduler-1", { pattern: "0 * * * *", tz: "UTC" }, { name: "scheduler-1", data: { schedulerId: 1 } });
   });
 
   it("stops the job of a scheduler deactivated while in ERROR", async () => {

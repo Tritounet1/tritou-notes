@@ -1,5 +1,5 @@
-import cronParser from "cron-parser";
 import { prisma } from "../config/prismaClient";
+import { nextCronRun, parseCron, SCHEDULER_TIMEZONE } from "../utils/cronSchedule";
 import { scrapeQueue } from "../config/queue";
 import { httpError, notFound } from "../utils/httpError";
 
@@ -12,7 +12,7 @@ const isScheduled = (status: string | null | undefined) => Boolean(status) && st
 
 export const assertValidCron = (cron: string) => {
   try {
-    cronParser.parse(cron);
+    parseCron(cron);
   } catch {
     throw httpError(`Expression cron invalide : « ${cron} »`);
   }
@@ -21,10 +21,10 @@ export const assertValidCron = (cron: string) => {
 const schedule = async (id: number, cron: string, startAt: Date | null) => {
   // One BullMQ job scheduler per scheduler, keyed by its job name. A start date in the future
   // delays the first run (BullMQ ignores past ones).
-  await scrapeQueue.upsertJobScheduler(jobName(id), { pattern: cron, ...(startAt && { startDate: startAt }) }, { name: jobName(id), data: { schedulerId: id } });
+  await scrapeQueue.upsertJobScheduler(jobName(id), { pattern: cron, tz: SCHEDULER_TIMEZONE, ...(startAt && { startDate: startAt }) }, { name: jobName(id), data: { schedulerId: id } });
   await prisma.scrapingScheduler.update({
     where: { id },
-    data: { start_at: startAt || new Date(), next_run_at: cronParser.parse(cron).next().toDate() },
+    data: { start_at: startAt || new Date(), next_run_at: nextCronRun(cron) },
   });
 };
 
