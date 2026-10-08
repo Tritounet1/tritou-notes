@@ -3,6 +3,7 @@ import config from "../config/config";
 import { sendEmail } from "../config/mailClient";
 import { prisma } from "../config/prismaClient";
 import { PASSWORD_RULE, validEmail, validPassword, validUsername } from "../utils/credentials";
+import { ipFailures } from "../utils/failureLimiter";
 import { hashPassword } from "../utils/bcryptUtils";
 import { setAuthCookie } from "../utils/cookieUtils";
 import { createToken } from "../utils/jwtUtils";
@@ -89,9 +90,18 @@ export const verifyInvitation = async (
   try {
     const token = req.params.token;
 
+    // Unknown tokens count as failed attempts: guessing invitation links is throttled.
+    const attempts = `invitation:${req.ip}`;
+    const wait = ipFailures.retryAfter(attempts);
+    if (wait > 0) {
+      res.setHeader("Retry-After", String(wait));
+      res.status(429).json({ message: `Trop de tentatives. Réessayez dans ${Math.ceil(wait / 60)} min.` });
+      return;
+    }
     const invitation = await prisma.invitation.findUnique({ where: { token } });
 
     if (!invitation) {
+      ipFailures.fail(attempts);
       res.status(404).json({ message: "Invitation introuvable" });
       return;
     }
@@ -131,9 +141,18 @@ export const registerWithInvitation = async (
     }
 
     // Verifier l'invitation
+    // Unknown tokens count as failed attempts: guessing invitation links is throttled.
+    const attempts = `invitation:${req.ip}`;
+    const wait = ipFailures.retryAfter(attempts);
+    if (wait > 0) {
+      res.setHeader("Retry-After", String(wait));
+      res.status(429).json({ message: `Trop de tentatives. Réessayez dans ${Math.ceil(wait / 60)} min.` });
+      return;
+    }
     const invitation = await prisma.invitation.findUnique({ where: { token } });
 
     if (!invitation) {
+      ipFailures.fail(attempts);
       res.status(404).json({ message: "Invitation introuvable" });
       return;
     }

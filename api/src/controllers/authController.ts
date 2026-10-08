@@ -46,9 +46,7 @@ export const login = async (
     if (byEmail) {
       user = await prisma.user.findUnique({ where: { email: email.trim() } });
     } else {
-      // Usernames are not unique: only an unambiguous one can log in.
-      const matches = await prisma.user.findMany({ where: { username: username.trim() }, take: 2 });
-      user = matches.length === 1 ? matches[0] : null;
+      user = await prisma.user.findUnique({ where: { username: username.trim() } });
     }
 
     const isPasswordCorrect = await verifyPassword(password, user?.password ?? (await unknownUserHash()));

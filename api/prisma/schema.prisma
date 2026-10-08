@@ -16,7 +16,7 @@ datasource db {
 model User {
   id                Int               @id @default(autoincrement())
   email             String            @unique
-  username          String
+  username          String            @unique
   password          String
   role              Role              @default(USER)
   // Part of every session token: incrementing it signs out all the user's sessions.

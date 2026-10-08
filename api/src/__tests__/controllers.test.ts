@@ -107,14 +107,11 @@ describe("login and session", () => {
     expect(ctx.cookie).toHaveBeenCalledWith("auth_token", "jwt", expect.objectContaining({ httpOnly: true, path: "/" }));
     expect(ctx.json.mock.calls[0][0].user).not.toHaveProperty("password");
   });
-  it("authenticates by username only when it names a single account", async () => {
-    db.user.findMany.mockResolvedValue([user]);
-    expect((await call(auth.login, { email: "", username: "user", password: "password" })).cookie).toHaveBeenCalled();
-    expect(db.user.findMany).toHaveBeenCalledWith({ where: { username: "user" }, take: 2 });
-    db.user.findMany.mockResolvedValue([user, { ...user, id: 8 }]);
-    const ctx = await call(auth.login, { email: "", username: "user", password: "password" });
-    expect(ctx.status).toHaveBeenCalledWith(401);
-    expect(ctx.cookie).not.toHaveBeenCalled();
+  it("authenticates by exact (unique) username", async () => {
+    expect((await call(auth.login, { email: "", username: " user ", password: "password" })).cookie).toHaveBeenCalled();
+    expect(db.user.findUnique).toHaveBeenCalledWith({ where: { username: "user" } });
+    db.user.findUnique.mockResolvedValue(null);
+    expect((await call(auth.login, { email: "", username: "nobody", password: "password" })).status).toHaveBeenCalledWith(401);
   });
   it.each([{}, { email: { not: "" }, password: "x" }, { email: "", username: "", password: "x" }, { email: "a@b.c", password: ["x"] }, { username: "user" }])("rejects malformed credentials %j without querying", async body => {
     const ctx = await call(auth.login, body);
@@ -218,6 +215,16 @@ describe("invitations", () => {
     expect(ctx.status).toHaveBeenCalledWith(400);
     expect(ctx.json).toHaveBeenCalledWith({ message: expect.stringContaining(message) });
     expect(db.invitation.findUnique).not.toHaveBeenCalled();
+  });
+  it("throttles guessing invitation links", async () => {
+    const { ipFailures } = await import("../utils/failureLimiter");
+    ipFailures.clear();
+    db.invitation.findUnique.mockResolvedValue(null);
+    for (let i = 0; i < 100; i++) expect((await call(invitations.verifyInvitation)).status).toHaveBeenCalledWith(404);
+    const ctx = await call(invitations.registerWithInvitation, { username: "new", password: "password-long" });
+    expect(ctx.status).toHaveBeenCalledWith(429);
+    expect(ctx.setHeader).toHaveBeenCalledWith("Retry-After", expect.any(String));
+    ipFailures.clear();
   });
   it("rejects an email already registered", async () => {
     expect((await call(invitations.sendInvitation, { email: user.email })).status).toHaveBeenCalledWith(400);
