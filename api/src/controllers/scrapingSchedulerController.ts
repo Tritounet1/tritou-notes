@@ -15,7 +15,7 @@ export const createScrapingScheduler = async (
     if (!user) {
       throw new Error("Utilisateur introuvable");
     }
-    // TODO: + Verif if the user have access to this route with his userPermissions
+    // Access is checked by the route (modifyScraperStatus).
 
     const scrapingScheduler = await prisma.scrapingScheduler.create({
       data: {
