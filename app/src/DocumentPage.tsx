@@ -310,6 +310,8 @@ export const DocumentPage = () => {
   // While in conflict, autosaves stop and the user chooses which version to keep.
   const conflictRef = useRef(false);
   const [conflict, setConflict] = useState(false);
+  // Failed actions (save, sub-page, deletion) show a banner; the editor stays mounted with the text.
+  const [actionError, setActionError] = useState<{ message: string; retrySave: boolean } | null>(null);
 
   const saveDocument = useCallback(
     (newTitle: string, newText: string, newIsPublic: boolean, overwrite = false) => {
@@ -340,12 +342,13 @@ export const DocumentPage = () => {
           setConflict(false);
           // PUT returns the bare row: keep the breadcrumb and sub-pages loaded by GET.
           setDocument((previous) => (previous ? { ...previous, ...data } : data));
+          setActionError(null);
           if (newTitle !== savedTitleRef.current) {
             savedTitleRef.current = newTitle;
             notifyDocumentsChanged();
           }
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Erreur");
+        } catch {
+          setActionError({ message: "L’enregistrement a échoué : vos modifications sont conservées ici, mais pas encore enregistrées.", retrySave: true });
         } finally {
           setSaving(false);
         }
@@ -393,7 +396,7 @@ export const DocumentPage = () => {
       notifyDocumentsChanged();
       navigate(`/document/${child.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur");
+      setActionError({ message: err instanceof Error ? err.message : "Impossible de créer la sous-page", retrySave: false });
     }
   };
 
@@ -840,7 +843,7 @@ export const DocumentPage = () => {
       notifyDocumentsChanged();
       navigate(document?.parentId ? `/document/${document.parentId}` : "/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur");
+      setActionError({ message: err instanceof Error ? err.message : "Erreur lors de la suppression", retrySave: false });
     }
   };
 
@@ -958,6 +961,18 @@ export const DocumentPage = () => {
             </div>
           </header>
         ) : <div className="h-3" />}
+
+        {actionError && !conflict && (
+          <div role="alert" className="mx-3 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-danger/30 bg-danger-tint px-4 py-3 text-sm text-danger-ink">
+            <p className="min-w-0 flex-1">{actionError.message}</p>
+            <div className="flex gap-2">
+              {actionError.retrySave && (
+                <button type="button" onClick={() => void saveDocument(title, text, isPublic)} className="btn-primary">Réessayer</button>
+              )}
+              <button type="button" onClick={() => setActionError(null)} className="btn-secondary">Fermer</button>
+            </div>
+          </div>
+        )}
 
         {conflict && (
           <div role="alert" className="mx-3 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-danger/30 bg-danger-tint px-4 py-3 text-sm text-danger-ink">
