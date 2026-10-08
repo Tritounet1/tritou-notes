@@ -197,6 +197,11 @@ export const DocumentPage = () => {
   const imageInsertRef = useRef({ start: 0, end: 0, source: "" });
   const [pendingLinkId, setPendingLinkId] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
+  // Latest title / text / visibility, for async work (a /scrape) that ends after more edits.
+  const latestRef = useRef({ title: "", text: "", isPublic: false });
+  useEffect(() => {
+    latestRef.current = { title, text, isPublic };
+  }, [title, text, isPublic]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -236,6 +241,15 @@ export const DocumentPage = () => {
   const [showScrapeModal, setShowScrapeModal] = useState(false);
   const [scrapeUrl, setScrapeUrl] = useState("");
   const [scrapeLoading, setScrapeLoading] = useState(false);
+  // Polling of a /scrape in progress: stopped when it ends or when the page unmounts.
+  const scrapePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopScrapePolling = () => {
+    if (scrapePollRef.current) clearInterval(scrapePollRef.current);
+    scrapePollRef.current = null;
+  };
+  useEffect(() => () => {
+    if (scrapePollRef.current) clearInterval(scrapePollRef.current);
+  }, []);
   const [scrapeError, setScrapeError] = useState("");
   const scrapeInsertPosRef = useRef<number>(0);
 
@@ -544,88 +558,62 @@ export const DocumentPage = () => {
   };
 
   const SCRAPE_PLACEHOLDER = "\u23F3 Scraping en cours...";
+  const SCRAPE_POLL_MS = 3000;
+  const SCRAPE_MAX_POLLS = 60; // 3 minutes
+
+  /** Replaces the placeholder in the current text (not the text of when the scrape started) and saves. */
+  const finishScrape = (replacement: string) => {
+    stopScrapePolling();
+    const { title: currentTitle, text: currentText, isPublic: currentPublic } = latestRef.current;
+    const next = currentText.replace(SCRAPE_PLACEHOLDER, replacement);
+    setText(next);
+    debouncedSave(currentTitle, next, currentPublic);
+    setScrapeLoading(false);
+  };
 
   const handleScrape = async () => {
-    if (!scrapeUrl.trim()) return;
+    const url = scrapeUrl.trim();
+    if (!url) return;
     setScrapeLoading(true);
     setScrapeError("");
 
     // Insert placeholder at the saved cursor position
     const insertPos = scrapeInsertPosRef.current;
-    const beforeInsert = text.slice(0, insertPos);
-    const afterInsert = text.slice(insertPos);
-    const textWithPlaceholder = beforeInsert + SCRAPE_PLACEHOLDER + afterInsert;
+    const textWithPlaceholder = text.slice(0, insertPos) + SCRAPE_PLACEHOLDER + text.slice(insertPos);
     setText(textWithPlaceholder);
     debouncedSave(title, textWithPlaceholder, isPublic);
     setShowScrapeModal(false);
 
     try {
-      // Create the scrape instance
       const createResponse = await apiFetch("/api/instance-scrape", {
         method: "POST",
-        body: JSON.stringify({ url: scrapeUrl.trim() }),
+        body: JSON.stringify({ url }),
       });
+      if (!createResponse.ok) throw new Error("Erreur lors de la création du scrape");
+      const { id: instanceId } = await createResponse.json();
 
-      if (!createResponse.ok) {
-        throw new Error("Erreur lors de la creation du scrape");
-      }
-
-      const instance = await createResponse.json();
-      const instanceId = instance.id;
-
-      // Poll for result
-      const poll = async () => {
-        const res = await apiFetch(`/api/instance-scrape/${instanceId}`);
-        if (!res.ok) throw new Error("Erreur lors du polling");
-        return res.json();
-      };
-
-      const pollInterval = setInterval(async () => {
+      let polls = 0;
+      stopScrapePolling();
+      scrapePollRef.current = setInterval(async () => {
+        polls += 1;
         try {
-          const data = await poll();
-
+          const res = await apiFetch(`/api/instance-scrape/${instanceId}`);
+          if (!res.ok) throw new Error("Erreur lors du suivi du scrape");
+          const data = await res.json();
           if (data.status === "FINISHED") {
-            clearInterval(pollInterval);
             const tmpl = data.scraper?.display_template;
-            const markdown =
-              tmpl && tmpl.length > 0
-                ? templateToMarkdown(data.response, tmpl)
-                : jsonToMarkdownTable(data.response);
-            setText((current) => current.replace(SCRAPE_PLACEHOLDER, markdown));
-            // Save after replacing placeholder
-            setText((current) => {
-              debouncedSave(title, current, isPublic);
-              return current;
-            });
-            setScrapeLoading(false);
+            finishScrape(tmpl && tmpl.length > 0 ? templateToMarkdown(data.response, tmpl) : jsonToMarkdownTable(data.response));
           } else if (data.status === "ERROR") {
-            clearInterval(pollInterval);
-            const errorMsg = `**Erreur de scraping** : impossible de scraper ${scrapeUrl}`;
-            setText((current) => current.replace(SCRAPE_PLACEHOLDER, errorMsg));
-            setText((current) => {
-              debouncedSave(title, current, isPublic);
-              return current;
-            });
-            setScrapeLoading(false);
+            finishScrape(`**Erreur de scraping** : impossible de scraper ${url}`);
+          } else if (polls >= SCRAPE_MAX_POLLS) {
+            finishScrape(`**Scraping trop long** : le résultat de ${url} sera visible dans Instances.`);
           }
         } catch {
-          clearInterval(pollInterval);
-          setText((current) => current.replace(SCRAPE_PLACEHOLDER, "**Erreur** : le scraping a echoue"));
-          setText((current) => {
-            debouncedSave(title, current, isPublic);
-            return current;
-          });
-          setScrapeLoading(false);
+          finishScrape("**Erreur** : le scraping a échoué");
         }
-      }, 3000);
+      }, SCRAPE_POLL_MS);
     } catch {
-      // Replace placeholder with error
-      setText((current) => current.replace(SCRAPE_PLACEHOLDER, "**Erreur** : impossible de lancer le scraping"));
-      setText((current) => {
-        debouncedSave(title, current, isPublic);
-        return current;
-      });
-      setScrapeLoading(false);
+      finishScrape("**Erreur** : impossible de lancer le scraping");
     }
   };
 
