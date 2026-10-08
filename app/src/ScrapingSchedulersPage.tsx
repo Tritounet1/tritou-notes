@@ -184,30 +184,6 @@ export const ScrapingSchedulersPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              // TODO: Exporter les planificateurs
-              console.log("TODO: Export schedulers");
-            }}
-            className="icon-btn"
-            aria-label="Exporter les planificateurs"
-            title="Exporter les planificateurs"
-          >
-            <Icon d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1M8 12l4 4 4-4M12 16V4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              // TODO: Importer des planificateurs
-              console.log("TODO: Import schedulers");
-            }}
-            className="icon-btn"
-            aria-label="Importer des planificateurs"
-            title="Importer des planificateurs"
-          >
-            <Icon d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1M16 8l-4-4-4 4M12 4v12" />
-          </button>
           {hasPermission("modifyScraperStatus") && (
             <button type="button" onClick={() => setShowModal(true)} className="btn-primary">
               <Icon d="M12 5v14M5 12h14" />

@@ -128,30 +128,6 @@ export const ScrapersPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              // TODO: Importer des scrapers
-              console.log("TODO: Import scrapers");
-            }}
-            className="icon-btn w-10 h-10 border border-line-strong bg-paper text-ink-2"
-            aria-label="Importer des scrapers"
-            title="Importer des scrapers"
-          >
-            <Icon d="M12 15V3M7 8l5-5 5 5M5 21h14" />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              // TODO: Exporter les scrapers
-              console.log("TODO: Export scrapers");
-            }}
-            className="icon-btn w-10 h-10 border border-line-strong bg-paper text-ink-2"
-            aria-label="Exporter les scrapers"
-            title="Exporter les scrapers"
-          >
-            <Icon d="M12 3v12M7 10l5 5 5-5M5 21h14" />
-          </button>
           {canModify && (
             <button
               type="button"

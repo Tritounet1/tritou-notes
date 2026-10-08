@@ -99,35 +99,7 @@ export const UsersPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => {
-              // TODO: Exporter les utilisateurs
-              console.log("TODO: Export users");
-            }}
-            className="icon-btn"
-            title="Exporter les utilisateurs"
-            aria-label="Exporter les utilisateurs"
-          >
-            <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              // TODO: Importer des utilisateurs
-              console.log("TODO: Import users");
-            }}
-            className="icon-btn"
-            title="Importer des utilisateurs"
-            aria-label="Importer des utilisateurs"
-          >
-            <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-          </button>
-          <button type="button" onClick={() => setShowInviteModal(true)} className="btn-primary ml-2">
+          <button type="button" onClick={() => setShowInviteModal(true)} className="btn-primary">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 5v14M5 12h14" />
             </svg>

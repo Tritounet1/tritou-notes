@@ -302,54 +302,6 @@ export const Dashboard = () => {
                     A → Z
                   </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    // TODO: Importer des documents
-                    console.log("TODO: Import documents");
-                  }}
-                  className="icon-btn"
-                  aria-label="Importer des documents"
-                  title="Importer des documents"
-                >
-                  <svg
-                    width="17"
-                    height="17"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.75}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 15V3M7 8l5-5 5 5M5 21h14" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    // TODO: Exporter les documents
-                    console.log("TODO: Export documents");
-                  }}
-                  className="icon-btn"
-                  aria-label="Exporter les documents"
-                  title="Exporter les documents"
-                >
-                  <svg
-                    width="17"
-                    height="17"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.75}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
-                  </svg>
-                </button>
               </div>
             </div>
 
