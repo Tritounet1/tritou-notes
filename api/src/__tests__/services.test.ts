@@ -1,12 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, resetDatabase } from "./helpers/database";
 vi.mock("../config/prismaClient", async () => ({ prisma: (await import("./helpers/database")).db }));
-const mocks = vi.hoisted(() => ({ decrypt: vi.fn(), transport: vi.fn(), verify: vi.fn(), mail: vi.fn(), s3: vi.fn() }));
+const mocks = vi.hoisted(() => ({ decrypt: vi.fn(), transport: vi.fn(), verify: vi.fn(), mail: vi.fn() }));
 vi.mock("../utils/utils", () => ({ decrypt: mocks.decrypt }));
 vi.mock("nodemailer", () => ({ default: { createTransport: mocks.transport } }));
-vi.mock("../utils/s3Client", () => ({ s3Client: { send: mocks.s3 } }));
 import { sendEmail } from "../config/mailClient";
-import { getFile, getPublicUrl, uploadFile } from "../utils/storageService";
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -46,28 +44,3 @@ describe("SMTP adapter", () => {
   });
 });
 
-
-describe("S3 adapter", () => {
-  it("uploads bytes and their content type to the configured bucket", async () => {
-    vi.stubEnv("S3_BUCKET", "test-bucket");
-    const bytes = Buffer.from("image");
-    await uploadFile(bytes, "photo.png", "image/png");
-    expect(mocks.s3.mock.calls[0][0].input).toEqual({ Bucket: "test-bucket", Key: "photo.png", Body: bytes, ContentType: "image/png" });
-  });
-  it("retrieves the requested object", async () => {
-    vi.stubEnv("S3_BUCKET", "test-bucket");
-    mocks.s3.mockResolvedValue({ Body: "bytes" });
-    expect(await getFile("photo.png")).toEqual({ Body: "bytes" });
-    expect(mocks.s3.mock.calls[0][0].input).toEqual({ Bucket: "test-bucket", Key: "photo.png" });
-  });
-  it("propagates storage failures", async () => {
-    mocks.s3.mockRejectedValue(new Error("S3 unavailable"));
-    await expect(uploadFile(Buffer.from("a"), "key", "text/plain")).rejects.toThrow("S3 unavailable");
-    await expect(getFile("key")).rejects.toThrow("S3 unavailable");
-  });
-  it("uses the configured public endpoint", () => {
-    vi.stubEnv("S3_ENDPOINT", "https://storage.example.com");
-    vi.stubEnv("S3_BUCKET", "assets");
-    expect(getPublicUrl("photo.png")).toBe("https://storage.example.com/assets/photo.png");
-  });
-});

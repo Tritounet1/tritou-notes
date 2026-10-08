@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ redis: vi.fn(), queue: vi.fn(), adapter: vi.fn(), prisma: vi.fn(), s3: vi.fn(), listen: vi.fn(), dotenv: vi.fn() }));
+const mocks = vi.hoisted(() => ({ redis: vi.fn(), queue: vi.fn(), adapter: vi.fn(), prisma: vi.fn(), listen: vi.fn(), dotenv: vi.fn() }));
 vi.mock("ioredis", () => ({ default: class { constructor(options: unknown) { mocks.redis(options); } } }));
 vi.mock("bullmq", () => ({ Queue: class { constructor(name: string, options: unknown) { mocks.queue(name, options); } } }));
 vi.mock("@prisma/adapter-pg", () => ({ PrismaPg: class { constructor(options: unknown) { mocks.adapter(options); } } }));
 vi.mock("../generated/prisma/client", () => ({ PrismaClient: class { constructor(options: unknown) { mocks.prisma(options); } } }));
-vi.mock("@aws-sdk/client-s3", () => ({ S3Client: class { constructor(options: unknown) { mocks.s3(options); } } }));
 vi.mock("../app", () => ({ default: { listen: mocks.listen } }));
 vi.mock("dotenv", () => ({ default: { config: mocks.dotenv } }));
 beforeEach(() => { vi.resetModules(); vi.clearAllMocks(); });
@@ -58,11 +57,7 @@ it("uses the configured database URL for the Prisma adapter", async () => {
   expect(mocks.adapter).toHaveBeenCalledWith({ connectionString: "postgresql://test-only" });
   expect(mocks.prisma).toHaveBeenCalledWith({ adapter: expect.any(Object) });
 });
-it("configures S3's endpoint and path-style access", async () => {
-  vi.stubEnv("S3_ENDPOINT", "https://s3.test"); vi.stubEnv("S3_ACCESS_KEY", "test-access"); vi.stubEnv("S3_SECRET_KEY", "test-secret");
-  await import("../utils/s3Client");
-  expect(mocks.s3).toHaveBeenCalledWith({ region: "us-east-1", endpoint: "https://s3.test", forcePathStyle: true, credentials: { accessKeyId: "test-access", secretAccessKey: "test-secret" } });
-});
+
 it("loads environment configuration and starts the API on its configured port", async () => {
   vi.stubEnv("PORT", "4000");
   mocks.listen.mockImplementation((_port, ready) => ready());

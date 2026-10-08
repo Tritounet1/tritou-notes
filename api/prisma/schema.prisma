@@ -239,12 +239,6 @@ model Settings {
   mcpTokenUserId    Int?
 }
 
-model Images {
-  id         Int      @id @default(autoincrement())
-  name       String
-  created_at DateTime @default(now())
-}
-
 // Files are stored locally by the Express API; removing a document deletes its metadata.
 model DocumentImage {
   id         String   @id @default(uuid()) @db.Uuid

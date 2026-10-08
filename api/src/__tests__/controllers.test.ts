@@ -7,7 +7,7 @@ import { db, resetDatabase, user } from "./helpers/database";
 import { call } from "./helpers/http";
 import { cronRunsAround, recentRuns } from "../utils/schedulerRuns";
 vi.mock("../config/prismaClient", async () => ({ prisma: (await import("./helpers/database")).db }));
-const mocks = vi.hoisted(() => ({ hash: vi.fn(), verify: vi.fn(), token: vi.fn(), email: vi.fn(), encrypt: vi.fn(), response: vi.fn(), models: vi.fn(), upload: vi.fn(), add: vi.fn(), jobs: vi.fn(), remove: vi.fn() }));
+const mocks = vi.hoisted(() => ({ hash: vi.fn(), verify: vi.fn(), token: vi.fn(), email: vi.fn(), encrypt: vi.fn(), response: vi.fn(), models: vi.fn(), add: vi.fn(), jobs: vi.fn(), remove: vi.fn() }));
 vi.mock("../utils/bcryptUtils", () => ({ hashPassword: mocks.hash, verifyPassword: mocks.verify }));
 vi.mock("../utils/jwtUtils", () => ({ createToken: mocks.token }));
 vi.mock("../config/mailClient", () => ({ sendEmail: mocks.email }));
@@ -16,7 +16,6 @@ vi.mock("../ai/openrouter", async importOriginal => ({
   ...await importOriginal<typeof import("../ai/openrouter")>(),
   chatCompletion: mocks.response, listTextModels: mocks.models, listImageModels: mocks.models, generateImage: mocks.response,
 }));
-vi.mock("../utils/storageService", () => ({ uploadFile: mocks.upload }));
 vi.mock("../config/queue", () => ({ scrapeQueue: { add: mocks.add, getRepeatableJobs: mocks.jobs, removeRepeatableByKey: mocks.remove } }));
 import * as users from "../controllers/userController";
 import * as auth from "../controllers/authController";
@@ -29,7 +28,6 @@ import * as instanceHistory from "../controllers/instanceScrapeHistoryController
 import * as schedulers from "../controllers/scrapingSchedulerController";
 import * as settings from "../controllers/settingsController";
 import * as permissions from "../controllers/userPermissionsController";
-import * as images from "../controllers/imagesController";
 import * as ai from "../controllers/aiController";
 import { MAX_VERSIONS, MERGE_WINDOW_MS } from "../utils/documentRevision";
 import { accountFailures, ipFailures } from "../utils/failureLimiter";
@@ -282,7 +280,7 @@ describe("invitations", () => {
 const reads = [
   [users.getUserById, db.user], [documents.getDocumentById, db.document],
   [scrapers.getScraperById, db.scraper], [instances.getInstancesScrapeById, db.instanceScrape],
-  [schedulers.getScrapingSchedulerById, db.scrapingScheduler], [images.getImageById, db.images],
+  [schedulers.getScrapingSchedulerById, db.scrapingScheduler],
 ] as const;
 it.each(reads.map(([handler, model]) => ({ handler, model, name: handler.name })))("$name returns 404 for a missing resource", async ({ handler, model }) => {
   model.findUnique.mockResolvedValue(null);
@@ -297,7 +295,7 @@ const lists = [
   [documents.getDocuments, db.document],
   [scrapers.getScrapers, db.scraper],
   [instances.getInstancesScrape, db.instanceScrape], [instanceHistory.getInstancesScrapeHistory, db.instanceScrapeHistory],
-  [schedulers.getScrapingScheduler, db.scrapingScheduler], [settings.getSettings, db.settings], [images.getImages, db.images],
+  [schedulers.getScrapingScheduler, db.scrapingScheduler], [settings.getSettings, db.settings],
 ] as const;
 it.each(lists.map(([handler, model]) => ({ handler, model, name: handler.name })))("$name returns an empty collection", async ({ handler, model }) => {
   const ctx = await call(handler);
@@ -532,33 +530,22 @@ describe("settings, permissions, images and AI", () => {
     expect((await call(permissions.updateUserPermissions)).status).toHaveBeenCalledWith(403);
     expect(db.userPermissions.update).not.toHaveBeenCalled();
   });
-  it("uploads an image before creating its metadata", async () => {
-    const ctx = await call(images.createImage, { name: "photo", file_body: Buffer.from("photo") });
-    expect(mocks.upload).toHaveBeenCalledOnce();
-    expect(ctx.status).toHaveBeenCalledWith(201);
-  });
-  it("does not save image metadata after an upload failure", async () => {
-    mocks.upload.mockRejectedValue(new Error("Storage unavailable"));
-    const ctx = await call(images.createImage, { name: "photo", file_body: Buffer.from("photo") });
-    expect(ctx.next).toHaveBeenCalledWith(expect.objectContaining({ message: "Storage unavailable" }));
-    expect(db.images.create).not.toHaveBeenCalled();
-  });
 });
 
-const deletes = [[scrapers.deleteScraper, db.scraper, "id"], [instances.deleteInstanceScrape, db.instanceScrape, "id"], [schedulers.deleteScrapingScheduler, db.scrapingScheduler, "id"], [images.deleteImage, db.images, "id"]] as const;
+const deletes = [[scrapers.deleteScraper, db.scraper, "id"], [instances.deleteInstanceScrape, db.instanceScrape, "id"], [schedulers.deleteScrapingScheduler, db.scrapingScheduler, "id"]] as const;
 it.each(deletes.map(([handler, model, key]) => ({ handler, model, key, name: handler.name })))("$name deletes only the requested resource", async ({ handler, model, key }) => {
   await call(handler);
   expect(model.delete).toHaveBeenCalledWith({ where: { [key]: 12 } });
 });
 
 // A rejected dependency must reach Express's error handler, never a success response.
-const modules = [users, auth, invitations, documents, documentHistory, scrapers, instances, instanceHistory, schedulers, settings, permissions, images, ai];
+const modules = [users, auth, invitations, documents, documentHistory, scrapers, instances, instanceHistory, schedulers, settings, permissions, ai];
 for (const module of modules) {
   for (const [name, handler] of Object.entries(module)) {
     it(`${name} forwards dependency failures`, async () => {
       const failure = new Error("Dependency unavailable");
       for (const model of Object.values(db)) for (const mock of Object.values(model)) mock.mockRejectedValue(failure);
-      for (const mock of [mocks.email, mocks.hash, mocks.response, mocks.models, mocks.upload]) mock.mockRejectedValue(failure);
+      for (const mock of [mocks.email, mocks.hash, mocks.response, mocks.models]) mock.mockRejectedValue(failure);
       const ctx = await call(handler, { username: "new", password: "password-long", currentPassword: "old", newPassword: "password-long", email: "new@example.com", url: "https://example.com" });
       // Logout has no database dependency; exercise a cookie write failure instead.
       if (name === "logout") {
