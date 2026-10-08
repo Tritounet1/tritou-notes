@@ -21,7 +21,8 @@ model User {
   role              Role              @default(USER)
   // Part of every session token: incrementing it signs out all the user's sessions.
   tokenVersion      Int               @default(0)
-  documents         Document[]
+  documents         Document[]       @relation("DocumentAuthor")
+  editedDocuments   Document[]       @relation("DocumentLastEditor")
   documentHistories DocumentHistory[]
   conversations     Conversation[]
   userPermissions   UserPermissions?
@@ -35,8 +36,11 @@ model Document {
   public            Boolean           @default(false)
   created_at        DateTime          @default(now())
   last_update       DateTime          @default(now())
-  author            User?              @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  // Creator of the page; lastEditor wrote its current content.
+  author            User?              @relation("DocumentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
   authorId          Int?
+  lastEditor        User?             @relation("DocumentLastEditor", fields: [lastEditorId], references: [id], onDelete: SetNull)
+  lastEditorId      Int?
   type              DocumentType      @default(TEXT)
   // Sub-pages: deleting a page deletes its whole subtree.
   parentId          Int?

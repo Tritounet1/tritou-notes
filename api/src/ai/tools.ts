@@ -185,6 +185,7 @@ const pageTools: Record<string, Tool> = {
           type: pageType,
           text: pageType === "TEXT" && typeof text === "string" ? text : "",
           author: { connect: { id: ctx.userId } },
+          lastEditor: { connect: { id: ctx.userId } },
           ...(parent !== null && { parent: { connect: { id: parent } } }),
           ...(folder !== null && { folder: { connect: { id: folder } } }),
         },

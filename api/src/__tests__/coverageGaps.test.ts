@@ -120,7 +120,7 @@ describe("document controller edge cases", () => {
   it("creates a root page inside a folder", async () => {
     useFolders([{ id: 4, name: "Perso", parentId: null }]);
     await call(documents.createDocument, { title: "Notes", type: "TEXT", folderId: 4 });
-    expect(db.document.create.mock.calls[0][0].data).toEqual({ title: "Notes", type: "TEXT", folder: { connect: { id: 4 } }, author: { connect: { id: 7 } } });
+    expect(db.document.create.mock.calls[0][0].data).toEqual({ title: "Notes", type: "TEXT", folder: { connect: { id: 4 } }, lastEditor: { connect: { id: 7 } }, author: { connect: { id: 7 } } });
   });
 
   it("lists children and the folder path of a root page", async () => {

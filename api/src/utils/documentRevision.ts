@@ -72,14 +72,18 @@ export const reviseDocument = async (id: number, authorId: number, changes: Docu
         (changes.title !== undefined && changes.title !== previous_document.title) ||
         (changes.text !== undefined && changes.text !== previous_document.text) ||
         (changes.public !== undefined && changes.public !== previous_document.public);
-      if (contentChanged && !(mergeRecent && (await recentVersionBy(tx, id, author.id)))) {
+      // An editor continuing their own recent session shares the version taken at its start.
+      const continuingSession = mergeRecent && previous_document.lastEditorId === author.id && (await hasRecentVersion(tx, id));
+      if (contentChanged && !continuingSession) {
+        // The version keeps the previous content, so it belongs to whoever wrote that content.
+        const previousWriter = previous_document.lastEditorId ?? previous_document.authorId;
         await tx.documentHistory.create({
           data: {
             title: previous_document.title,
             text: previous_document.text,
             public: previous_document.public,
             document: { connect: { id } },
-            author: { connect: { id: author.id } },
+            ...(previousWriter !== null && { author: { connect: { id: previousWriter } } }),
           },
         });
         await pruneVersions(tx, id);
@@ -91,9 +95,8 @@ export const reviseDocument = async (id: number, authorId: number, changes: Docu
         data: {
           title: changes.title,
           text: changes.text,
-          author: {
-            connect: { id: author.id },
-          },
+          // The creator (author) never changes; the last editor does.
+          lastEditor: { connect: { id: author.id } },
           public: changes.public,
           ...(parent !== undefined && {
             parent: parent === null ? { disconnect: true } : { connect: { id: parent } },
@@ -115,9 +118,9 @@ export const reviseDocument = async (id: number, authorId: number, changes: Docu
 
 type Tx = Prisma.TransactionClient;
 
-const recentVersionBy = async (tx: Tx, documentId: number, authorId: number) => {
+const hasRecentVersion = async (tx: Tx, documentId: number) => {
   const latest = await tx.documentHistory.findFirst({ where: { documentId }, orderBy: [{ created_at: "desc" }, { id: "desc" }] });
-  return latest !== null && latest.authorId === authorId && Date.now() - latest.created_at.getTime() < MERGE_WINDOW_MS;
+  return latest !== null && Date.now() - latest.created_at.getTime() < MERGE_WINDOW_MS;
 };
 
 const pruneVersions = async (tx: Tx, documentId: number) => {

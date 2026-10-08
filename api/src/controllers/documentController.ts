@@ -26,6 +26,7 @@ export const createDocument = async (
         type: type,
         ...(parent !== null && { parent: { connect: { id: parent } } }),
         ...(folder !== null && { folder: { connect: { id: folder } } }),
+        lastEditor: { connect: { id: author.id } },
         author: {
           connect: { id: author.id },
         },

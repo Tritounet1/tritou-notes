@@ -57,7 +57,7 @@ describe("document controller with sub-pages", () => {
   it("creates a page under a parent", async () => {
     await call(documents.createDocument, { title: "Sub", type: "TEXT", parentId: 1 });
     expect(db.document.create).toHaveBeenCalledWith({
-      data: { title: "Sub", type: "TEXT", parent: { connect: { id: 1 } }, author: { connect: { id: 7 } } },
+      data: { title: "Sub", type: "TEXT", parent: { connect: { id: 1 } }, lastEditor: { connect: { id: 7 } }, author: { connect: { id: 7 } } },
     });
   });
 

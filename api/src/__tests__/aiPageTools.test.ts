@@ -131,7 +131,7 @@ describe("create_page", () => {
     const context = ctx();
     const result = await run("create_page", { title: "Nouvelle", text: "# Hello" }, context);
     expect(result).toEqual({ ok: true, output: { id: 9, title: "Nouvelle", parentId: null }, summary: "Page créée : « Nouvelle »" });
-    expect(db.document.create).toHaveBeenCalledWith({ data: { title: "Nouvelle", type: "TEXT", text: "# Hello", author: { connect: { id: 7 } } } });
+    expect(db.document.create).toHaveBeenCalledWith({ data: { title: "Nouvelle", type: "TEXT", text: "# Hello", author: { connect: { id: 7 } }, lastEditor: { connect: { id: 7 } } } });
     expect([...context.changed]).toEqual([9]);
     expect(db.document.update).not.toHaveBeenCalled();
   });

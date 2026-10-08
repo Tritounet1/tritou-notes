@@ -317,7 +317,7 @@ it("returns the latest document versions, oldest first", async () => {
 describe("document lifecycle", () => {
   it("uses the authenticated author when creating a document", async () => {
     const ctx = await call(documents.createDocument, { title: "Note", type: "TEXT", authorId: 99 });
-    expect(db.document.create).toHaveBeenCalledWith({ data: { title: "Note", type: "TEXT", author: { connect: { id: 7 } } } });
+    expect(db.document.create).toHaveBeenCalledWith({ data: { title: "Note", type: "TEXT", lastEditor: { connect: { id: 7 } }, author: { connect: { id: 7 } } } });
     expect(ctx.status).toHaveBeenCalledWith(201);
   });
   it.each([documents.createDocument, documents.updateDocument])("%s rejects missing authors", async handler => {
@@ -326,11 +326,19 @@ describe("document lifecycle", () => {
     expect(db.document.create).not.toHaveBeenCalled();
     expect(db.document.update).not.toHaveBeenCalled();
   });
-  it("saves the previous contents before updating the document", async () => {
-    db.document.findFirst.mockResolvedValue({ id: 12, title: "Old", text: "Before", public: false });
+  it("saves the previous contents, credited to their writer, and keeps the creator", async () => {
+    db.document.findFirst.mockResolvedValue({ id: 12, title: "Old", text: "Before", public: false, authorId: 3, lastEditorId: 5 });
     await call(documents.updateDocument, { title: "New", text: "After", is_public: true });
-    expect(db.documentHistory.create).toHaveBeenCalledWith({ data: { title: "Old", text: "Before", public: false, document: { connect: { id: 12 } }, author: { connect: { id: 7 } } } });
-    expect(db.document.update).toHaveBeenCalledWith({ where: { id: 12 }, data: { title: "New", text: "After", public: true, author: { connect: { id: 7 } }, last_update: expect.any(Date) } });
+    expect(db.documentHistory.create).toHaveBeenCalledWith({ data: { title: "Old", text: "Before", public: false, document: { connect: { id: 12 } }, author: { connect: { id: 5 } } } });
+    expect(db.document.update).toHaveBeenCalledWith({ where: { id: 12 }, data: { title: "New", text: "After", public: true, lastEditor: { connect: { id: 7 } }, last_update: expect.any(Date) } });
+
+    // Without a recorded last editor the content is the creator's; without either, no author.
+    db.document.findFirst.mockResolvedValue({ id: 12, title: "Old", text: "Before", public: false, authorId: 3, lastEditorId: null });
+    await call(documents.updateDocument, { text: "Again" });
+    expect(db.documentHistory.create).toHaveBeenLastCalledWith({ data: expect.objectContaining({ author: { connect: { id: 3 } } }) });
+    db.document.findFirst.mockResolvedValue({ id: 12, title: "Old", text: "Before", public: false, authorId: null, lastEditorId: null });
+    await call(documents.updateDocument, { text: "Again" });
+    expect(db.documentHistory.create.mock.lastCall![0].data).not.toHaveProperty("author");
     expect(db.documentHistory.create.mock.invocationCallOrder[0]).toBeLessThan(db.document.update.mock.invocationCallOrder[0]);
   });
   it("creates no version when title, text and visibility are unchanged", async () => {
@@ -340,15 +348,18 @@ describe("document lifecycle", () => {
     expect(db.document.update).toHaveBeenCalled();
   });
   it("groups the editor saves of one author into a version per 10 minutes", async () => {
-    db.document.findFirst.mockResolvedValue({ id: 12, title: "T", text: "Before", public: false });
-    db.documentHistory.findFirst.mockResolvedValue({ id: 5, authorId: 7, created_at: new Date(Date.now() - 60_000) });
+    // Same editor as the last save, and a version taken a minute ago: same session.
+    db.document.findFirst.mockResolvedValue({ id: 12, title: "T", text: "Before", public: false, lastEditorId: 7 });
+    db.documentHistory.findFirst.mockResolvedValue({ id: 5, created_at: new Date(Date.now() - 60_000) });
     await call(documents.updateDocument, { text: "After" });
     expect(db.documentHistory.findFirst).toHaveBeenCalledWith({ where: { documentId: 12 }, orderBy: [{ created_at: "desc" }, { id: "desc" }] });
     expect(db.documentHistory.create).not.toHaveBeenCalled();
     expect(db.document.update).toHaveBeenCalled();
 
-    for (const latest of [{ id: 5, authorId: 8, created_at: new Date() }, { id: 5, authorId: 7, created_at: new Date(Date.now() - MERGE_WINDOW_MS - 1) }, null]) {
+    // Someone else edited last, or the session is older than the window, or no version yet.
+    for (const [lastEditorId, latest] of [[8, { id: 5, created_at: new Date() }], [7, { id: 5, created_at: new Date(Date.now() - MERGE_WINDOW_MS - 1) }], [7, null]] as const) {
       db.documentHistory.create.mockClear();
+      db.document.findFirst.mockResolvedValue({ id: 12, title: "T", text: "Before", public: false, lastEditorId });
       db.documentHistory.findFirst.mockResolvedValue(latest);
       await call(documents.updateDocument, { text: "After" });
       expect(db.documentHistory.create).toHaveBeenCalledOnce();
