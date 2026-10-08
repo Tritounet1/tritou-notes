@@ -56,7 +56,7 @@ const rowClass = (active: boolean, dropTarget = false) =>
         : "text-ink-2 hover:bg-black/[0.04]"
   }`;
 const hoverButton =
-  "flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted opacity-0 transition hover:bg-black/[0.06] hover:text-ink group-hover:opacity-100 focus-visible:opacity-100";
+  "flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted opacity-0 transition hover:bg-black/[0.06] hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100";
 
 /**
  * Sidebar tree: folders (closed by default, open state remembered) and pages with their

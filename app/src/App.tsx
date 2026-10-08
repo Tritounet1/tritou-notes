@@ -31,6 +31,15 @@ const DocumentRoute = () => <DocumentPage key={useParams().id} />;
 const Shell = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated } = useAuth();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Below 840px the sidebar is a drawer opened from the top bar.
+  const [navOpen, setNavOpen] = useState(false);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => e.key === "Escape" && setNavOpen(false);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [navOpen]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -47,8 +56,25 @@ const Shell = ({ children }: { children: ReactNode }) => {
   if (!isAuthenticated) return <>{children}</>;
   return (
     <div className="min-h-screen flex flex-wrap items-start">
-      <div className="flex-[1_1_248px] max-w-full min-[840px]:sticky min-[840px]:top-0 min-[840px]:max-h-screen min-[840px]:overflow-y-auto">
-        <Navigation onSearch={() => setPaletteOpen(true)} />
+      <header className="sticky top-0 z-30 flex w-full items-center justify-between gap-2 bg-frame/95 px-3 py-2 backdrop-blur min-[840px]:hidden">
+        <button type="button" onClick={() => setNavOpen(true)} aria-label="Ouvrir le menu" aria-expanded={navOpen} aria-controls="app-sidebar" className="icon-btn">
+          <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+        </button>
+        <span className="font-display text-base font-bold tracking-tight text-ink">Tritou Notes</span>
+        <button type="button" onClick={() => setPaletteOpen(true)} aria-label="Rechercher" className="icon-btn">
+          <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-3.5-3.5" /></svg>
+        </button>
+      </header>
+      {navOpen && <div aria-hidden="true" onClick={() => setNavOpen(false)} className="fixed inset-0 z-40 bg-ink/30 min-[840px]:hidden" />}
+      <div
+        id="app-sidebar"
+        // Choosing a link closes the drawer.
+        onClick={(e) => (e.target as HTMLElement).closest("a") && setNavOpen(false)}
+        className={`flex-[1_1_248px] max-w-full min-[840px]:sticky min-[840px]:top-0 min-[840px]:max-h-screen min-[840px]:overflow-y-auto ${
+          navOpen ? "max-[839px]:fixed max-[839px]:inset-y-0 max-[839px]:left-0 max-[839px]:z-50 max-[839px]:w-[min(300px,85vw)] max-[839px]:overflow-y-auto max-[839px]:bg-frame max-[839px]:shadow-xl" : "max-[839px]:hidden"
+        }`}
+      >
+        <Navigation onSearch={() => { setNavOpen(false); setPaletteOpen(true); }} />
       </div>
       <main className="paper flex-[999_1_560px] min-w-0 m-2.5 min-h-[calc(100vh-20px)] overflow-hidden">{children}</main>
       {paletteOpen && (
