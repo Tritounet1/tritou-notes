@@ -81,6 +81,10 @@ admin auth page : http://localhost:5173/admin-auth?code=…
 
 Open it to create the administrator account. Other users join through email invitations (**Users** page), which requires SMTP settings (**Settings › E-mail**). To keep the link out of the logs, set `ADMIN_BOOTSTRAP_CODE` (32+ characters) in `api/.env` and open `/admin-auth?code=<that value>` yourself.
 
+### Access model
+
+Tritou Notes is a **shared workspace**: every signed-in user reads every page and its history, like a team wiki. Permissions (**Users** page) control what each user may *do*: create, edit or delete pages, use the scrapers, the scraping pages or the assistant. Scrape results require access to the Instances or Scrapers pages. Pages marked public are readable without an account through their link.
+
 ### AI assistant
 
 In **Settings › Intelligence artificielle**, paste an [OpenRouter API key](https://openrouter.ai/keys) and pick a text model (any model with tool calling) and an image model. The key is stored encrypted and never sent back to the browser. Users need the *AI chat* permission.

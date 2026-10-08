@@ -3,10 +3,14 @@ import {
   getInstancesScrapeHistory,
   getInstancesScrapeHistoryByInstanceScrapeId,
 } from "../controllers/instanceScrapeHistoryController";
+import { requireAnyPermission } from "../middlewares/permissionsMiddleware";
 
 const router = Router();
 
-router.get("/", getInstancesScrapeHistory);
-router.get("/:id", getInstancesScrapeHistoryByInstanceScrapeId);
+// Scrape results: readable from the Instances page or from a scheduler's page.
+const canReadResults = requireAnyPermission("accessInstancesScrapersPage", "accessScrapersPage");
+
+router.get("/", canReadResults, getInstancesScrapeHistory);
+router.get("/:id", canReadResults, getInstancesScrapeHistoryByInstanceScrapeId);
 
 export default router;

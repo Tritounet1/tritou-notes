@@ -113,8 +113,22 @@ it.each(["GET", "POST"])("keeps invitation %s validation public", async method =
   db.invitation.findUnique.mockResolvedValue(null);
   expect((await dispatch(invitations, method, "/invitation/token", { user: undefined, body: { username: "new", password: "password-long" } })).status).toHaveBeenCalledWith(404);
 });
-it.each([{ router: documents, url: "/" }, { router: documents, url: "/12" }, { router: histories, url: "/12" }, { router: instanceHistories, url: "/" }, { router: instanceHistories, url: "/12" }])("serves authenticated read routes %#", async ({ router, url }) => {
-  expect((await dispatch(router, "GET", url, { user: regular })).json).toHaveBeenCalledOnce();
+// The workspace is shared: every signed-in user reads the pages and their history.
+it.each([{ router: documents, url: "/" }, { router: documents, url: "/12" }, { router: histories, url: "/12" }])("serves shared read routes to any signed-in user %#", async ({ router, url }) => {
+  const ctx = await dispatch(router, "GET", url, { user: regular });
+  expect(ctx.status).not.toHaveBeenCalled();
+  expect(ctx.json).toHaveBeenCalledOnce();
+});
+// Scrape results follow the scraping pages' permissions.
+it.each(["/", "/12"])("serves scrape results %s only with a scraping page permission", async url => {
+  db.userPermissions.findUnique.mockResolvedValue({ accessInstancesScrapersPage: false, accessScrapersPage: false });
+  expect((await dispatch(instanceHistories, "GET", url, { user: regular })).status).toHaveBeenCalledWith(403);
+  for (const permission of ["accessInstancesScrapersPage", "accessScrapersPage"]) {
+    db.userPermissions.findUnique.mockResolvedValue({ [permission]: true });
+    const ctx = await dispatch(instanceHistories, "GET", url, { user: regular });
+    expect(ctx.status).not.toHaveBeenCalled();
+    expect(ctx.json).toHaveBeenCalledOnce();
+  }
 });
 
 describe("link preview endpoint", () => {

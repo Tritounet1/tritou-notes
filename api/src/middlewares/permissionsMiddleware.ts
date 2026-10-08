@@ -4,8 +4,15 @@ import { UserPermissions } from "../generated/prisma/client";
 
 type PermissionKey = keyof Omit<UserPermissions, "id" | "userId">;
 
-export const requirePermission = (
-  ...permissions: PermissionKey[]
+/** Every listed permission is required (admins have them all). */
+export const requirePermission = (...permissions: PermissionKey[]): RequestHandler => permissionCheck(permissions, "all");
+
+/** One of the listed permissions is enough. */
+export const requireAnyPermission = (...permissions: PermissionKey[]): RequestHandler => permissionCheck(permissions, "any");
+
+const permissionCheck = (
+  permissions: PermissionKey[],
+  mode: "all" | "any",
 ): RequestHandler => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -25,9 +32,8 @@ export const requirePermission = (
         return res.status(403).json({ message: "No permissions configured" });
       }
 
-      const hasPermission = permissions.every(
-        (perm) => userPermissions[perm] === true,
-      );
+      const granted = (perm: PermissionKey) => userPermissions[perm] === true;
+      const hasPermission = mode === "all" ? permissions.every(granted) : permissions.some(granted);
 
       if (!hasPermission) {
         return res.status(403).json({ message: "Permission denied" });
