@@ -1,24 +1,27 @@
 import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
-import { AdminAuthPage } from "./AdminAuthPage";
 import { AuthProvider } from "./components/AuthProvider";
 import { Navigation } from "./components/Navigation";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import { Dashboard } from "./Dashboard";
-import { DocumentPage } from "./DocumentPage";
-import { InstancesScrapePage } from "./InstancesScrapePage";
-import { Loginpage } from "./LoginPage";
-import { RegisterPage } from "./RegisterPage";
-import { ScraperPage } from "./ScraperPage";
-import { ScrapersPage } from "./ScrapersPage";
-import { ScrapingSchedulerPage } from "./ScrapingSchedulerPage";
-import { ScrapingSchedulersPage } from "./ScrapingSchedulersPage";
-import { UserPage } from "./UserPage";
-import { UsersPage } from "./UsersPage";
-import { SettingsPage } from "./SettingsPage";
-import { AssistantPage } from "./AssistantPage";
 import { useAuth } from "./hooks/useAuth";
-import { useEffect, useState, type ReactNode } from "react";
-import { CommandPalette } from "./components/CommandPalette";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+
+// Each page is its own chunk: a reader of a public page does not download CodeMirror,
+// the scraping pages or the admin screens.
+const AdminAuthPage = lazy(() => import("./AdminAuthPage").then((module) => ({ default: module.AdminAuthPage })));
+const Dashboard = lazy(() => import("./Dashboard").then((module) => ({ default: module.Dashboard })));
+const DocumentPage = lazy(() => import("./DocumentPage").then((module) => ({ default: module.DocumentPage })));
+const InstancesScrapePage = lazy(() => import("./InstancesScrapePage").then((module) => ({ default: module.InstancesScrapePage })));
+const Loginpage = lazy(() => import("./LoginPage").then((module) => ({ default: module.Loginpage })));
+const RegisterPage = lazy(() => import("./RegisterPage").then((module) => ({ default: module.RegisterPage })));
+const ScraperPage = lazy(() => import("./ScraperPage").then((module) => ({ default: module.ScraperPage })));
+const ScrapersPage = lazy(() => import("./ScrapersPage").then((module) => ({ default: module.ScrapersPage })));
+const ScrapingSchedulerPage = lazy(() => import("./ScrapingSchedulerPage").then((module) => ({ default: module.ScrapingSchedulerPage })));
+const ScrapingSchedulersPage = lazy(() => import("./ScrapingSchedulersPage").then((module) => ({ default: module.ScrapingSchedulersPage })));
+const UserPage = lazy(() => import("./UserPage").then((module) => ({ default: module.UserPage })));
+const UsersPage = lazy(() => import("./UsersPage").then((module) => ({ default: module.UsersPage })));
+const SettingsPage = lazy(() => import("./SettingsPage").then((module) => ({ default: module.SettingsPage })));
+const AssistantPage = lazy(() => import("./AssistantPage").then((module) => ({ default: module.AssistantPage })));
+const CommandPalette = lazy(() => import("./components/CommandPalette").then((module) => ({ default: module.CommandPalette })));
 
 // One DocumentPage per document: switching between sub-pages remounts it, which
 // flushes the previous page's pending save instead of mixing the two pages' state.
@@ -48,7 +51,11 @@ const Shell = ({ children }: { children: ReactNode }) => {
         <Navigation onSearch={() => setPaletteOpen(true)} />
       </div>
       <main className="paper flex-[999_1_560px] min-w-0 m-2.5 min-h-[calc(100vh-20px)] overflow-hidden">{children}</main>
-      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+      {paletteOpen && (
+        <Suspense fallback={null}>
+          <CommandPalette onClose={() => setPaletteOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 };
@@ -58,6 +65,7 @@ export const App = () => {
     <AuthProvider>
       <BrowserRouter>
         <Shell>
+        <Suspense fallback={<p className="py-24 text-center text-muted">Chargement…</p>}>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/login" element={<Loginpage />} />
@@ -145,6 +153,7 @@ export const App = () => {
             }
           />
         </Routes>
+        </Suspense>
         </Shell>
       </BrowserRouter>
     </AuthProvider>
