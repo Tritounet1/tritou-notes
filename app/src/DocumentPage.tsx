@@ -211,6 +211,7 @@ export const DocumentPage = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState(false);
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
 
   const [editingSegmentIndex, setEditingSegmentIndex] = useState<number | null>(null);
@@ -227,6 +228,7 @@ export const DocumentPage = () => {
   const [showSchedulerModal, setShowSchedulerModal] = useState(false);
   const [schedulerList, setSchedulerList] = useState<{ id: number; title: string; status: string }[]>([]);
   const [schedulerListLoading, setSchedulerListLoading] = useState(false);
+  const [schedulerListError, setSchedulerListError] = useState(false);
   const schedulerInsertRef = useRef<{ segIndex: number; cursorPos: number } | null>(null);
 
   const [showAiChat, setShowAiChat] = useState(false);
@@ -282,17 +284,17 @@ export const DocumentPage = () => {
 
   const fetchHistory = async () => {
     setHistoryLoading(true);
+    setHistoryError(false);
     try {
       const response = await apiFetch(`/api/document-histories/${id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setHistory(data);
-        if (data.length > 0) {
-          setSelectedVersion(data.length - 1);
-        }
+      if (!response.ok) throw new Error(`history ${response.status}`);
+      const data = await response.json();
+      setHistory(data);
+      if (data.length > 0) {
+        setSelectedVersion(data.length - 1);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
+      setHistoryError(true);
     } finally {
       setHistoryLoading(false);
     }
@@ -518,10 +520,14 @@ export const DocumentPage = () => {
 
   const fetchSchedulerList = async () => {
     setSchedulerListLoading(true);
+    setSchedulerListError(false);
     try {
       const res = await apiFetch("/api/scraping-schedulers");
-      if (res.ok) setSchedulerList(await res.json());
-    } catch { /* ignore */ } finally {
+      if (!res.ok) throw new Error(`schedulers ${res.status}`);
+      setSchedulerList(await res.json());
+    } catch {
+      setSchedulerListError(true);
+    } finally {
       setSchedulerListLoading(false);
     }
   };
@@ -1211,6 +1217,10 @@ export const DocumentPage = () => {
 
             {schedulerListLoading ? (
               <p className="py-6 text-center text-sm text-muted">Chargement…</p>
+            ) : schedulerListError ? (
+              <p role="alert" className="py-6 text-center text-sm text-danger-ink">
+                Impossible de charger les planificateurs (accès aux pages Scrapers requis ?).
+              </p>
             ) : schedulerList.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted">Aucun planificateur disponible.</p>
             ) : (
@@ -1306,6 +1316,11 @@ export const DocumentPage = () => {
 
             {historyLoading ? (
               <p className="p-8 text-center text-muted">Chargement…</p>
+            ) : historyError ? (
+              <p role="alert" className="p-8 text-center text-danger-ink">
+                Impossible de charger l’historique.{" "}
+                <button type="button" onClick={() => void fetchHistory()} className="cursor-pointer underline">Réessayer</button>
+              </p>
             ) : history.length === 0 ? (
               <p className="p-8 text-center text-muted">Aucun historique disponible</p>
             ) : (

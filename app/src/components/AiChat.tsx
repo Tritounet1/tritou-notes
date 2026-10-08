@@ -183,7 +183,7 @@ export const AiChat = ({ documentId, variant, onClose, onDocumentsChanged }: AiC
         setConversations(list);
         setActiveId(list[0]?.id ?? null);
       })
-      .catch(console.error);
+      .catch(() => setError("Impossible de charger les conversations."));
   }, [scope]);
 
   useEffect(() => {
@@ -196,9 +196,12 @@ export const AiChat = ({ documentId, variant, onClose, onDocumentsChanged }: AiC
       return;
     }
     apiFetch(`/api/ai/conversations/${activeId}`)
-      .then((res) => (res.ok ? res.json() : { messages: [] }))
+      .then(async (res) => {
+        if (!res.ok) throw new Error(await errorMessage(res));
+        return res.json();
+      })
       .then((data) => setMessages(data.messages))
-      .catch(console.error);
+      .catch(() => setError("Impossible de charger cette conversation."));
   }, [activeId]);
 
   useEffect(() => {
@@ -295,7 +298,7 @@ export const AiChat = ({ documentId, variant, onClose, onDocumentsChanged }: AiC
       if (err instanceof DOMException && err.name === "AbortError") {
         // Stopped by the user: reload what the server kept (the question, any finished tool steps).
         if (activeIdRef.current !== null) {
-          apiFetch(`/api/ai/conversations/${activeIdRef.current}`).then((r) => (r.ok ? r.json() : null)).then((d) => d && setMessages(d.messages)).catch(() => {});
+          apiFetch(`/api/ai/conversations/${activeIdRef.current}`).then((r) => (r.ok ? r.json() : null)).then((d) => d && setMessages(d.messages)).catch(() => setError("Réponse arrêtée ; la conversation n’a pas pu être rechargée."));
         }
       } else {
         setError(err instanceof Error ? err.message : "Erreur");
