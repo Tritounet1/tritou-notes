@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "./api";
 import { useAuth } from "./hooks/useAuth";
+import { useConfirm } from "./hooks/useConfirm";
 import { AiSettings } from "./components/AiSettings";
 import { McpSettings } from "./components/McpSettings";
 
@@ -62,7 +63,8 @@ interface Settings {
 }
 
 export const SettingsPage = () => {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, user, logout } = useAuth();
+  const [confirm, confirmDialog] = useConfirm();
   const [tab, setTab] = useState<"account" | "ai" | "mail" | "mcp">("account");
   const [ai, setAi] = useState({ keySet: false, textModel: null as string | null, imageModel: null as string | null });
   const [mcp, setMcp] = useState({ tokenSet: false, createdAt: null as string | null });
@@ -156,6 +158,23 @@ export const SettingsPage = () => {
   };
 
 
+  /** Signs out every device, this one included (the session token version changes). */
+  const handleLogoutEverywhere = async () => {
+    const ok = await confirm({
+      title: "Déconnecter toutes les sessions ?",
+      message: "Tous les appareils connectés à votre compte, celui-ci compris, devront se reconnecter.",
+      confirmLabel: "Tout déconnecter",
+    });
+    if (!ok) return;
+    try {
+      const response = await apiFetch("/auth/logout-everywhere", { method: "POST" });
+      if (!response.ok) throw new Error();
+      logout();
+    } catch {
+      showFeedback("error", "Impossible de déconnecter les sessions");
+    }
+  };
+
   const handleChangePassword = async () => {
     if (saving) return;
     if (!currentPassword || newPassword.length < 8) {
@@ -224,6 +243,7 @@ export const SettingsPage = () => {
 
   return (
     <div className="max-w-[1000px] mx-auto px-6 sm:px-10 pt-10 pb-16 flex flex-col gap-7">
+      {confirmDialog}
       <h1 className="page-title">Paramètres</h1>
 
       {(success || error) && (
@@ -319,6 +339,15 @@ export const SettingsPage = () => {
                     Modifier le mot de passe
                   </button>
                 </div>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-5">
+                <div>
+                  <p className="font-medium text-ink">Sessions</p>
+                  <p className="text-sm text-muted">Un appareil perdu ou partagé ? Déconnectez toutes les sessions ouvertes sur votre compte.</p>
+                </div>
+                <button type="button" onClick={handleLogoutEverywhere} className="btn-danger">
+                  Déconnecter partout
+                </button>
               </div>
             </section>
           )}

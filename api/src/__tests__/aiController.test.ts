@@ -22,6 +22,7 @@ vi.mock("../ai/openrouter", () => ({
 }));
 vi.mock("../utils/documentImageStorage", () => ({ prepareImage: mocks.prepareImage, storeImage: mocks.storeImage, removeImage: mocks.removeImage }));
 import * as ai from "../controllers/aiController";
+import { aiMessageBudget } from "../utils/failureLimiter";
 
 const config = { apiKey: "key", textModel: "provider/model", imageModel: "provider/image" };
 const dataUrl = (mime: string, content: string) => `data:${mime};base64,${Buffer.from(content).toString("base64")}`;
@@ -31,7 +32,7 @@ const streamingResponse = (overrides: Record<string, unknown> = {}) => {
   const written: string[] = [];
   const listeners: Record<string, () => void> = {};
   const res = {
-    status: vi.fn().mockReturnThis(), set: vi.fn().mockReturnThis(), flushHeaders: vi.fn(),
+    status: vi.fn().mockReturnThis(), set: vi.fn().mockReturnThis(), setHeader: vi.fn(), flushHeaders: vi.fn(),
     on: vi.fn((event: string, listener: () => void) => { listeners[event] = listener; }),
     write: vi.fn((chunk: string) => written.push(chunk)), end: vi.fn(), writableEnded: false, destroyed: false,
     ...overrides,
@@ -50,6 +51,7 @@ beforeEach(() => {
   mocks.getAiConfig.mockResolvedValue(config);
   mocks.toDisplayMessages.mockImplementation((rows: unknown[]) => rows.map((row) => ({ shown: row })));
   mocks.runTurn.mockResolvedValue(undefined);
+  aiMessageBudget.clear();
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -198,6 +200,15 @@ describe("sendMessage", () => {
     await first;
     expect(await send({ text: "three" }, streamingResponse().res)).not.toHaveBeenCalled();
     expect(mocks.runTurn).toHaveBeenCalledTimes(2);
+  });
+
+  it("limits the messages a user sends to the assistant", async () => {
+    for (let i = 0; i < 60; i++) expect(await send({ text: `m${i}` }, streamingResponse().res)).not.toHaveBeenCalled();
+    const { res } = streamingResponse();
+    const next = await send({ text: "one too many" }, res);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 429 }));
+    expect(res.setHeader).toHaveBeenCalledWith("Retry-After", expect.any(String));
+    expect(mocks.runTurn).toHaveBeenCalledTimes(60);
   });
 
   it("rejects more attachments than allowed before streaming", async () => {

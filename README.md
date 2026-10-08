@@ -79,7 +79,7 @@ While no administrator exists, the API prints a one-time link at startup:
 admin auth page : http://localhost:5173/admin-auth?code=…
 ```
 
-Open it to create the administrator account. Other users join through email invitations (**Users** page), which requires SMTP settings (**Settings › E-mail**).
+Open it to create the administrator account. Other users join through email invitations (**Users** page), which requires SMTP settings (**Settings › E-mail**). To keep the link out of the logs, set `ADMIN_BOOTSTRAP_CODE` (32+ characters) in `api/.env` and open `/admin-auth?code=<that value>` yourself.
 
 ### AI assistant
 
@@ -98,6 +98,7 @@ In **Settings › Intelligence artificielle**, paste an [OpenRouter API key](htt
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD` | Redis for the scraping queue (default `127.0.0.1:6379`) |
 | `IMAGE_STORAGE_PATH` | Where uploaded and generated document images are stored (default `./uploads/images`) |
 | `PORT`, `NODE_ENV` | API port (default `3000`) and environment |
+| `ADMIN_BOOTSTRAP_CODE` | Optional, 32+ characters: code of the first-administrator link, which is then not written to the logs |
 
 The app reads `VITE_API_URL` at build time (default `http://localhost:3000`).
 

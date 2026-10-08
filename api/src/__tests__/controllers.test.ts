@@ -160,6 +160,12 @@ describe("login and session", () => {
     expect(ctx.next).toHaveBeenCalledWith(expect.any(Error));
     expect(ctx.cookie).not.toHaveBeenCalled();
   });
+  it("signs out every session on request", async () => {
+    const ctx = await call(auth.logoutEverywhere);
+    expect(db.user.update).toHaveBeenCalledWith({ where: { id: 7 }, data: { tokenVersion: { increment: 1 } } });
+    expect(ctx.cookie).toHaveBeenCalledWith("auth_token", "", expect.objectContaining({ maxAge: 0 }));
+    expect(ctx.status).toHaveBeenCalledWith(200);
+  });
   it("clears the authentication cookie on logout", async () => {
     const ctx = await call(auth.logout);
     expect(ctx.cookie).toHaveBeenCalledWith("auth_token", "", expect.objectContaining({ maxAge: 0, httpOnly: true }));

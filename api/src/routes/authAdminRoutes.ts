@@ -30,7 +30,10 @@ const initFirstAdmin = async () => {
   });
 
   if (nbAdmins === 0) {
-    const randomUrl = makeid(64);
+    // ADMIN_BOOTSTRAP_CODE (32+ characters) keeps the link out of the logs: whoever reads
+    // the logs could otherwise claim the first admin account.
+    const configured = process.env.ADMIN_BOOTSTRAP_CODE ?? "";
+    const randomUrl = configured.length >= 32 ? configured : makeid(64);
 
     router.post("/" + randomUrl, async (req, res, next) => {
       try {
@@ -104,7 +107,9 @@ const initFirstAdmin = async () => {
     });
 
     console.log(
-      `admin auth page : ${config.frontendUrl}/admin-auth?code=` + randomUrl,
+      randomUrl === configured
+        ? `admin auth page : ${config.frontendUrl}/admin-auth?code=<ADMIN_BOOTSTRAP_CODE>`
+        : `admin auth page : ${config.frontendUrl}/admin-auth?code=` + randomUrl,
     );
   }
 };

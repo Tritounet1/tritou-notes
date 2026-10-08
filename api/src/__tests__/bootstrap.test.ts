@@ -24,6 +24,24 @@ async function bootstrap() {
   return router;
 }
 describe("first administrator setup", () => {
+  it("logs the bootstrap link, unless ADMIN_BOOTSTRAP_CODE keeps it secret", async () => {
+    db.user.count.mockResolvedValue(0);
+    await bootstrap();
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining("code=bootstrap-code"));
+
+    vi.mocked(console.log).mockClear();
+    vi.stubEnv("ADMIN_BOOTSTRAP_CODE", "c".repeat(32));
+    try {
+      vi.resetModules();
+      const router = await bootstrap();
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining("code=<ADMIN_BOOTSTRAP_CODE>"));
+      expect(JSON.stringify(vi.mocked(console.log).mock.calls)).not.toContain("c".repeat(32));
+      const ctx = await dispatch(router, "POST", `/${"c".repeat(32)}`, { body: { email: user.email, username: "admin", password: "password-long" } });
+      expect(ctx.status).toHaveBeenCalledWith(201);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
   it("disables bootstrap registration if an administrator already exists", async () => {
     const ctx = await dispatch(await bootstrap(), "POST", "/bootstrap-code");
     expect(ctx.json).not.toHaveBeenCalled();

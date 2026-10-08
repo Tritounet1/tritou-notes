@@ -45,5 +45,7 @@ export const createFailureLimiter = ({ max, windowMs }: { max: number; windowMs:
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
 /** Per account (email / username / user id): the real brute-force protection. */
 export const accountFailures = createFailureLimiter({ max: 10, windowMs: FIFTEEN_MINUTES });
+/** Messages sent to the assistant per user (each one may trigger several paid model calls). */
+export const aiMessageBudget = createFailureLimiter({ max: 60, windowMs: 60 * 60 * 1000 });
 /** Per client IP: generous, since behind a reverse proxy every user may share one address. */
 export const ipFailures = createFailureLimiter({ max: 100, windowMs: FIFTEEN_MINUTES });

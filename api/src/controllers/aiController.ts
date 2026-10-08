@@ -6,6 +6,7 @@ import type { ToolContext } from "../ai/toolKit";
 import { generateImage as generateWithOpenRouter, getAiConfig, listImageModels, listTextModels } from "../ai/openrouter";
 import { prisma } from "../config/prismaClient";
 import { prepareImage, removeImage, storeImage } from "../utils/documentImageStorage";
+import { aiMessageBudget } from "../utils/failureLimiter";
 import { httpError, toHttpError } from "../utils/httpError";
 
 
@@ -136,6 +137,11 @@ export const sendMessage = async (req: Request<{ id: string }>, res: Response, n
   try {
     const conversation = await ownConversation(req);
     if (busyConversations.has(conversation.id)) throw httpError("Une réponse est déjà en cours dans cette conversation.", 409);
+    const wait = aiMessageBudget.retryAfter(`user:${req.user.id}`);
+    if (wait > 0) {
+      res.setHeader("Retry-After", String(wait));
+      throw httpError(`Limite de messages à l’assistant atteinte : réessayez dans ${Math.ceil(wait / 60)} min.`, 429);
+    }
     const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
     const attachments: Attachment[] = Array.isArray(req.body?.attachments) ? req.body.attachments : [];
     if (!text && !attachments.length) throw httpError("Message vide");
@@ -145,6 +151,7 @@ export const sendMessage = async (req: Request<{ id: string }>, res: Response, n
     const ctx = await toolContext(req);
     busyConversations.add(conversation.id);
     locked = conversation.id;
+    aiMessageBudget.fail(`user:${req.user.id}`);
 
     if (conversation.title === "Nouvelle conversation" && text) {
       await prisma.conversation.update({ where: { id: conversation.id }, data: { title: text.slice(0, 60) } });

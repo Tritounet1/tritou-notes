@@ -233,6 +233,17 @@ export const changePassword = async (
   }
 };
 
+/** Signs out every session of the user (all devices), this one included. */
+export const logoutEverywhere = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await prisma.user.update({ where: { id: req.user.id }, data: { tokenVersion: { increment: 1 } } });
+    clearAuthCookie(res);
+    res.status(200).json({ message: "Toutes les sessions ont été déconnectées" });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const me = async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
