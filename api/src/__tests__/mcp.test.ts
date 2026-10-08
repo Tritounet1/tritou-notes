@@ -6,7 +6,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, resetDatabase, user } from "./helpers/database";
 vi.mock("../config/prismaClient", async () => ({ prisma: (await import("./helpers/database")).db }));
-vi.mock("../config/queue", () => ({ scrapeQueue: { add: vi.fn(), getRepeatableJobs: vi.fn().mockResolvedValue([]), removeRepeatableByKey: vi.fn() } }));
+vi.mock("../config/queue", () => ({ scrapeQueue: { add: vi.fn(), upsertJobScheduler: vi.fn(), removeJobScheduler: vi.fn() } }));
 import { createMcpApp } from "../mcp/http";
 import { authorize, buildServer, MCP_INSTRUCTIONS, stdioUser } from "../mcp/server";
 import { hashMcpToken } from "../utils/mcpToken";

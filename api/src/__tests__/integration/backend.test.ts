@@ -199,10 +199,25 @@ describe("real HTTP + PostgreSQL + Redis", () => {
     expect(created.status).toBe(201);
     schedulerId = created.data.id;
     expect((await request(`/api/scraping-schedulers/${schedulerId}`, "PUT", { status: "ACTIVATE", cron_expression: "0 * * * *" })).status).toBe(200);
-    expect((await queue.getRepeatableJobs()).some(job => job.name === `scheduler-${schedulerId}`)).toBe(true);
+    expect((await queue.getJobSchedulers()).some(job => job.key === `scheduler-${schedulerId}`)).toBe(true);
     expect((await prisma.scrapingScheduler.findUniqueOrThrow({ where: { id: schedulerId } })).next_run_at).toBeInstanceOf(Date);
     expect((await request(`/api/scraping-schedulers/${schedulerId}`, "PUT", { status: "DESACTIVATE" })).status).toBe(200);
-    expect((await queue.getRepeatableJobs()).some(job => job.name === `scheduler-${schedulerId}`)).toBe(false);
+    expect((await queue.getJobSchedulers()).some(job => job.key === `scheduler-${schedulerId}`)).toBe(false);
+  });
+  it("moves repeatable jobs of the former API to job schedulers, once", async () => {
+    const { migrateLegacySchedulerJobs } = await import("../../services/schedulerService");
+    const active = await prisma.scrapingScheduler.create({ data: { title: "Legacy on", status: "ACTIVATE", cron_expression: "0 * * * *" } });
+    const inactive = await prisma.scrapingScheduler.create({ data: { title: "Legacy off", status: "DESACTIVATE", cron_expression: "0 * * * *" } });
+    for (const { id } of [active, inactive]) await queue.add(`scheduler-${id}`, { schedulerId: id }, { repeat: { pattern: "0 * * * *" }, jobId: `scheduler-${id}` });
+
+    expect(await migrateLegacySchedulerJobs()).toBe(2);
+    const keys = (await queue.getJobSchedulers()).map(job => job.key);
+    expect(keys).toContain(`scheduler-${active.id}`);
+    expect(keys).not.toContain(`scheduler-${inactive.id}`);
+    // No hash-keyed leftover, so no double run.
+    expect((await queue.getJobSchedulers()).filter(job => job.name.startsWith("scheduler-") && job.key !== job.name)).toEqual([]);
+    expect(await migrateLegacySchedulerJobs()).toBe(0);
+    await queue.removeJobScheduler(`scheduler-${active.id}`);
   });
   it("stores encrypted settings that decrypt correctly", async () => {
     const response = await request("/api/settings/1", "PUT", { smtpPassword: "smtp-secret", smtpPort: 587 });

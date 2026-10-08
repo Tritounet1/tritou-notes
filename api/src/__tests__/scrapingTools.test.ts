@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, resetDatabase } from "./helpers/database";
 vi.mock("../config/prismaClient", async () => ({ prisma: (await import("./helpers/database")).db }));
-const queue = vi.hoisted(() => ({ add: vi.fn(), getRepeatableJobs: vi.fn(), removeRepeatableByKey: vi.fn() }));
+const queue = vi.hoisted(() => ({ upsertJobScheduler: vi.fn(), removeJobScheduler: vi.fn(), getJobSchedulers: vi.fn(), add: vi.fn() }));
 vi.mock("../config/queue", () => ({ scrapeQueue: queue }));
 vi.mock("../utils/documentImageStorage", () => ({ removeDocumentImages: vi.fn().mockResolvedValue(undefined) }));
 import { runTool, type ToolContext } from "../ai/tools";
@@ -13,8 +13,9 @@ const run = (name: string, args: object, ctx = admin()) => runTool(name, JSON.st
 beforeEach(() => {
   resetDatabase();
   queue.add.mockReset();
-  queue.getRepeatableJobs.mockReset().mockResolvedValue([]);
-  queue.removeRepeatableByKey.mockReset();
+  queue.upsertJobScheduler.mockReset();
+  queue.removeJobScheduler.mockReset();
+  queue.getJobSchedulers.mockReset().mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -179,7 +180,7 @@ describe("scheduler tools", () => {
     expect(db.scrapingScheduler.create).toHaveBeenCalledWith({ data: { title: "Veille", description: "prix", InstanceScrapes: { create: [{ url: "https://a.example/x" }] } } });
     expect(db.instanceScrape.create).not.toHaveBeenCalled();
     expect(db.scrapingScheduler.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { title: undefined, description: undefined, status: "ACTIVATE", cron_expression: "0 0 * * *" } });
-    expect(queue.add).toHaveBeenCalledWith("scheduler-1", { schedulerId: 1 }, { repeat: { pattern: "0 0 * * *" }, jobId: "scheduler-1" });
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith("scheduler-1", { pattern: "0 0 * * *" }, { name: "scheduler-1", data: { schedulerId: 1 } });
   });
 
   it("rolls the scheduler back when scheduling fails", async () => {
@@ -190,7 +191,7 @@ describe("scheduler tools", () => {
     expect(result).toMatchObject({ ok: false, summary: expect.stringContaining("Utilisateur introuvable") });
     expect(db.instanceScrape.deleteMany).toHaveBeenCalledWith({ where: { scrapingSchedulerId: 5 } });
     expect(db.scrapingScheduler.delete).toHaveBeenCalledWith({ where: { id: 5 } });
-    expect(queue.add).not.toHaveBeenCalled();
+    expect(queue.upsertJobScheduler).not.toHaveBeenCalled();
   });
 
   it("creates a bare scheduler without touching the queue", async () => {
@@ -200,7 +201,7 @@ describe("scheduler tools", () => {
     });
     expect(db.scrapingScheduler.create).toHaveBeenCalledWith({ data: { title: "Seul", description: null } });
     expect(db.scrapingScheduler.update).not.toHaveBeenCalled();
-    expect(queue.add).not.toHaveBeenCalled();
+    expect(queue.upsertJobScheduler).not.toHaveBeenCalled();
   });
 
   it("stores a cron without activating", async () => {
@@ -209,7 +210,7 @@ describe("scheduler tools", () => {
     db.scrapingScheduler.update.mockResolvedValue({ ...scheduler, id: 3, cron_expression: "0 8 * * *" });
     expect(await run("create_scheduler", { title: "C", cron_expression: "0 8 * * *" })).toMatchObject({ ok: true, output: { status: "DESACTIVATE" } });
     expect(db.scrapingScheduler.update).toHaveBeenCalledWith({ where: { id: 3 }, data: expect.objectContaining({ cron_expression: "0 8 * * *", status: undefined }) });
-    expect(queue.add).not.toHaveBeenCalled();
+    expect(queue.upsertJobScheduler).not.toHaveBeenCalled();
   });
 
   it("validates create_scheduler before writing anything", async () => {
@@ -229,7 +230,7 @@ describe("scheduler tools", () => {
     db.scrapingScheduler.findFirst.mockResolvedValue(withCron);
     db.scrapingScheduler.update.mockResolvedValue({ ...withCron, status: "ACTIVATE" });
     expect(await run("update_scheduler", { id: 1, status: "ACTIVATE" })).toMatchObject({ ok: true, summary: "Planificateur modifié : « Veille » (statut)", output: { status: "ACTIVATE", cron_expression: "0 * * * *" } });
-    expect(queue.add).toHaveBeenCalledWith("scheduler-1", { schedulerId: 1 }, expect.objectContaining({ repeat: { pattern: "0 * * * *" } }));
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith("scheduler-1", { pattern: "0 * * * *" }, { name: "scheduler-1", data: { schedulerId: 1 } });
 
     expect(await run("update_scheduler", { id: 1, status: "RUNNING" })).toMatchObject({ ok: false, summary: expect.stringContaining("ACTIVATE ou DESACTIVATE") });
     // Clearing the cron while activating is refused, even though one is stored.
@@ -241,12 +242,11 @@ describe("scheduler tools", () => {
     db.scrapingScheduler.findUnique.mockResolvedValue(active);
     db.scrapingScheduler.findFirst.mockResolvedValue(active);
     db.scrapingScheduler.update.mockResolvedValueOnce({ ...active, cron_expression: "*/5 * * * *" });
-    queue.getRepeatableJobs.mockResolvedValue([{ name: "scheduler-1", key: "k" }]);
-    queue.add.mockRejectedValueOnce(new Error("Redis down")).mockResolvedValue(undefined);
+        queue.upsertJobScheduler.mockRejectedValueOnce(new Error("Redis down")).mockResolvedValue(undefined);
     expect(await run("update_scheduler", { id: 1, cron_expression: "*/5 * * * *" })).toMatchObject({ ok: false, summary: expect.stringContaining("Redis down") });
     expect(db.scrapingScheduler.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { status: "ACTIVATE", cron_expression: "0 * * * *", next_run_at: active.next_run_at } });
     // The previous job is scheduled again.
-    expect(queue.add).toHaveBeenLastCalledWith("scheduler-1", { schedulerId: 1 }, expect.objectContaining({ repeat: { pattern: "0 * * * *" } }));
+    expect(queue.upsertJobScheduler).toHaveBeenLastCalledWith("scheduler-1", { pattern: "0 * * * *" }, { name: "scheduler-1", data: { schedulerId: 1 } });
   });
 
   it("clears the cron and edits title/description", async () => {

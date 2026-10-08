@@ -16,7 +16,7 @@ vi.mock("../ai/openrouter", async importOriginal => ({
   ...await importOriginal<typeof import("../ai/openrouter")>(),
   chatCompletion: mocks.response, listTextModels: mocks.models, listImageModels: mocks.models, generateImage: mocks.response,
 }));
-vi.mock("../config/queue", () => ({ scrapeQueue: { add: mocks.add, getRepeatableJobs: mocks.jobs, removeRepeatableByKey: mocks.remove } }));
+vi.mock("../config/queue", () => ({ scrapeQueue: { add: mocks.add, upsertJobScheduler: mocks.jobs, removeJobScheduler: mocks.remove } }));
 import * as users from "../controllers/userController";
 import * as auth from "../controllers/authController";
 import * as invitations from "../controllers/adminAuthController";
@@ -477,17 +477,15 @@ describe("scraping resources", () => {
     db.scrapingScheduler.findFirst.mockResolvedValue({ status: "DESACTIVATE" });
     db.scrapingScheduler.update.mockResolvedValue({ id: 12, status: "ACTIVATE", cron_expression: "0 * * * *" });
     await call(schedulers.updateScrapingScheduler, { status: "ACTIVATE", cron_expression: "0 * * * *" });
-    expect(mocks.add).toHaveBeenCalledWith("scheduler-12", { schedulerId: 12 }, { repeat: { pattern: "0 * * * *" }, jobId: "scheduler-12" });
+    expect(mocks.jobs).toHaveBeenCalledWith("scheduler-12", { pattern: "0 * * * *" }, { name: "scheduler-12", data: { schedulerId: 12 } });
     expect(db.scrapingScheduler.update).toHaveBeenLastCalledWith({ where: { id: 12 }, data: { start_at: expect.any(Date), next_run_at: expect.any(Date) } });
   });
-  it.each([[[]], [[{ name: "scheduler-12", key: "repeat-key" }]]])("deactivates a scheduler with repeatable jobs %j", async jobs => {
-    db.scrapingScheduler.findFirst.mockResolvedValue({ status: "ACTIVATE" });
+  it("deactivates a scheduler and removes its job scheduler", async () => {
+    db.scrapingScheduler.findFirst.mockResolvedValue({ status: "ACTIVATE", cron_expression: "0 * * * *" });
     db.scrapingScheduler.update.mockResolvedValue({ status: "DESACTIVATE" });
-    mocks.jobs.mockResolvedValue(jobs);
     await call(schedulers.updateScrapingScheduler, { status: "DESACTIVATE" });
     expect(db.scrapingScheduler.update).toHaveBeenLastCalledWith({ where: { id: 12 }, data: { next_run_at: null } });
-    if (jobs.length) expect(mocks.remove).toHaveBeenCalledWith("repeat-key");
-    else expect(mocks.remove).not.toHaveBeenCalled();
+    expect(mocks.remove).toHaveBeenCalledWith("scheduler-12");
   });
   it("does not queue a scheduler without a cron expression", async () => {
     db.scrapingScheduler.findFirst.mockResolvedValue({ status: "DESACTIVATE" });

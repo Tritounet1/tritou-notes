@@ -19,8 +19,9 @@ export const assertValidCron = (cron: string) => {
 };
 
 const schedule = async (id: number, cron: string, startAt: Date | null) => {
-  // A start date in the future delays the first run (BullMQ ignores past ones).
-  await scrapeQueue.add(jobName(id), { schedulerId: id }, { repeat: { pattern: cron, ...(startAt && { startDate: startAt }) }, jobId: jobName(id) });
+  // One BullMQ job scheduler per scheduler, keyed by its job name. A start date in the future
+  // delays the first run (BullMQ ignores past ones).
+  await scrapeQueue.upsertJobScheduler(jobName(id), { pattern: cron, ...(startAt && { startDate: startAt }) }, { name: jobName(id), data: { schedulerId: id } });
   await prisma.scrapingScheduler.update({
     where: { id },
     data: { start_at: startAt || new Date(), next_run_at: cronParser.parse(cron).next().toDate() },
@@ -28,8 +29,23 @@ const schedule = async (id: number, cron: string, startAt: Date | null) => {
 };
 
 const unschedule = async (id: number) => {
-  const job = (await scrapeQueue.getRepeatableJobs()).find((repeatable) => repeatable.name === jobName(id));
-  if (job) await scrapeQueue.removeRepeatableByKey(job.key);
+  await scrapeQueue.removeJobScheduler(jobName(id));
+};
+
+/**
+ * Converts repeatable jobs created with the former `add(name, data, { repeat })` API (keyed by
+ * a hash, not by their name) into job schedulers. Run at API startup; returns how many moved.
+ * Without it, a scheduler changed after the upgrade would run twice.
+ */
+export const migrateLegacySchedulerJobs = async () => {
+  const legacy = (await scrapeQueue.getJobSchedulers()).filter((job) => job.name.startsWith("scheduler-") && job.key !== job.name);
+  for (const job of legacy) {
+    await scrapeQueue.removeJobScheduler(job.key);
+    const id = Number(job.name.slice("scheduler-".length));
+    const scheduler = await prisma.scrapingScheduler.findUnique({ where: { id } });
+    if (scheduler && isScheduled(scheduler.status) && scheduler.cron_expression) await schedule(id, scheduler.cron_expression, scheduler.start_at);
+  }
+  return legacy.length;
 };
 
 export interface SchedulerChanges {

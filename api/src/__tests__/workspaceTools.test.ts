@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db, resetDatabase } from "./helpers/database";
 vi.mock("../config/prismaClient", async () => ({ prisma: (await import("./helpers/database")).db }));
-const queue = vi.hoisted(() => ({ add: vi.fn(), getRepeatableJobs: vi.fn(), removeRepeatableByKey: vi.fn() }));
+const queue = vi.hoisted(() => ({ upsertJobScheduler: vi.fn(), removeJobScheduler: vi.fn(), getJobSchedulers: vi.fn(), add: vi.fn() }));
 vi.mock("../config/queue", () => ({ scrapeQueue: queue }));
 const images = vi.hoisted(() => ({ removeDocumentImages: vi.fn() }));
 vi.mock("../utils/documentImageStorage", () => images);

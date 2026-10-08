@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ redis: vi.fn(), queue: vi.fn(), adapter: vi.fn(), prisma: vi.fn(), listen: vi.fn(), dotenv: vi.fn() }));
+const mocks = vi.hoisted(() => ({ migrate: vi.fn(), redis: vi.fn(), queue: vi.fn(), adapter: vi.fn(), prisma: vi.fn(), listen: vi.fn(), dotenv: vi.fn() }));
 vi.mock("ioredis", () => ({ default: class { constructor(options: unknown) { mocks.redis(options); } } }));
 vi.mock("bullmq", () => ({ Queue: class { constructor(name: string, options: unknown) { mocks.queue(name, options); } } }));
 vi.mock("@prisma/adapter-pg", () => ({ PrismaPg: class { constructor(options: unknown) { mocks.adapter(options); } } }));
 vi.mock("../generated/prisma/client", () => ({ PrismaClient: class { constructor(options: unknown) { mocks.prisma(options); } } }));
 vi.mock("../app", () => ({ default: { listen: mocks.listen } }));
+vi.mock("../services/schedulerService", () => ({ migrateLegacySchedulerJobs: mocks.migrate }));
 vi.mock("dotenv", () => ({ default: { config: mocks.dotenv } }));
 beforeEach(() => { vi.resetModules(); vi.clearAllMocks(); });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
@@ -62,7 +63,21 @@ it("loads environment configuration and starts the API on its configured port", 
   vi.stubEnv("PORT", "4000");
   mocks.listen.mockImplementation((_port, ready) => ready());
   vi.spyOn(console, "log").mockImplementation(() => {});
+  mocks.migrate.mockResolvedValue(0);
   await import("../server");
   expect(mocks.dotenv).toHaveBeenCalledOnce();
   expect(mocks.listen).toHaveBeenCalledWith(4000, expect.any(Function));
+  expect(mocks.migrate).toHaveBeenCalledOnce();
+});
+it("reports scheduler jobs moved to job schedulers at startup, and migration failures", async () => {
+  const log = vi.spyOn(console, "log").mockImplementation(() => {});
+  const error = vi.spyOn(console, "error").mockImplementation(() => {});
+  mocks.migrate.mockResolvedValue(2);
+  await import("../server");
+  await vi.waitFor(() => expect(log).toHaveBeenCalledWith("Moved 2 scheduler job(s) to BullMQ job schedulers."));
+
+  vi.resetModules();
+  mocks.migrate.mockRejectedValue(new Error("Redis down"));
+  await import("../server");
+  await vi.waitFor(() => expect(error).toHaveBeenCalledWith("Could not migrate the scheduler jobs:", expect.any(Error)));
 });

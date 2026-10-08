@@ -10,7 +10,7 @@ vi.mock("../config/prismaClient", async () => ({ prisma: (await import("./helper
 const mocks = vi.hoisted(() => ({ decode: vi.fn(), mail: vi.fn(), preview: vi.fn(), parse: vi.fn() }));
 vi.mock("../utils/jwtUtils", () => ({ decodeToken: mocks.decode, createToken: () => "jwt" }));
 vi.mock("../config/mailClient", () => ({ sendEmail: mocks.mail }));
-vi.mock("../config/queue", () => ({ scrapeQueue: { add: vi.fn(), getRepeatableJobs: async () => [] } }));
+vi.mock("../config/queue", () => ({ scrapeQueue: { add: vi.fn(), upsertJobScheduler: vi.fn(), removeJobScheduler: vi.fn() } }));
 vi.mock("../utils/utils", () => ({ encrypt: (value: string) => value, makeid: () => "token" }));
 vi.mock("../utils/linkPreview", () => ({ getLinkPreview: mocks.preview, parsePublicUrl: mocks.parse }));
 import documents from "../routes/documentRoutes";

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db, resetDatabase } from "./helpers/database";
 vi.mock("../config/prismaClient", async () => ({ prisma: (await import("./helpers/database")).db }));
-const queue = vi.hoisted(() => ({ add: vi.fn(), getRepeatableJobs: vi.fn(), removeRepeatableByKey: vi.fn() }));
+const queue = vi.hoisted(() => ({ upsertJobScheduler: vi.fn(), removeJobScheduler: vi.fn(), getJobSchedulers: vi.fn(), add: vi.fn() }));
 vi.mock("../config/queue", () => ({ scrapeQueue: queue }));
 vi.mock("../utils/documentImageStorage", () => ({ removeDocumentImages: vi.fn().mockResolvedValue(undefined) }));
 import { runTool, toolDefinitions, type ToolContext } from "../ai/tools";
@@ -14,8 +14,9 @@ const run = (name: string, args: object, ctx = admin()) => runTool(name, JSON.st
 beforeEach(() => {
   resetDatabase();
   queue.add.mockReset();
-  queue.getRepeatableJobs.mockReset().mockResolvedValue([]);
-  queue.removeRepeatableByKey.mockReset();
+  queue.upsertJobScheduler.mockReset();
+  queue.removeJobScheduler.mockReset();
+  queue.getJobSchedulers.mockReset().mockResolvedValue([]);
 });
 
 describe("tool catalogue", () => {
@@ -43,7 +44,7 @@ describe("schedulers", () => {
 
     const result = await run("update_scheduler", { id: 1, description: "Prix Apple Watch", cron_expression: "0 0 * * *", status: "ACTIVATE" });
     expect(result).toMatchObject({ ok: true, summary: "Planificateur modifié : « Test » (description, cron, statut)" });
-    expect(queue.add).toHaveBeenCalledWith("scheduler-1", { schedulerId: 1 }, { repeat: { pattern: "0 0 * * *" }, jobId: "scheduler-1" });
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith("scheduler-1", { pattern: "0 0 * * *" }, { name: "scheduler-1", data: { schedulerId: 1 } });
   });
 
   it("refuses an invalid cron and activation without cron", async () => {
@@ -51,7 +52,7 @@ describe("schedulers", () => {
     db.scrapingScheduler.findFirst.mockResolvedValue(scheduler);
     expect(await run("update_scheduler", { id: 1, cron_expression: "tous les jours" })).toMatchObject({ ok: false });
     expect(await run("update_scheduler", { id: 1, status: "ACTIVATE" })).toMatchObject({ ok: false, summary: expect.stringContaining("cron") });
-    expect(queue.add).not.toHaveBeenCalled();
+    expect(queue.upsertJobScheduler).not.toHaveBeenCalled();
   });
 
   it("needs modifyScraperStatus", async () => {
@@ -65,11 +66,10 @@ describe("scheduler service fixes", () => {
     const active = { id: 2, status: "ACTIVATE", cron_expression: "0 * * * *", start_at: new Date(0) };
     db.scrapingScheduler.findFirst.mockResolvedValue(active);
     db.scrapingScheduler.update.mockResolvedValue({ ...active, cron_expression: "0 8 * * *" });
-    queue.getRepeatableJobs.mockResolvedValue([{ name: "scheduler-2", key: "old-key" }]);
     await updateScheduler(2, 7, { cron_expression: "0 8 * * *" });
-    expect(queue.removeRepeatableByKey).toHaveBeenCalledWith("old-key");
+    expect(queue.removeJobScheduler).toHaveBeenCalledWith("scheduler-2");
     // The stored start date goes to BullMQ (which ignores it once in the past).
-    expect(queue.add).toHaveBeenCalledWith("scheduler-2", { schedulerId: 2 }, { repeat: { pattern: "0 8 * * *", startDate: new Date(0) }, jobId: "scheduler-2" });
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith("scheduler-2", { pattern: "0 8 * * *", startDate: new Date(0) }, { name: "scheduler-2", data: { schedulerId: 2 } });
   });
 
   it("only accepts configuration statuses, and a cron to activate", async () => {
@@ -82,19 +82,32 @@ describe("scheduler service fixes", () => {
     expect(db.scrapingScheduler.update).not.toHaveBeenCalled();
   });
 
+  it("moves legacy repeatable jobs to job schedulers", async () => {
+    queue.getJobSchedulers.mockResolvedValue([
+      { name: "scheduler-1", key: "hash-1" }, // legacy, active
+      { name: "scheduler-2", key: "hash-2" }, // legacy, deactivated meanwhile
+      { name: "scheduler-3", key: "scheduler-3" }, // already a job scheduler
+      { name: "other", key: "hash-x" },
+    ]);
+    db.scrapingScheduler.findUnique.mockImplementation(async ({ where: { id } }) => (id === 1 ? { id, status: "ACTIVATE", cron_expression: "0 * * * *", start_at: null } : { id, status: "DESACTIVATE", cron_expression: "0 * * * *" }));
+    const { migrateLegacySchedulerJobs } = await import("../services/schedulerService");
+    expect(await migrateLegacySchedulerJobs()).toBe(2);
+    expect(queue.removeJobScheduler.mock.calls.map(([key]) => key)).toEqual(["hash-1", "hash-2"]);
+    expect(queue.upsertJobScheduler).toHaveBeenCalledOnce();
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith("scheduler-1", { pattern: "0 * * * *" }, { name: "scheduler-1", data: { schedulerId: 1 } });
+  });
+
   it("stops the job of a scheduler deactivated while in ERROR", async () => {
     db.scrapingScheduler.findFirst.mockResolvedValue({ id: 3, status: "ERROR", cron_expression: "0 * * * *" });
     db.scrapingScheduler.update.mockResolvedValue({ id: 3, status: "DESACTIVATE", cron_expression: "0 * * * *" });
-    queue.getRepeatableJobs.mockResolvedValue([{ name: "scheduler-3", key: "k3" }]);
     await updateScheduler(3, 7, { status: "DESACTIVATE" });
-    expect(queue.removeRepeatableByKey).toHaveBeenCalledWith("k3");
+    expect(queue.removeJobScheduler).toHaveBeenCalledWith("scheduler-3");
   });
 
   it("removes the repeatable job when a scheduler is deleted", async () => {
     db.scrapingScheduler.findUnique.mockResolvedValue({ id: 4, title: "Old" });
-    queue.getRepeatableJobs.mockResolvedValue([{ name: "scheduler-4", key: "k4" }]);
     expect(await run("delete_scheduler", { id: 4 })).toMatchObject({ ok: true });
-    expect(queue.removeRepeatableByKey).toHaveBeenCalledWith("k4");
+    expect(queue.removeJobScheduler).toHaveBeenCalledWith("scheduler-4");
     expect(db.scrapingScheduler.delete).toHaveBeenCalledWith({ where: { id: 4 } });
   });
 });
