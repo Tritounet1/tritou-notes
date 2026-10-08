@@ -1,5 +1,5 @@
 import { prisma } from "../config/prismaClient";
-import type { Prisma } from "../generated/prisma/client";
+import type { AiRole, Prisma } from "../generated/prisma/client";
 import { chatCompletion, type AiConfig, type ChatMessage, type ContentPart } from "./openrouter";
 import { runTool, toolDefinitions, type ToolContext } from "./tools";
 
@@ -187,7 +187,7 @@ export const runTurn = async ({
 
   const save = (message: ChatMessage, summary: string | null = null) =>
     prisma.aiMessage.create({
-      data: { conversationId, role: message.role, data: message as unknown as Prisma.InputJsonValue, summary },
+      data: { conversationId, role: message.role as AiRole, data: message as unknown as Prisma.InputJsonValue, summary },
     });
 
   await save(withoutAttachments(userMessage), attachmentNames.length ? attachmentNames.join("\n") : null);

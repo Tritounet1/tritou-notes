@@ -35,7 +35,7 @@ model Document {
   text              String            @default("")
   public            Boolean           @default(false)
   created_at        DateTime          @default(now())
-  last_update       DateTime          @default(now())
+  last_update       DateTime          @default(now()) @updatedAt
   // Creator of the page; lastEditor wrote its current content.
   author            User?              @relation("DocumentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
   authorId          Int?
@@ -88,7 +88,7 @@ model ScrapingScheduler {
   last_run_at             DateTime?
   next_run_at             DateTime?
   status                  ScrapingSchedulerStatus @default(DESACTIVATE)
-  update_at               DateTime                @default(now())
+  update_at               DateTime                @default(now()) @updatedAt
   created_at              DateTime                @default(now())
   instanceScrapeHistories InstanceScrapeHistory[]
 }
@@ -124,7 +124,7 @@ model Scraper {
   base_url         String[]
   status           ScraperStatus    @default(DISABLE)
   created_at       DateTime         @default(now())
-  last_update      DateTime         @default(now())
+  last_update      DateTime         @default(now()) @updatedAt
   display_template Json?
   instanceScrapes  InstanceScrape[]
 }
@@ -135,7 +135,7 @@ model InstanceScrape {
   response                Json?
   status                  InstanceScrapeStatus    @default(IN_QUEUE)
   created_at              DateTime                @default(now())
-  last_update             DateTime                @default(now())
+  last_update             DateTime                @default(now()) @updatedAt
   scrapingScheduler       ScrapingScheduler?      @relation(fields: [scrapingSchedulerId], references: [id])
   scrapingSchedulerId     Int?
   instanceScrapeHistories InstanceScrapeHistory[]
@@ -170,7 +170,7 @@ model Conversation {
   author     User?       @relation(fields: [authorId], references: [id], onDelete: Cascade)
   authorId   Int?
   created_at DateTime    @default(now())
-  updated_at DateTime    @default(now())
+  updated_at DateTime    @default(now()) @updatedAt
   messages   AiMessage[]
 
   @@index([documentId])
@@ -178,11 +178,18 @@ model Conversation {
 }
 
 // One chat-completions message, stored as sent to OpenRouter (role, content, tool_calls, tool_call_id).
+/// Stored chat messages (system prompts are rebuilt, never stored).
+enum AiRole {
+  user
+  assistant
+  tool
+}
+
 model AiMessage {
   id             Int          @id @default(autoincrement())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   conversationId Int
-  role           String
+  role           AiRole
   data           Json
   /// Human-readable result of a tool call, shown in the chat.
   summary        String?
