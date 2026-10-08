@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { notifyDocumentsChanged } from "./utils/documentEvents";
 import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "./api";
 import { useAuth } from "./hooks/useAuth";
@@ -8,7 +9,6 @@ import { docTypeStyles } from "./utils/docTypes";
 interface Document {
   id: number;
   title: string;
-  text: string | null;
   public: boolean;
   last_update: string;
   authorId: number | null;
@@ -65,6 +65,7 @@ export const Dashboard = () => {
       });
       if (response.ok) {
         const newDoc = await response.json();
+        notifyDocumentsChanged();
         navigate(`/document/${newDoc.id}`);
       }
     } catch (err) {

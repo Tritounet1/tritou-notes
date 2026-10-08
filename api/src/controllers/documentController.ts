@@ -44,7 +44,11 @@ export const getDocuments = async (
   next: NextFunction,
 ) => {
   try {
-    const documents = await prisma.document.findMany();
+    // The page list (sidebar, dashboard, palette) never needs the content: no text.
+    const documents = await prisma.document.findMany({
+      select: { id: true, title: true, type: true, public: true, parentId: true, folderId: true, authorId: true, lastEditorId: true, created_at: true, last_update: true },
+      orderBy: { id: "asc" },
+    });
     res.json(documents);
   } catch (error) {
     next(error);

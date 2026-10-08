@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { notifyDocumentsChanged } from "../utils/documentEvents";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api";
 import { useAuth } from "../hooks/useAuth";
@@ -69,6 +70,7 @@ export const Navigation = ({ onSearch }: { onSearch: () => void }) => {
     });
     if (res.ok) {
       const doc = await res.json();
+      notifyDocumentsChanged();
       navigate(`/document/${doc.id}`);
     }
   };

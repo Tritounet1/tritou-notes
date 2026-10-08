@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { notifyDocumentsChanged } from "../utils/documentEvents";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../api";
 import { useAuth } from "../hooks/useAuth";
@@ -118,7 +119,10 @@ export const CommandPalette = ({ onClose }: { onClose: () => void }) => {
               method: "POST",
               body: JSON.stringify({ title: query.trim(), type: "TEXT" }),
             });
-            if (res.ok) go(`/document/${(await res.json()).id}`)();
+            if (res.ok) {
+              notifyDocumentsChanged();
+              go(`/document/${(await res.json()).id}`)();
+            }
           },
         }]
       : [];

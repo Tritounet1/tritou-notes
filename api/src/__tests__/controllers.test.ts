@@ -314,6 +314,13 @@ it("returns the latest document versions, oldest first", async () => {
   expect(ctx.json).toHaveBeenCalledWith([{ id: 2 }, { id: 3 }]);
 });
 
+it("lists pages without their content", async () => {
+  await call(documents.getDocuments);
+  const { select } = db.document.findMany.mock.calls[0][0];
+  expect(select).toMatchObject({ id: true, title: true, parentId: true, folderId: true });
+  expect(select).not.toHaveProperty("text");
+});
+
 describe("document lifecycle", () => {
   it("uses the authenticated author when creating a document", async () => {
     const ctx = await call(documents.createDocument, { title: "Note", type: "TEXT", authorId: 99 });

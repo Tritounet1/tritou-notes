@@ -70,6 +70,7 @@ export const PageTree = () => {
   const [pages, setPages] = useState<PageRow[]>([]);
   const [folders, setFolders] = useState<FolderRow[]>([]);
   const [reload, setReload] = useState(0);
+  const [loadError, setLoadError] = useState(false);
   // Pages: manual overrides on top of the automatic "path to the current page" expansion.
   const [opened, setOpened] = useState<Set<number>>(new Set());
   const [closed, setClosed] = useState<Set<number>>(new Set());
@@ -90,10 +91,21 @@ export const PageTree = () => {
     return () => window.removeEventListener(DOCUMENTS_CHANGED, refresh);
   }, []);
 
+  // Loaded once, then again only when pages or folders change (DOCUMENTS_CHANGED), not on
+  // every navigation. A newer load cancels an older one so the tree never goes back in time.
   useEffect(() => {
-    apiFetch("/api/documents").then((res) => (res.ok ? res.json() : [])).then(setPages).catch(console.error);
-    apiFetch("/api/folders").then((res) => (res.ok ? res.json() : [])).then(setFolders).catch(console.error);
-  }, [location.pathname, reload]);
+    const controller = new AbortController();
+    const load = async <T,>(url: string, apply: (data: T) => void) => {
+      const res = await apiFetch(url, { signal: controller.signal });
+      if (!res.ok) throw new Error(`${url} ${res.status}`);
+      const data = await res.json();
+      if (!controller.signal.aborted) apply(data);
+    };
+    Promise.all([load("/api/documents", setPages), load("/api/folders", setFolders)])
+      .then(() => setLoadError(false))
+      .catch(() => !controller.signal.aborted && setLoadError(true));
+    return () => controller.abort();
+  }, [reload]);
 
   useEffect(() => {
     try {
@@ -380,6 +392,12 @@ export const PageTree = () => {
           </button>
         )}
       </div>
+      {loadError && (
+        <p role="alert" className="px-2.5 py-1 text-xs text-danger-ink">
+          Pages indisponibles.{" "}
+          <button type="button" onClick={() => setReload((n) => n + 1)} className="cursor-pointer underline">Réessayer</button>
+        </p>
+      )}
       <div role="tree" aria-label="Pages" className="flex flex-col gap-0.5">
         {renderFolders(null, 0, new Set())}
         {renderPages(pagesInFolder.get(null) ?? [], 0, new Set())}
