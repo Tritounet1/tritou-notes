@@ -16,9 +16,7 @@ Install dependencies separately in the root, `app/` and `api/`; these are separa
 - `npm run lint`: lint the API and frontend with ESLint.
 - `npm --prefix api test`: run backend Vitest tests; use `npm --prefix api run test:watch` during development.
 - `cd api && npx prisma generate`: generate the API database client; `npm --prefix api run migrate`: apply the database migrations.
-- `npm --prefix api run build` and `npm --prefix app run build`: compile backend and frontend.
-
-The root `npm run build` currently invokes an undefined API `prod` script; use the explicit builds above.
+- `npm run build`: compile the API (with its Prisma client and sandbox bundle) and the frontend; `npm --prefix api run build` and `npm --prefix app run build` build one side.
 
 ## Coding Style & Naming Conventions
 
