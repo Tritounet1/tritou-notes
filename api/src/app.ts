@@ -18,6 +18,7 @@ import scraperRoutes from "./routes/scraperRoutes";
 import scrapingSchedulerRoutes from "./routes/scrapingSchedulerRoutes";
 import settingsRoutes from "./routes/settingsRoutes";
 import mcpTokenRoutes from "./routes/mcpTokenRoutes";
+import mcpRoutes from "./mcp/http";
 import linkPreviewRoutes from "./routes/linkPreviewRoutes";
 import userPermissionsRoutes from "./routes/userPermissionsRoutes";
 import userRoutes from "./routes/userRoutes";
@@ -41,8 +42,8 @@ app.use(
 );
 
 app.use(cookieParser());
-// /api/ai parses its own, larger bodies (chat attachments).
-app.use(/^(?!\/api\/ai\/)/, express.json());
+// /api/ai and /mcp parse their own, larger bodies (chat attachments, page contents).
+app.use(/^(?!\/api\/ai\/|\/mcp(\/|$))/, express.json());
 
 app.use("/health", (req, res) => res.sendStatus(200));
 
@@ -56,6 +57,9 @@ app.use("/api/admin-auth", authAdminRoutes);
 
 // Routes without connection needed
 app.use("/auth", authRoutes);
+
+// MCP server (personal Bearer token, checked by the route itself)
+app.use(mcpRoutes);
 
 // Auth middleware for check if user is connected
 app.use(authHandler);

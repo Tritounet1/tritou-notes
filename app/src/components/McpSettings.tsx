@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiFetch } from "../api";
+import { API_URL, apiFetch } from "../api";
 import { useConfirm } from "../hooks/useConfirm";
 
 interface McpToken {
@@ -18,8 +18,8 @@ const CLIENTS: [Client, string][] = [
   ["desktop", "Claude Desktop"],
 ];
 
-// Production setups proxy /mcp on the app's domain (see the README); override with VITE_MCP_URL.
-const defaultMcpUrl = import.meta.env.VITE_MCP_URL || `${window.location.origin}/mcp`;
+// The API serves the MCP server on /mcp.
+const defaultMcpUrl = `${API_URL.replace(/\/$/, "")}/mcp`;
 
 const snippet = (client: Client, url: string, token: string) => {
   const auth = `Authorization: Bearer ${token}`;

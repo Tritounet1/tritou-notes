@@ -26,9 +26,8 @@ React app ──► Express API ──► PostgreSQL (Prisma)
                   │
                   ├──► Redis / BullMQ ──► Worker (Puppeteer + Cheerio) ──► websites
                   ├──► OpenRouter (assistant, image generation)
-                  └──► Local disk (document images)
-
-MCP server ──► PostgreSQL + Redis (same data, used by Claude)
+                  ├──► Local disk (document images)
+                  └──► /mcp: MCP server (assistant tools, used by Claude)
 ```
 
 A scraper is a piece of synchronous JavaScript that receives `$` (Cheerio loaded with the page HTML) and assigns `result`. The worker picks the active scraper whose base URLs contain the page's origin:
@@ -110,7 +109,7 @@ The app reads `VITE_API_URL` at build time (default `http://localhost:3000`).
 
 ## Deployment
 
-`docker-compose.yml` runs every service: `database`, `redis`, `api`, `worker`, `mcp` and `app` (nginx).
+`docker-compose.yml` runs every service: `database`, `redis`, `api` (which also serves the MCP server on `/mcp`), `worker` and `app` (nginx).
 
 ```sh
 VITE_API_URL=https://api.example.com docker compose up -d --build
@@ -120,9 +119,9 @@ VITE_API_URL=https://api.example.com docker compose up -d --build
 - Document images live in the `document-images` volume: include it in your backups along with PostgreSQL.
 - On startup the API container applies pending migrations from `api/prisma/migrations` (`npm run migrate`). A database created earlier with `prisma db push` is detected and baselined automatically on `0_init`. To change the schema: `npm --prefix api run migrate:dev -- --name <change>`, review the SQL, commit it.
 - Behind nginx, keep response buffering off for the API so assistant replies stream (the API already sends `X-Accel-Buffering: no`).
-- Images use Node 24 and run as the unprivileged `node` user; the worker also drops every Linux capability. The API and MCP containers start as root only to hand the `document-images` volume to `node`.
+- Images use Node 24 and run as the unprivileged `node` user; the worker also drops every Linux capability. The API container starts as root only to hand the `document-images` volume to `node`.
 - Chromium keeps its own sandbox: the worker image is Debian-based and Compose applies `docker/worker/seccomp-chromium.json` (Docker's default profile plus the syscalls Chromium needs for user namespaces). If your platform runs the worker without that profile, it logs a warning and scrapes without the sandbox; set `CHROMIUM_SANDBOX=required` to refuse instead.
-- PostgreSQL, Redis and the MCP server are published on `127.0.0.1` only: reach them through the reverse proxy (or the Docker network).
+- PostgreSQL and Redis are published on `127.0.0.1` only: reach them through the reverse proxy (or the Docker network).
 - Session cookies are `Secure` and `SameSite=Strict` when `FRONTEND_URL` is https, and last as long as the session (2 days). Changing a password signs out every other session.
 
 ### MCP server
@@ -130,16 +129,7 @@ VITE_API_URL=https://api.example.com docker compose up -d --build
 The MCP server (`api/src/mcp.ts`) gives Claude the in-app assistant's tools: pages, folders, to-dos, spreadsheets, scrapers, schedulers and instances, with the same validation, page history and permissions. It acts as the user whose personal token it receives.
 
 - **Tokens**: every user creates personal tokens in **Settings › MCP**, one per device or use, optionally *read-only* (only the tools that read). A token is shown once; only its SHA-256 is stored. The page lists your tokens with their last use, revokes them, and shows ready-to-copy Claude Code and Claude Desktop configurations.
-- **HTTP** (production): `MCP_HTTP_PORT=3001 npm --prefix api run start:mcp`, or the `mcp` Compose service. Proxy `/mcp` on the app's domain with buffering off; `/mcp/health` answers without a token.
-
-  ```nginx
-  location /mcp {
-      proxy_pass http://localhost:3001;
-      proxy_http_version 1.1;
-      proxy_set_header Connection "";
-      proxy_buffering off;
-  }
-  ```
+- **HTTP**: the API serves it on `/mcp` (e.g. `https://api.example.com/mcp`), authenticated by the token in an `Authorization: Bearer` header; `/mcp/health` answers without a token. No extra service or proxy rule is needed.
 
 - **stdio** (local): `MCP_TOKEN=<personal token> node api/dist/mcp.js` with the API's `.env`.
 
@@ -161,8 +151,8 @@ tritou-notes/
 │       ├── scraping/    # Scraper sandbox and network guard
 │       ├── server.ts    # API entry point
 │       ├── worker.ts    # Scraping queue consumer
-│       └── mcp.ts       # MCP server entry point
-├── docker/              # Dockerfiles for api, worker, app and mcp
+│       └── mcp.ts       # MCP server over stdio (local clients)
+├── docker/              # Dockerfiles for api, worker and app
 ├── docs/                # Architecture diagrams and test documentation
 └── docker-compose.yml
 ```

@@ -3,7 +3,7 @@
 ## Project Structure & Module Organization
 
 - `app/src/`: React, TypeScript, Vite, and Tailwind frontend; pages sit at the root, with reusable `components/`, `hooks/`, and `types/`.
-- `api/src/`: Express backend organized into `routes/`, `controllers/`, `middlewares/`, `config/`, and `utils/`. `server.ts` starts the API; `worker.ts` runs BullMQ scraping jobs; `mcp.ts` starts the MCP server, which exposes the assistant's tools (`ai/`).
+- `api/src/`: Express backend organized into `routes/`, `controllers/`, `middlewares/`, `config/`, and `utils/`. `server.ts` starts the API; `worker.ts` runs BullMQ scraping jobs; the MCP server (`mcp/`), which exposes the assistant's tools (`ai/`), is served by the API on `/mcp`; `mcp.ts` runs it over stdio for local clients.
 - `api/prisma/schema.prisma`: database schema, with versioned migrations in `api/prisma/migrations/`; `api/src/__tests__/`: backend tests.
 - `docker/` and `docker-compose.yml`: container definitions and PostgreSQL/Redis services. `assets/images/` contains README screenshots.
 

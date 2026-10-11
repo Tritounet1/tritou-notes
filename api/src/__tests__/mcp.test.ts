@@ -7,7 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, resetDatabase, user } from "./helpers/database";
 vi.mock("../config/prismaClient", async () => ({ prisma: (await import("./helpers/database")).db }));
 vi.mock("../config/queue", () => ({ scrapeQueue: { add: vi.fn(), upsertJobScheduler: vi.fn(), removeJobScheduler: vi.fn() } }));
-import { createMcpApp } from "../mcp/http";
+import express from "express";
+import mcpRoutes from "../mcp/http";
 import { authorize, buildServer, MCP_INSTRUCTIONS, READ_ONLY_TOOLS, stdioIdentity } from "../mcp/server";
 import { hashMcpToken } from "../utils/mcpToken";
 
@@ -105,7 +106,7 @@ describe("MCP server", () => {
 describe("MCP over HTTP", () => {
   let server: HttpServer | undefined;
   const start = async () => {
-    server = createMcpApp().listen(0, "127.0.0.1");
+    server = express().use(mcpRoutes).listen(0, "127.0.0.1");
     await once(server, "listening");
     return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   };
@@ -123,8 +124,7 @@ describe("MCP over HTTP", () => {
   it("serves health without a token and rejects unauthorized requests", async () => {
     withToken();
     const base = await start();
-    expect(await (await fetch(`${base}/health`)).json()).toEqual({ ok: true });
-    expect((await fetch(`${base}/mcp/health`)).status).toBe(200);
+    expect(await (await fetch(`${base}/mcp/health`)).json()).toEqual({ ok: true });
     expect((await rpc(base)).status).toBe(401);
     expect((await rpc(base, "Bearer wrong")).status).toBe(401);
   });

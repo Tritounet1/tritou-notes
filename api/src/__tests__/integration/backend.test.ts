@@ -265,30 +265,25 @@ describe("real HTTP + PostgreSQL + Redis", () => {
   it("serves the assistant's tools over MCP as the admin who generated the token", async () => {
     const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
     const { StreamableHTTPClientTransport } = await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
-    const { createMcpApp } = await import("../../mcp/http");
     const created = await request("/api/mcp-tokens", "POST", { name: "Intégration" });
     expect(created.status).toBe(201);
-    const mcp = createMcpApp().listen(0, "127.0.0.1");
-    await once(mcp, "listening");
-    const url = new URL(`http://127.0.0.1:${(mcp.address() as AddressInfo).port}/mcp`);
-    try {
-      const denied = new Client({ name: "test", version: "1" });
-      await expect(denied.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers: { Authorization: "Bearer wrong" } } }))).rejects.toThrow();
+    // Served by the API itself, before the session cookie check.
+    const url = new URL(`${base}/mcp`);
+    expect(await (await fetch(`${base}/mcp/health`)).json()).toEqual({ ok: true });
+    const denied = new Client({ name: "test", version: "1" });
+    await expect(denied.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers: { Authorization: "Bearer wrong" } } }))).rejects.toThrow();
 
-      const client = new Client({ name: "test", version: "1" });
-      await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers: { Authorization: `Bearer ${created.data.token}` } } }));
-      const page = await client.callTool({ name: "create_page", arguments: { title: "Via MCP" } });
-      expect(page.isError).toBe(false);
-      const { id } = JSON.parse((page.content as { text: string }[])[0].text);
-      expect(await prisma.document.findUniqueOrThrow({ where: { id } })).toMatchObject({ title: "Via MCP", authorId: (await prisma.user.findFirstOrThrow({ where: { email: "admin@test.example" } })).id });
-      const edited = await client.callTool({ name: "rewrite_page", arguments: { id, text: "Contenu MCP" } });
-      expect(edited.isError).toBe(false);
-      // MCP edits go through the page history like any other edit.
-      expect(await prisma.documentHistory.count({ where: { documentId: id } })).toBe(1);
-      await client.close();
-    } finally {
-      await new Promise((resolve) => mcp.close(resolve));
-    }
+    const client = new Client({ name: "test", version: "1" });
+    await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers: { Authorization: `Bearer ${created.data.token}` } } }));
+    const page = await client.callTool({ name: "create_page", arguments: { title: "Via MCP" } });
+    expect(page.isError).toBe(false);
+    const { id } = JSON.parse((page.content as { text: string }[])[0].text);
+    expect(await prisma.document.findUniqueOrThrow({ where: { id } })).toMatchObject({ title: "Via MCP", authorId: (await prisma.user.findFirstOrThrow({ where: { email: "admin@test.example" } })).id });
+    const edited = await client.callTool({ name: "rewrite_page", arguments: { id, text: "Contenu MCP" } });
+    expect(edited.isError).toBe(false);
+    // MCP edits go through the page history like any other edit.
+    expect(await prisma.documentHistory.count({ where: { documentId: id } })).toBe(1);
+    await client.close();
   });
   it("deletes a scrape instance together with its history", async () => {
     await prisma.instanceScrapeHistory.create({ data: { instanceScrapeId: instanceId, url: "https://example.com/", status: "FINISHED", response: { price: 1 } } });
