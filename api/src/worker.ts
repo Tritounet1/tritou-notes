@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import dotenv from "dotenv";
-import { writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 dotenv.config();
 
 import IORedis from "ioredis";
@@ -40,10 +40,15 @@ const SANDBOX_MODE = process.env.CHROMIUM_SANDBOX ?? "auto";
 let sandboxed = SANDBOX_MODE !== "off";
 
 const launchBrowser = async (): Promise<Browser> => {
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+  // Checked first: a wrong path must not pass for a sandbox failure and turn the sandbox off.
+  if (executablePath && !existsSync(executablePath)) {
+    throw new Error(`Chromium not found at PUPPETEER_EXECUTABLE_PATH=${executablePath} (the worker image installs it at /usr/bin/chromium).`);
+  }
   const launch = (sandbox: boolean) =>
     puppeteer.launch({
       headless: true,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      executablePath,
       // Renderer heap capped: a scraper building a huge result crashes its tab, not the worker.
       args: ["--start-maximized", `--js-flags=--max-old-space-size=${RENDERER_HEAP_MB}`, ...(sandbox ? [] : ["--no-sandbox", "--disable-setuid-sandbox"])],
     });

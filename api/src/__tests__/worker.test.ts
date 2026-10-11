@@ -257,6 +257,13 @@ describe("Chromium sandbox", () => {
     expect(sandboxFlags(0)).toBe("on");
   });
 
+  it("reports a wrong Chromium path without turning the sandbox off", async () => {
+    vi.stubEnv("PUPPETEER_EXECUTABLE_PATH", "/usr/bin/chromium-browser-missing");
+    await restart();
+    await expect(run({ id: 12 })).rejects.toThrow("Chromium not found at PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser-missing");
+    expect(mocks.launch).not.toHaveBeenCalled();
+  });
+
   it("never uses it when turned off", async () => {
     await restart("off");
     await run({ id: 12 });
